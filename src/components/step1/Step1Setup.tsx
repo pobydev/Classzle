@@ -273,250 +273,64 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
                     {/* 엑셀 업로드 영역 */}
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* 왼쪽: 업로드 영역 (2/3) */}
-                        <div className="lg:col-span-2 space-y-4">
+                    {/* 엑셀 업로드 영역 및 버튼/설명 */}
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 space-y-4">
 
-                            {/* 파일 업로드 영역 */}
-                            <div
-                                className={`
+                                {/* 파일 업로드 영역 */}
+                                <div
+                                    className={`
                                     border-2 border-dashed rounded-xl p-6 text-center transition-all h-[280px] flex flex-col items-center justify-center relative
                                     ${isDragging ? 'border-indigo-500 bg-indigo-50/50 scale-[1.02]' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'}
                                     ${uploadStatus === 'error' ? 'border-red-400 bg-red-50/30' : ''}
                                     ${uploadStatus === 'success' ? 'border-emerald-400 bg-emerald-50/30' : ''}
                                 `}
-                                onDragOver={(e) => {
-                                    e.preventDefault();
-                                    setIsDragging(true);
-                                }}
-                                onDragLeave={() => setIsDragging(false)}
-                                onDrop={handleDrop}
-                            >
-                                {uploadStatus === 'loading' ? (
-                                    <div className="space-y-2">
-                                        <div className="animate-spin text-2xl">⏳</div>
-                                        <p className="text-sm">파일 처리 중...</p>
-                                    </div>
-                                ) : uploadStatus === 'success' ? (
-                                    <div className="space-y-1">
-                                        <div className="text-2xl">✅</div>
-                                        <p className="text-green-600 font-medium text-sm">
-                                            {students.length}명의 학생 데이터 로드 완료
-                                        </p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        <div className="text-2xl">📤</div>
-                                        <p className="font-medium text-sm">
-                                            엑셀 파일을 드래그하거나 클릭
-                                        </p>
-                                        {uploadStatus === 'error' && (
-                                            <p className="text-destructive text-xs">{errorMessage}</p>
-                                        )}
-                                        <input
-                                            type="file"
-                                            accept=".xlsx,.xls"
-                                            onChange={handleFileSelect}
-                                            className="hidden"
-                                            id="file-upload"
-                                        />
-                                        <label htmlFor="file-upload">
-                                            <Button asChild variant="outline" size="sm">
-                                                <span>파일 선택</span>
-                                            </Button>
-                                        </label>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 버튼들 */}
-                            <div>
-                                <div className="flex gap-2 flex-wrap mb-2">
-                                    <Button variant="outline" size="sm" onClick={() => setIsGuideOpen(true)}>
-                                        ❓ 엑셀 작성 가이드
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={downloadSampleExcel}>
-                                        📥 양식 A (이전학년 명단)
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={downloadPreAssignedSampleExcel}>
-                                        📥 양식 B (신학년 기배정안)
-                                    </Button>
-                                    {students.length > 0 && (
-                                        <Button variant="destructive" size="sm" onClick={handleResetAll}>
-                                            🗑️ 전체 초기화
-                                        </Button>
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        setIsDragging(true);
+                                    }}
+                                    onDragLeave={() => setIsDragging(false)}
+                                    onDrop={handleDrop}
+                                >
+                                    {uploadStatus === 'loading' ? (
+                                        <div className="space-y-2">
+                                            <div className="animate-spin text-2xl">⏳</div>
+                                            <p className="text-sm">파일 처리 중...</p>
+                                        </div>
+                                    ) : uploadStatus === 'success' ? (
+                                        <div className="space-y-1">
+                                            <div className="text-2xl">✅</div>
+                                            <p className="text-green-600 font-medium text-sm">
+                                                {students.length}명의 학생 데이터 로드 완료
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <div className="text-2xl">📤</div>
+                                            <p className="font-medium text-sm">
+                                                엑셀 파일을 드래그하거나 클릭
+                                            </p>
+                                            {uploadStatus === 'error' && (
+                                                <p className="text-destructive text-xs">{errorMessage}</p>
+                                            )}
+                                            <input
+                                                type="file"
+                                                accept=".xlsx,.xls"
+                                                onChange={handleFileSelect}
+                                                className="hidden"
+                                                id="file-upload"
+                                            />
+                                            <label htmlFor="file-upload">
+                                                <Button asChild variant="outline" size="sm">
+                                                    <span>파일 선택</span>
+                                                </Button>
+                                            </label>
+                                        </div>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground break-keep">
-                                    <strong>양식 A</strong>: 새로 반을 편성할 때 (이전 학년도 반/번호 정보만 필요) &nbsp;|&nbsp;
-                                    <strong>양식 B</strong>: 기존 배정안을 수정할 때 (신학년 배정 결과 포함) -
-                                    둘 중 하나에 학생 정보를 붙여넣고 업로드하세요.
-                                </p>
+
                             </div>
-
-                            <Dialog open={isGuideOpen} onOpenChange={setIsGuideOpen}>
-                                <DialogContent className="sm:max-w-[60vw] max-h-[80vh] overflow-y-auto">
-                                    <DialogHeader>
-                                        <DialogTitle>📊 엑셀 파일 작성 가이드</DialogTitle>
-                                    </DialogHeader>
-                                    <div className="space-y-6 pt-4">
-                                        <Tabs defaultValue="form-a" className="w-full">
-                                            <TabsList className="grid w-full grid-cols-2 mb-4">
-                                                <TabsTrigger value="form-a">양식 A (기본)</TabsTrigger>
-                                                <TabsTrigger value="form-b">양식 B (기배정)</TabsTrigger>
-                                            </TabsList>
-
-                                            <TabsContent value="form-a" className="space-y-6">
-                                                <div className="space-y-2">
-                                                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                                                        <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
-                                                        필수 열(Column) 구성 (양식 A)
-                                                    </h3>
-                                                    <p className="text-sm text-muted-foreground ml-8">
-                                                        새로 반 편성을 할 때 사용합니다. 엑셀 헤더에 아래 항목들이 포함되어야 합니다.
-                                                    </p>
-                                                    <div className="ml-8 border rounded-md overflow-hidden">
-                                                        <Table>
-                                                            <TableHeader className="bg-muted/50">
-                                                                <TableRow>
-                                                                    <TableHead className="w-24">항목</TableHead>
-                                                                    <TableHead>설명 및 예시</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody className="text-sm">
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">학년/반/번호</TableCell>
-                                                                    <TableCell>
-                                                                        학생의 이전 학적 정보입니다.<br />
-                                                                        <span className="text-muted-foreground text-xs">예: 2 (학년), 1 (반), 15 (번호)</span>
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">이름</TableCell>
-                                                                    <TableCell>학생의 성명 (필수)</TableCell>
-                                                                </TableRow>
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">성별</TableCell>
-                                                                    <TableCell>'남', '여', 'M', 'F' 중 입력</TableCell>
-                                                                </TableRow>
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">성적</TableCell>
-                                                                    <TableCell>숫자 형태의 학업 성취도 등급 또는 점수</TableCell>
-                                                                </TableRow>
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">생활지도</TableCell>
-                                                                    <TableCell>
-                                                                        학생의 생활지도 특성 (아래 상세 설명 참조)
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            </TableBody>
-                                                        </Table>
-                                                    </div>
-                                                </div>
-                                            </TabsContent>
-
-                                            <TabsContent value="form-b" className="space-y-6">
-                                                <div className="space-y-2">
-                                                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                                                        <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
-                                                        필수 열(Column) 구성 (양식 B)
-                                                    </h3>
-                                                    <p className="text-sm text-muted-foreground ml-8">
-                                                        이미 배정된 결과를 초기 데이터로 불러올 때 사용합니다.<br />
-                                                        (반 편성 탭에서 <strong>기존 배정 유지</strong>를 선택하여 이어서 작업 가능)
-                                                    </p>
-                                                    <div className="ml-8 border rounded-md overflow-hidden">
-                                                        <Table>
-                                                            <TableHeader className="bg-muted/50">
-                                                                <TableRow>
-                                                                    <TableHead className="w-32">항목</TableHead>
-                                                                    <TableHead>설명 및 예시</TableHead>
-                                                                </TableRow>
-                                                            </TableHeader>
-                                                            <TableBody className="text-sm">
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">
-                                                                        <span className="text-indigo-600 font-bold">배정 학년/반/번호</span>
-                                                                        <br />(앞쪽 열)
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        <span className="font-semibold text-indigo-600">새로 배정된</span> 정보입니다.<br />
-                                                                        <span className="text-muted-foreground text-xs">예: 3 (학년), 1 (반), 1 (번호)</span>
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">
-                                                                        <span className="text-slate-500 font-bold">이전 학년/반/번호</span>
-                                                                        <br />(뒤쪽 열)
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        <span className="font-semibold text-slate-500">작년(이전)</span> 학적 정보입니다.<br />
-                                                                        <span className="text-muted-foreground text-xs">예: 2 (학년), 1 (반), 15 (번호)</span>
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">이름/성별/성적</TableCell>
-                                                                    <TableCell>양식 A와 동일합니다.</TableCell>
-                                                                </TableRow>
-                                                                <TableRow>
-                                                                    <TableCell className="font-medium">생활지도</TableCell>
-                                                                    <TableCell>양식 A와 동일합니다.</TableCell>
-                                                                </TableRow>
-                                                            </TableBody>
-                                                        </Table>
-                                                    </div>
-                                                </div>
-                                            </TabsContent>
-                                        </Tabs>
-
-                                        <div className="space-y-2 pt-4 border-t">
-                                            <h3 className="font-semibold text-lg flex items-center gap-2">
-                                                <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">2</span>
-                                                생활지도 입력 값 (공통 중요)
-                                            </h3>
-                                            <p className="text-sm text-muted-foreground ml-8">
-                                                '생활지도' 열에는 아래 형식의 텍스트가 정확히 입력되어야 점수가 반영됩니다.
-                                            </p>
-                                            <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="border rounded-md p-3 bg-green-50/50 border-green-100">
-                                                    <span className="font-bold text-green-700 block mb-2">🟢 리더십 (점수 가산)</span>
-                                                    <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                                                        <li><code className="text-foreground font-semibold">리더(+2)</code> : 리더십이 탁월한 학생 (회장감)</li>
-                                                        <li><code className="text-foreground font-semibold">리더(+1)</code> : 모범적이고 성실한 학생</li>
-                                                    </ul>
-                                                </div>
-                                                <div className="border rounded-md p-3 bg-red-50/50 border-red-100">
-                                                    <span className="font-bold text-red-700 block mb-2">🔴 행동 특성 (점수 차감)</span>
-                                                    <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                                                        <li><code className="text-foreground font-semibold">행동(-3)</code> : 심각한 방해, 학교폭력 등 집중 관리 필요</li>
-                                                        <li><code className="text-foreground font-semibold">행동(-2)</code> : 잦은 방해, 지속적 지도 필요</li>
-                                                        <li><code className="text-foreground font-semibold">행동(-1)</code> : 가벼운 딴짓, 관심 필요</li>
-                                                    </ul>
-                                                </div>
-                                                <div className="border rounded-md p-3 bg-blue-50/50 border-blue-100">
-                                                    <span className="font-bold text-blue-700 block mb-2">🔵 정서 특성 (점수 차감)</span>
-                                                    <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                                                        <li><code className="text-foreground font-semibold">정서(-3)</code> : 특별한 케어/전문가 개입 필요</li>
-                                                        <li><code className="text-foreground font-semibold">정서(-2)</code> : 교우관계/정서 지원 필요</li>
-                                                        <li><code className="text-foreground font-semibold">정서(-1)</code> : 다소 예민함, 배려 필요</li>
-                                                    </ul>
-                                                </div>
-                                                <div className="border rounded-md p-3 bg-slate-50 border-slate-200">
-                                                    <span className="font-bold text-slate-700 block mb-2">⚪ 해당 없음</span>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        <code className="text-foreground font-semibold">해당없음</code> 또는 빈 칸<br />
-                                                        (0점으로 처리됨)
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex justify-end pt-2">
-                                            <Button onClick={() => setIsGuideOpen(false)}>확인</Button>
-                                        </div>
-                                    </div>
-                                </DialogContent>
-                            </Dialog>
                         </div>
 
                         {/* 오른쪽: 통계 (1/3) */}
@@ -550,8 +364,203 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                             </div>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+
+                    {/* 버튼들 및 설명 */}
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="flex gap-2 flex-wrap mb-3">
+                            <Button variant="outline" size="sm" onClick={() => setIsGuideOpen(true)}>
+                                ❓ 엑셀 작성 가이드
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={downloadSampleExcel}>
+                                📥 양식 A (이전학년 명단)
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={downloadPreAssignedSampleExcel}>
+                                📥 양식 B (신학년 기배정안)
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleResetAll}
+                                disabled={students.length === 0}
+                                className={students.length === 0 ? "opacity-50 cursor-not-allowed" : ""}
+                            >
+                                🗑️ 전체 초기화
+                            </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground break-keep text-left w-full">
+                            <strong>양식 A</strong>: 새로 반을 편성할 때 (이전 학년도 반/번호 정보만 필요) &nbsp;|&nbsp;
+                            <strong>양식 B</strong>: 기존 배정안을 수정할 때 (신학년 배정 결과 포함) -
+                            둘 중 하나에 학생 정보를 붙여넣고 업로드하세요.
+                        </p>
+                    </div>
+
+
+                    <Dialog open={isGuideOpen} onOpenChange={setIsGuideOpen}>
+                        <DialogContent className="sm:max-w-[60vw] max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>📊 엑셀 파일 작성 가이드</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-6 pt-4">
+                                <Tabs defaultValue="form-a" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                                        <TabsTrigger value="form-a">양식 A (기본)</TabsTrigger>
+                                        <TabsTrigger value="form-b">양식 B (기배정)</TabsTrigger>
+                                    </TabsList>
+
+                                    <TabsContent value="form-a" className="space-y-6">
+                                        <div className="space-y-2">
+                                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                                                <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
+                                                필수 열(Column) 구성 (양식 A)
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground ml-8">
+                                                새로 반 편성을 할 때 사용합니다. 엑셀 헤더에 아래 항목들이 포함되어야 합니다.
+                                            </p>
+                                            <div className="ml-8 border rounded-md overflow-hidden">
+                                                <Table>
+                                                    <TableHeader className="bg-muted/50">
+                                                        <TableRow>
+                                                            <TableHead className="w-24">항목</TableHead>
+                                                            <TableHead>설명 및 예시</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody className="text-sm">
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">학년/반/번호</TableCell>
+                                                            <TableCell>
+                                                                학생의 이전 학적 정보입니다.<br />
+                                                                <span className="text-muted-foreground text-xs">예: 2 (학년), 1 (반), 15 (번호)</span>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">이름</TableCell>
+                                                            <TableCell>학생의 성명 (필수)</TableCell>
+                                                        </TableRow>
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">성별</TableCell>
+                                                            <TableCell>'남', '여', 'M', 'F' 중 입력</TableCell>
+                                                        </TableRow>
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">성적</TableCell>
+                                                            <TableCell>숫자 형태의 학업 성취도 등급 또는 점수</TableCell>
+                                                        </TableRow>
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">생활지도</TableCell>
+                                                            <TableCell>
+                                                                학생의 생활지도 특성 (아래 상세 설명 참조)
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="form-b" className="space-y-6">
+                                        <div className="space-y-2">
+                                            <h3 className="font-semibold text-lg flex items-center gap-2">
+                                                <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
+                                                필수 열(Column) 구성 (양식 B)
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground ml-8">
+                                                이미 배정된 결과를 초기 데이터로 불러올 때 사용합니다.<br />
+                                                (반 편성 탭에서 <strong>기존 배정 유지</strong>를 선택하여 이어서 작업 가능)
+                                            </p>
+                                            <div className="ml-8 border rounded-md overflow-hidden">
+                                                <Table>
+                                                    <TableHeader className="bg-muted/50">
+                                                        <TableRow>
+                                                            <TableHead className="w-32">항목</TableHead>
+                                                            <TableHead>설명 및 예시</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody className="text-sm">
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">
+                                                                <span className="text-indigo-600 font-bold">배정 학년/반/번호</span>
+                                                                <br />(앞쪽 열)
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <span className="font-semibold text-indigo-600">새로 배정된</span> 정보입니다.<br />
+                                                                <span className="text-muted-foreground text-xs">예: 3 (학년), 1 (반), 1 (번호)</span>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">
+                                                                <span className="text-slate-500 font-bold">이전 학년/반/번호</span>
+                                                                <br />(뒤쪽 열)
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <span className="font-semibold text-slate-500">작년(이전)</span> 학적 정보입니다.<br />
+                                                                <span className="text-muted-foreground text-xs">예: 2 (학년), 1 (반), 15 (번호)</span>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">이름/성별/성적</TableCell>
+                                                            <TableCell>양식 A와 동일합니다.</TableCell>
+                                                        </TableRow>
+                                                        <TableRow>
+                                                            <TableCell className="font-medium">생활지도</TableCell>
+                                                            <TableCell>양식 A와 동일합니다.</TableCell>
+                                                        </TableRow>
+                                                    </TableBody>
+                                                </Table>
+                                            </div>
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
+
+                                <div className="space-y-2 pt-4 border-t">
+                                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                                        <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">2</span>
+                                        생활지도 입력 값 (공통 중요)
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground ml-8">
+                                        '생활지도' 열에는 아래 형식의 텍스트가 정확히 입력되어야 점수가 반영됩니다.
+                                    </p>
+                                    <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="border rounded-md p-3 bg-green-50/50 border-green-100">
+                                            <span className="font-bold text-green-700 block mb-2">🟢 리더십 (점수 가산)</span>
+                                            <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                                                <li><code className="text-foreground font-semibold">리더(+2)</code> : 리더십이 탁월한 학생 (회장감)</li>
+                                                <li><code className="text-foreground font-semibold">리더(+1)</code> : 모범적이고 성실한 학생</li>
+                                            </ul>
+                                        </div>
+                                        <div className="border rounded-md p-3 bg-red-50/50 border-red-100">
+                                            <span className="font-bold text-red-700 block mb-2">🔴 행동 특성 (점수 차감)</span>
+                                            <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                                                <li><code className="text-foreground font-semibold">행동(-3)</code> : 심각한 방해, 학교폭력 등 집중 관리 필요</li>
+                                                <li><code className="text-foreground font-semibold">행동(-2)</code> : 잦은 방해, 지속적 지도 필요</li>
+                                                <li><code className="text-foreground font-semibold">행동(-1)</code> : 가벼운 딴짓, 관심 필요</li>
+                                            </ul>
+                                        </div>
+                                        <div className="border rounded-md p-3 bg-blue-50/50 border-blue-100">
+                                            <span className="font-bold text-blue-700 block mb-2">🔵 정서 특성 (점수 차감)</span>
+                                            <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                                                <li><code className="text-foreground font-semibold">정서(-3)</code> : 특별한 케어/전문가 개입 필요</li>
+                                                <li><code className="text-foreground font-semibold">정서(-2)</code> : 교우관계/정서 지원 필요</li>
+                                                <li><code className="text-foreground font-semibold">정서(-1)</code> : 다소 예민함, 배려 필요</li>
+                                            </ul>
+                                        </div>
+                                        <div className="border rounded-md p-3 bg-slate-50 border-slate-200">
+                                            <span className="font-bold text-slate-700 block mb-2">⚪ 해당 없음</span>
+                                            <p className="text-sm text-muted-foreground">
+                                                <code className="text-foreground font-semibold">해당없음</code> 또는 빈 칸<br />
+                                                (0점으로 처리됨)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-2">
+                                    <Button onClick={() => setIsGuideOpen(false)}>확인</Button>
+                                </div>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+
+                </CardContent >
+            </Card >
 
             {/* 학생 관리 테이블 (학생 데이터가 있을 때만) */}
             {
