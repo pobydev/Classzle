@@ -244,9 +244,7 @@ export default function Home() {
                   <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center gap-2">
                     Classzle
                   </h1>
-                  <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0 rounded-full border border-indigo-100 h-fit">
-                    Beta
-                  </span>
+
                 </div>
                 <p className="text-[10px] font-medium text-slate-400 leading-tight hidden sm:block">
                   완벽한 반 편성을 위한 마지막 조각
