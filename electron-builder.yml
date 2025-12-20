@@ -1,0 +1,30 @@
+appId: com.classzle.app
+productName: Classzle
+copyright: Copyright © 2024
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - dist-electron/**/*
+  - out/**/*
+  - package.json
+
+extraMetadata:
+  main: dist-electron/background.js
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Classzle
