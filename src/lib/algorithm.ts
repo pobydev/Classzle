@@ -366,7 +366,7 @@ function optimizeBalance(
             if (balanceBehaviorEmotionalTotal(students, classNames, scoreTolerance)) improved = true;
         }
 
-        // 기배정 모드일 경우, 과도한 재배치를 막기 위해 "세부 점수" 관련 로직만 건너뜀
+        // 기배정 모드일 경우, 과도한 재배치를 막기 위해 일부 로직만 적용
         if (!isPreAssignedMode) {
             // 7. 점수별 학생 수 균형 (-3, -2, -1, +1, +2)
             if (stats.scoreMinus3Imbalance > BALANCE_TOLERANCE) {
@@ -416,6 +416,18 @@ function optimizeBalance(
             // 9. 성적 평균 균형
             if (stats.scoreImbalance > 30) {
                 if (balanceScore(students, classNames)) improved = true;
+            }
+        } else {
+            // 기배정 모드: 심각한 불균형만 교정 (차이 2 이상)
+            // 유형+점수별 세분화 균형 (심각한 경우만: 행동형 -2/-3, 정서형 -2/-3)
+            if (balanceByTypeAndScoreStrict(students, classNames, 'BEHAVIOR', -3, scoreTolerance)) improved = true;
+            if (balanceByTypeAndScoreStrict(students, classNames, 'BEHAVIOR', -2, scoreTolerance)) improved = true;
+            if (balanceByTypeAndScoreStrict(students, classNames, 'EMOTIONAL', -3, scoreTolerance)) improved = true;
+            if (balanceByTypeAndScoreStrict(students, classNames, 'EMOTIONAL', -2, scoreTolerance)) improved = true;
+
+            // 생활지도 총점 균형 (차이가 심한 경우만)
+            if (stats.behaviorTotalImbalance > 3) {
+                if (balanceBehaviorTotal(students, classNames, scoreTolerance)) improved = true;
             }
         }
 
@@ -1223,6 +1235,85 @@ function balanceByTypeAndScore(
 
     if (actualStudentA && actualStudentB) {
         actualStudentA.assigned_class = minClass;
+        actualStudentB.assigned_class = maxClass;
+        return true;
+    }
+
+    return false;
+}
+
+
+/**
+ * 유형+점수 조합별 학생 수 균형 (기배정 모드용 - 더 엄격한 조건)
+ * 차이가 2 이상일 때만 교환하고, 생활지도 점수가 있는 학생끼리만 교환
+ */
+function balanceByTypeAndScoreStrict(
+    students: Student[],
+    classNames: string[],
+    targetType: 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL',
+    targetScore: number,
+    scoreTolerance: number
+): boolean {
+    const counts: Record<string, number> = {};
+    classNames.forEach(cn => {
+        counts[cn] = students.filter(s =>
+            s.assigned_class === cn &&
+            s.behavior_type === targetType &&
+            s.behavior_score === targetScore
+        ).length;
+    });
+
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => {
+        const diff = b - a;
+        if (diff !== 0) return diff;
+        return Math.random() - 0.5;
+    });
+    
+    // 기배정 모드: 차이가 2 미만이면 교환하지 않음 (더 보수적)
+    if (sorted[0][1] - sorted[sorted.length - 1][1] < 2) return false;
+
+    const maxClass = sorted[0][0];
+    const minClass = sorted[sorted.length - 1][0];
+
+    // 이동할 학생 찾기 (유형+점수가 일치하는 학생)
+    const studentA = students.find(s =>
+        s.assigned_class === maxClass &&
+        s.behavior_type === targetType &&
+        s.behavior_score === targetScore &&
+        !s.fixed_class &&
+        s.group_ids.length === 0 &&
+        s.avoid_ids.length === 0 &&
+        s.keep_ids.length === 0
+    );
+
+    if (!studentA) return false;
+
+    // 교환 대상: 같은 유형의 덜 심각한 학생 또는 일반 학생
+    const studentB = students.find(s =>
+        s.assigned_class === minClass &&
+        !s.fixed_class &&
+        s.gender === studentA.gender &&
+        (s.behavior_type === 'NONE' ||
+            (s.behavior_type === targetType && Math.abs(s.behavior_score) < Math.abs(targetScore))) &&
+        s.group_ids.length === 0 &&
+        s.avoid_ids.length === 0 &&
+        s.keep_ids.length === 0
+    );
+
+    // Fallback: 일반 학생과도 교환 허용
+    const studentBFallback = !studentB ? students.find(s =>
+        s.assigned_class === minClass &&
+        !s.fixed_class &&
+        s.gender === studentA.gender &&
+        s.behavior_type === 'NONE' &&
+        s.avoid_ids.length === 0 &&
+        s.keep_ids.length === 0
+    ) : null;
+
+    const actualStudentB = studentB || studentBFallback;
+
+    if (studentA && actualStudentB) {
+        studentA.assigned_class = minClass;
         actualStudentB.assigned_class = maxClass;
         return true;
     }
