@@ -1,4 +1,4 @@
-import { Student, CustomGroup, ClassStats, Violation } from './types';
+import { Student, CustomGroup, ClassStats, Violation } from '@/types';
 
 const MAX_ITERATIONS = 200;
 const BALANCE_TOLERANCE = 1; // 허용 편차 (1명 이내)
@@ -1139,6 +1139,7 @@ function balanceByScore(
 
 /**
  * 유형+점수 조합별 학생 수 균형 (예: 행동형-2점 학생 수 균형)
+ * 개선: 교환 조건을 완화하여 더 효과적인 균형 배정
  */
 function balanceByTypeAndScore(
     students: Student[],
@@ -1166,28 +1167,63 @@ function balanceByTypeAndScore(
     const maxClass = sorted[0][0];
     const minClass = sorted[sorted.length - 1][0];
 
+    // 이동할 학생 찾기 (유형+점수가 일치하는 학생)
     const studentA = students.find(s =>
         s.assigned_class === maxClass &&
         s.behavior_type === targetType &&
         s.behavior_score === targetScore &&
-        !s.fixed_class
+        !s.fixed_class &&
+        // 중요 제약조건만 확인 (그룹/관계 설정이 없는 학생 우선)
+        s.group_ids.length === 0 &&
+        s.avoid_ids.length === 0 &&
+        s.keep_ids.length === 0
     );
 
-    if (!studentA) return false;
+    // 우선 후보가 없으면 제약이 있는 학생도 시도 (단, fixed만 제외)
+    const studentAFallback = !studentA ? students.find(s =>
+        s.assigned_class === maxClass &&
+        s.behavior_type === targetType &&
+        s.behavior_score === targetScore &&
+        !s.fixed_class
+    ) : null;
 
-    // 교환 대상: 일반 학생 또는 같은 유형의 다른 점수 학생
+    const actualStudentA = studentA || studentAFallback;
+    if (!actualStudentA) return false;
+
+    // 교환 대상: 일반 학생(NONE) 또는 같은 유형의 다른 점수 학생
+    // 조건 완화: 성별만 맞추고, 성적 차이 조건 완화
     const studentB = students.find(s =>
         s.assigned_class === minClass &&
+        !s.fixed_class &&
+        s.gender === actualStudentA.gender &&
+        // 교환 대상은 일반 학생이거나 다른 유형/점수
         (s.behavior_type === 'NONE' ||
-            (s.behavior_type === targetType && s.behavior_score !== targetScore)) &&
-        canSwapForGeneralBalance(studentA, s, minClass) &&
-        s.gender === studentA.gender &&
-        Math.abs(s.academic_score - studentA.academic_score) <= scoreTolerance * 2
+            s.behavior_type !== targetType ||
+            s.behavior_score !== targetScore) &&
+        // 제약조건 완화: 그룹/관계가 없는 학생 우선
+        s.group_ids.length === 0 &&
+        s.avoid_ids.length === 0 &&
+        s.keep_ids.length === 0
     );
 
-    if (studentA && studentB) {
-        studentA.assigned_class = minClass;
-        studentB.assigned_class = maxClass;
+    // 우선 후보가 없으면 제약이 있는 학생도 시도
+    const studentBFallback = !studentB ? students.find(s =>
+        s.assigned_class === minClass &&
+        !s.fixed_class &&
+        s.gender === actualStudentA.gender &&
+        (s.behavior_type === 'NONE' ||
+            s.behavior_type !== targetType ||
+            s.behavior_score !== targetScore) &&
+        // 최소한 상극/같은반 관계가 없어야 함
+        s.avoid_ids.length === 0 &&
+        s.keep_ids.length === 0
+    ) : null;
+
+    const actualStudentB = studentB || studentBFallback;
+
+    if (actualStudentA && actualStudentB) {
+        actualStudentA.assigned_class = minClass;
+        actualStudentB.assigned_class = maxClass;
         return true;
     }
 
