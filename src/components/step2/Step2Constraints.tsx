@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useClasszleStore } from '@/lib/store';
-import { CustomGroup, Student } from '@/lib/types';
+import { CustomGroup, Student } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

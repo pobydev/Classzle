@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Student } from '@/lib/types';
+import { Student } from '@/types';
 import {
     Select,
     SelectContent,

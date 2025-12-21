@@ -5,7 +5,7 @@ import { useClasszleStore } from '@/lib/store';
 import { assignStudents, calculateClassStats } from '@/lib/algorithm';
 import { validateSwap } from '@/lib/validation';
 import { exportToExcel } from '@/lib/excel';
-import { Student, Violation, BehaviorType, AssignmentChange } from '@/lib/types';
+import { Student, Violation, BehaviorType, AssignmentChange } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
