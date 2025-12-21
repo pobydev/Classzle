@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { FolderOpen, FloppyDisk, Trash, BookOpen, Question } from "@phosphor-icons/react";
+import { FolderOpen, FloppyDisk, Trash } from "@phosphor-icons/react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -244,7 +244,9 @@ export default function Home() {
                   <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center gap-2">
                     Classzle
                   </h1>
-
+                  <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0 rounded-full border border-indigo-100 h-fit">
+                    Beta
+                  </span>
                 </div>
                 <p className="text-[10px] font-medium text-slate-400 leading-tight hidden sm:block">
                   완벽한 반 편성을 위한 마지막 조각
@@ -318,7 +320,19 @@ export default function Home() {
                     </Button>
                   </div>
 
-
+                  {/* 브라우저 환경 전용 파일 불러오기 (백업용) */}
+                  {!window.electronAPI && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBrowserLoad}
+                      className="rounded-xl hover:bg-indigo-50 hover:text-indigo-600 border-slate-200 h-9 px-3"
+                      title="JSON 파일로 불러오기"
+                    >
+                      <span className="hidden sm:inline">📂 파일 열기</span>
+                      <span className="sm:hidden text-lg">📂</span>
+                    </Button>
+                  )}
                 </>
               )}
             </div>
@@ -382,17 +396,6 @@ export default function Home() {
           © 2025 Classzle. All rights reserved.
         </div>
       </footer>
-
-      {/* Floating User Guide Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          className="rounded-full w-12 h-12 shadow-lg hover:scale-110 transition-transform bg-indigo-600 hover:bg-indigo-700 text-white p-0"
-          onClick={() => window.open('https://classzle-guide.vercel.app/', '_blank')}
-          title="사용자 가이드 (웹사이트)"
-        >
-          <Question size={24} weight="bold" />
-        </Button>
-      </div>
     </main>
   );
 }
