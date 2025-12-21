@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   },
   // Electron 호환을 위한 설정 (프로덕션만 적용)
   trailingSlash: isProd,
-  // TypeScript 빌드 에러 무시
+  // TypeScript 빌드 에러 무시 (Windows Turbopack symlink 권한 문제 우회)
   typescript: {
     ignoreBuildErrors: true,
   },
