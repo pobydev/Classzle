@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Student, CustomGroup, AppSettings, AssignmentChange } from './types';
+import { Student, CustomGroup, AppSettings, AssignmentChange } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ClasszleStore {

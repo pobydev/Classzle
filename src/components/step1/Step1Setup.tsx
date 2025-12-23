@@ -29,6 +29,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
     DialogTrigger,
 } from '@/components/ui/dialog';
 
@@ -39,7 +40,7 @@ interface Step1SetupProps {
 export default function Step1Setup({ onNext }: Step1SetupProps) {
     const {
         students, setStudents, settings, setClassCount, resetAll,
-        updateStudent, addStudent, deleteStudent
+        updateStudent, addStudent, deleteStudent, clearMovements
     } = useClasszleStore();
     const [isDragging, setIsDragging] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -57,14 +58,6 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         behavior_score: 0,
         behavior_type: 'NONE',
     });
-
-    // 학급 수 입력을 위한 로컬 상태 (즉시 복구 방지)
-    const [localClassCount, setLocalClassCount] = useState(settings.classCount.toString());
-
-    // 전역 상태가 변경될 때 로컬 상태 동기화 (예: 프로젝트 불러오기 시)
-    useEffect(() => {
-        setLocalClassCount(settings.classCount.toString());
-    }, [settings.classCount]);
 
     // 반 이름 목록
     const classNames = useMemo(() => {
@@ -101,6 +94,20 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         return filtered.sort((a, b) => a.prev_info.localeCompare(b.prev_info, undefined, { numeric: true }));
     }, [students, searchTerm, selectedTab]);
 
+    const onDrop = useCallback((acceptedFiles: File[]) => {
+        if (acceptedFiles.length > 0) {
+            handleFileUpload(acceptedFiles[0]);
+        }
+    }, []); // handleFileUpload 의존성 제거 (순환 참조 방지 및 호이스팅 활용)
+
+    // 학급 수 입력을 위한 로컬 상태 (즉시 복구 방지)
+    const [localClassCount, setLocalClassCount] = useState(settings.classCount.toString());
+
+    // 전역 상태가 변경될 때 로컬 상태 동기화 (예: 프로젝트 불러오기 시)
+    useEffect(() => {
+        setLocalClassCount(settings.classCount.toString());
+    }, [settings.classCount]);
+
     const handleResetAll = () => {
         if (window.confirm('정말 모든 데이터를 삭제하고 초기화하시겠습니까?\n저장하지 않은 진행 상황은 모두 사라집니다.')) {
             resetAll();
@@ -120,6 +127,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         try {
             const parsedStudents = await parseExcelFile(file);
             setStudents(parsedStudents);
+            clearMovements(); // 새 파일 로드 시 히스토리 초기화
 
             // 학급 수 자동 감지
             let detectedClassCount = 0;
@@ -158,7 +166,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             setUploadStatus('error');
             setErrorMessage((error as Error).message);
         }
-    }, [setStudents, setClassCount]);
+    }, [setStudents, setClassCount, clearMovements]);
 
 
     const handleDrop = useCallback(
@@ -358,6 +366,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                 <DialogContent className="sm:max-w-[60vw] max-h-[80vh] overflow-y-auto">
                                     <DialogHeader>
                                         <DialogTitle>📊 엑셀 파일 작성 가이드</DialogTitle>
+                                        <DialogDescription>학생 데이터 엑셀 파일 작성 방법을 안내합니다.</DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-6 pt-4">
                                         <Tabs defaultValue="form-a" className="w-full">
@@ -576,6 +585,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                         <DialogContent>
                                             <DialogHeader>
                                                 <DialogTitle>새 학생 추가</DialogTitle>
+                                                <DialogDescription>새 학생의 정보를 입력하세요.</DialogDescription>
                                             </DialogHeader>
                                             <div className="grid gap-4 py-4">
                                                 <div className="grid grid-cols-4 items-center gap-4">

@@ -15,6 +15,8 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogTrigger,
+    DialogDescription
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -516,6 +518,7 @@ function AssignmentReportDialog({
                     <DialogTitle className="text-2xl flex items-center gap-2">
                         📊 배정 결과 상세 리포트
                     </DialogTitle>
+                    <DialogDescription>학급 배정 결과를 상세히 확인하세요.</DialogDescription>
                 </DialogHeader>
 
 
@@ -754,9 +757,9 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     const [isAssigning, setIsAssigning] = useState(false);
 
     const [activeRelationIds, setActiveRelationIds] = useState<string[] | null>(null);
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [pendingSwap, setPendingSwap] = useState<{ s1Id: string, s2Id: string, violations: Violation[] } | null>(null);
-    const [highlightedStudentIds, setHighlightedStudentIds] = useState<string[]>([]);
 
     // 리포트 다이얼로그 상태
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -900,8 +903,16 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     };
 
     const handleExport = () => {
+        setIsExportDialogOpen(true);
+    };
+
+    const confirmExport = (includeDetails: boolean) => {
         const timestamp = new Date().toISOString().split('T')[0];
-        exportToExcel(students, settings.classCount, `반편성_결과_${timestamp}.xlsx`);
+        exportToExcel(students, settings.classCount, `반편성_결과_${timestamp}.xlsx`, {
+            includeDetails,
+            groups
+        });
+        setIsExportDialogOpen(false);
     };
     // 추천 교환 대상 학생 ID 목록
     const recommendedStudentIds = useMemo(() => {
@@ -1355,6 +1366,7 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                         <DialogTitle className="text-xl flex items-center gap-2 text-red-600">
                             ⚠️ 배정 제약 조건 위반 알림
                         </DialogTitle>
+                        <DialogDescription>교환 시 발생하는 제약 조건 위반을 확인하세요.</DialogDescription>
                     </DialogHeader>
                     <p className="text-sm font-medium text-gray-700">
                         두 학생의 위치를 교환할 경우 다음 제약 조건들이 위반됩니다:
@@ -1372,6 +1384,46 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                     <div className="flex justify-end gap-3 pt-4 border-t mt-6">
                         <Button variant="outline" onClick={() => setPendingSwap(null)}>취소</Button>
                         <Button variant="destructive" onClick={confirmSwap}>강제 변경 실행</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* 엑셀 내보내기 옵션 다이얼로그 */}
+            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl flex items-center gap-2">
+                            📥 배정 결과 엑셀 내보내기
+                        </DialogTitle>
+                        <DialogDescription>
+                            필요한 정보 수준에 따라 엑셀 출력 옵션을 선택하세요.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            엑셀 파일에 포함할 정보 수준을 선택해 주세요.
+                        </p>
+                        <div className="grid grid-cols-1 gap-3">
+                            <Button
+                                variant="outline"
+                                className="h-20 flex flex-col items-center justify-center gap-1 hover:border-primary hover:bg-primary/5"
+                                onClick={() => confirmExport(false)}
+                            >
+                                <span className="font-bold text-base text-slate-700">기본 정보만 출력</span>
+                                <span className="text-[11px] text-slate-500">배정 결과(학년, 반, 번호)와 기본 인적 사항만 포함</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="h-20 flex flex-col items-center justify-center gap-1 border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50"
+                                onClick={() => confirmExport(true)}
+                            >
+                                <span className="font-bold text-base text-indigo-700">상세 정보 포함</span>
+                                <span className="text-[11px] text-indigo-500">생활지도, 그룹, 관계 제약, 고정 배정 등 상세 옵션 포함</span>
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="flex justify-end pt-2">
+                        <Button variant="ghost" onClick={() => setIsExportDialogOpen(false)}>취소</Button>
                     </div>
                 </DialogContent>
             </Dialog>

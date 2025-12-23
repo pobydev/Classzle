@@ -50,7 +50,7 @@ export default function StudentManagement() {
     );
 
     const sortedStudents = [...filteredStudents].sort((a, b) => {
-        // ?�전?�년 ?�보�??�렬 (?? 3-1-1 < 3-1-2 < 3-2-1)
+        // 이전학년 정보로 정렬 (예: 3-1-1 < 3-1-2 < 3-2-1)
         return a.prev_info.localeCompare(b.prev_info, 'ko');
     });
 
@@ -103,29 +103,29 @@ export default function StudentManagement() {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                        ?�� ?�생 관�?
+                        📋 학생 관리
                         <span className="text-sm font-normal text-muted-foreground">
-                            (�?{students.length}�?
+                            (총 {students.length}명)
                         </span>
                     </CardTitle>
                     <div className="flex items-center gap-4">
                         <Input
-                            placeholder="?�름 ?�는 ?�전?�년 검??.."
+                            placeholder="이름 또는 이전학년 검색..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-64"
                         />
                         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                             <DialogTrigger asChild>
-                                <Button>+ ?�생 추�?</Button>
+                                <Button>+ 학생 추가</Button>
                             </DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle>???�생 추�?</DialogTitle>
+                                    <DialogTitle>새 학생 추가</DialogTitle>
                                 </DialogHeader>
                                 <div className="grid gap-4 py-4">
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <label className="text-right">?�름</label>
+                                        <label className="text-right">이름</label>
                                         <Input
                                             className="col-span-3"
                                             value={newStudent.name}
@@ -135,7 +135,7 @@ export default function StudentManagement() {
                                         />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <label className="text-right">?�전?�년</label>
+                                        <label className="text-right">이전학년</label>
                                         <Input
                                             className="col-span-3"
                                             placeholder="3-2-15"
@@ -146,7 +146,7 @@ export default function StudentManagement() {
                                         />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <label className="text-right">?�별</label>
+                                        <label className="text-right">성별</label>
                                         <Select
                                             value={newStudent.gender}
                                             onValueChange={(v) =>
@@ -157,13 +157,13 @@ export default function StudentManagement() {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="M">??/SelectItem>
-                                                <SelectItem value="F">??/SelectItem>
+                                                <SelectItem value="M">남</SelectItem>
+                                                <SelectItem value="F">여</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <label className="text-right">?�적</label>
+                                        <label className="text-right">성적</label>
                                         <Input
                                             className="col-span-3"
                                             type="number"
@@ -179,7 +179,7 @@ export default function StudentManagement() {
                                         />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <label className="text-right">?�활지???�수</label>
+                                        <label className="text-right">생활지도 점수</label>
                                         <Input
                                             className="col-span-3"
                                             type="number"
@@ -195,7 +195,7 @@ export default function StudentManagement() {
                                         />
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <label className="text-right">?�활지???�형</label>
+                                        <label className="text-right">생활지도 유형</label>
                                         <Select
                                             value={newStudent.behavior_type}
                                             onValueChange={(v) =>
@@ -209,10 +209,10 @@ export default function StudentManagement() {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="NONE">?�당?�음</SelectItem>
-                                                <SelectItem value="LEADER">리더??/SelectItem>
-                                                <SelectItem value="BEHAVIOR">?�동??/SelectItem>
-                                                <SelectItem value="EMOTIONAL">?�서??/SelectItem>
+                                                <SelectItem value="NONE">해당없음</SelectItem>
+                                                <SelectItem value="LEADER">리더형</SelectItem>
+                                                <SelectItem value="BEHAVIOR">행동형</SelectItem>
+                                                <SelectItem value="EMOTIONAL">정서형</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -221,7 +221,7 @@ export default function StudentManagement() {
                                     <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                                         취소
                                     </Button>
-                                    <Button onClick={handleAddStudent}>추�?</Button>
+                                    <Button onClick={handleAddStudent}>추가</Button>
                                 </div>
                             </DialogContent>
                         </Dialog>
@@ -234,21 +234,21 @@ export default function StudentManagement() {
                         <TableHeader className="sticky top-0 bg-background">
                             <TableRow>
                                 <TableHead className="w-[80px]">번호</TableHead>
-                                <TableHead>?�름</TableHead>
-                                <TableHead>?�전?�년</TableHead>
-                                <TableHead>?�별</TableHead>
-                                <TableHead>?�적</TableHead>
-                                <TableHead>?�활지??/TableHead>
-                                <TableHead>?�형</TableHead>
-                                <TableHead>배정�?/TableHead>
-                                <TableHead className="w-[100px]">?�션</TableHead>
+                                <TableHead>이름</TableHead>
+                                <TableHead>이전학년</TableHead>
+                                <TableHead>성별</TableHead>
+                                <TableHead>성적</TableHead>
+                                <TableHead>생활지도</TableHead>
+                                <TableHead>유형</TableHead>
+                                <TableHead>배정반</TableHead>
+                                <TableHead className="w-[100px]">액션</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {sortedStudents.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                                        ?�생 ?�이?��? ?�습?�다. Step 1?�서 ?��? ?�일???�로?�하거나 ?�생??추�??�세??
+                                        학생 데이터가 없습니다. Step 1에서 엑셀 파일을 업로드하거나 학생을 추가하세요.
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -296,12 +296,12 @@ export default function StudentManagement() {
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="M">??/SelectItem>
-                                                        <SelectItem value="F">??/SelectItem>
+                                                        <SelectItem value="M">남</SelectItem>
+                                                        <SelectItem value="F">여</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             ) : (
-                                                student.gender === 'M' ? '?? : '??
+                                                student.gender === 'M' ? '남' : '여'
                                             )}
                                         </TableCell>
                                         <TableCell>
@@ -352,18 +352,18 @@ export default function StudentManagement() {
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="NONE">?�당?�음</SelectItem>
-                                                        <SelectItem value="LEADER">리더??/SelectItem>
-                                                        <SelectItem value="BEHAVIOR">?�동??/SelectItem>
-                                                        <SelectItem value="EMOTIONAL">?�서??/SelectItem>
+                                                        <SelectItem value="NONE">해당없음</SelectItem>
+                                                        <SelectItem value="LEADER">리더형</SelectItem>
+                                                        <SelectItem value="BEHAVIOR">행동형</SelectItem>
+                                                        <SelectItem value="EMOTIONAL">정서형</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             ) : (
                                                 <span className="text-sm">
                                                     {student.behavior_type === 'NONE' && '-'}
-                                                    {student.behavior_type === 'LEADER' && '?�� 리더'}
-                                                    {student.behavior_type === 'BEHAVIOR' && '?�� ?�동'}
-                                                    {student.behavior_type === 'EMOTIONAL' && '?�� ?�서'}
+                                                    {student.behavior_type === 'LEADER' && '🟢 리더'}
+                                                    {student.behavior_type === 'BEHAVIOR' && '🟠 행동'}
+                                                    {student.behavior_type === 'EMOTIONAL' && '🔵 정서'}
                                                 </span>
                                             )}
                                         </TableCell>
@@ -378,7 +378,7 @@ export default function StudentManagement() {
                                                         variant="outline"
                                                         onClick={() => setEditingId(null)}
                                                     >
-                                                        ?�료
+                                                        완료
                                                     </Button>
                                                 ) : (
                                                     <Button
@@ -386,7 +386,7 @@ export default function StudentManagement() {
                                                         variant="ghost"
                                                         onClick={() => setEditingId(student.id)}
                                                     >
-                                                        ?�️
+                                                        ✏️
                                                     </Button>
                                                 )}
                                                 <Button
@@ -395,7 +395,7 @@ export default function StudentManagement() {
                                                     className="text-destructive"
                                                     onClick={() => deleteStudent(student.id)}
                                                 >
-                                                    ?���?
+                                                    🗑️
                                                 </Button>
                                             </div>
                                         </TableCell>
