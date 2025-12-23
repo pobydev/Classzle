@@ -37,6 +37,7 @@ export default function Home() {
   const [activeProjectName, setActiveProjectName] = useState<string | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
+  const [selectKey, setSelectKey] = useState<string>(""); // Select의 value를 리셋하기 위한 키
 
   useEffect(() => {
     setMounted(true);
@@ -112,8 +113,11 @@ export default function Home() {
   };
 
   const handleNamedLoad = async (name: string) => {
+    if (!name) return;
+
     if (students.length > 0) {
       if (!confirm('현재 작업 중인 내용이 있습니다. 저장하지 않은 내용은 사라집니다. 계속하시겠습니까?')) {
+        setSelectKey(""); // 선택 취소 시에도 초기화
         return;
       }
     }
@@ -145,6 +149,9 @@ export default function Home() {
     } else {
       toast.error('프로젝트 데이터를 찾을 수 없습니다.');
     }
+
+    // 다음 번에도 같은 항목을 선택할 수 있도록 즉시 초기화
+    setTimeout(() => setSelectKey(""), 0);
   };
 
   const handleDeleteProject = async (name: string, e: React.MouseEvent) => {
@@ -244,9 +251,6 @@ export default function Home() {
                   <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center gap-2">
                     Classzle
                   </h1>
-                  <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0 rounded-full border border-indigo-100 h-fit">
-                    Beta
-                  </span>
                 </div>
                 <p className="text-[10px] font-medium text-slate-400 leading-tight hidden sm:block">
                   완벽한 반 편성을 위한 마지막 조각
@@ -277,14 +281,14 @@ export default function Home() {
               {mounted && (
                 <>
                   <div className="flex items-center bg-slate-100/50 rounded-xl border border-slate-200 p-0.5">
-                    <Select value={activeProjectName || ""} onValueChange={handleNamedLoad}>
+                    <Select value={selectKey} onValueChange={handleNamedLoad}>
                       <SelectTrigger className="w-[140px] h-8 border-none bg-transparent focus:ring-0 text-xs font-medium">
                         <div className="flex items-center gap-1.5 overflow-hidden">
                           <FolderOpen size={16} className="text-slate-500 shrink-0" />
-                          <SelectValue placeholder="저장된 작업" />
+                          <SelectValue placeholder={activeProjectName || "저장된 작업"} />
                         </div>
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" sideOffset={4} className="max-h-[300px]">
                         {projectList.length === 0 ? (
                           <div className="px-2 py-4 text-center text-xs text-muted-foreground">
                             저장된 내역이 없습니다.

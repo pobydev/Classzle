@@ -1,4 +1,4 @@
-import { Student, Violation } from './types';
+import { Student, Violation } from '@/types';
 
 /**
  * 두 학생의 반을 바꿨을 때 발생하는 제약 조건 위반 사항을 검토합니다.

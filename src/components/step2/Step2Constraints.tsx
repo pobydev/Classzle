@@ -13,6 +13,7 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogDescription,
 } from '@/components/ui/dialog';
 import {
     Select,
@@ -1272,6 +1273,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{editingGroup ? '그룹 수정' : '새 그룹 추가'}</DialogTitle>
+                        <DialogDescription>분산 배정할 그룹 정보를 입력하세요.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">

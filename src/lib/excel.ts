@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Student, BehaviorType, Gender } from './types';
+import { Student, BehaviorType, Gender, CustomGroup } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 // 엑셀 파일에서 학생 데이터 파싱
@@ -61,7 +61,7 @@ export function parseExcelFile(file: File): Promise<Student[]> {
                         avoid_ids: [],
                         keep_ids: [],
                         fixed_class: row['고정반'] || row['fixed_class'] || undefined,
-                        birth: parseBirthDate(row['생년월일'] || row['birth'] || row['birthday']),
+                        birth: undefined, // 생년월일은 수집하지 않음
                         assigned_class: finalAssignedClass
                     };
                 });
@@ -173,8 +173,13 @@ function parseBirthDate(value: any): string | undefined {
 export async function exportToExcel(
     students: Student[],
     classCount: number,
-    filename: string = 'classzle-result.xlsx'
+    filename: string = 'classzle-result.xlsx',
+    options: {
+        includeDetails?: boolean;
+        groups?: CustomGroup[];
+    } = {}
 ) {
+    const { includeDetails = false, groups = [] } = options;
     const workbook = new ExcelJS.Workbook();
 
     // 공통 스타일 정의
@@ -234,6 +239,15 @@ export async function exportToExcel(
         { header: '번호(이전)', key: 'prev_number', width: 9 },
     ];
 
+    if (includeDetails) {
+        sheet1.columns = [
+            ...sheet1.columns,
+            { header: '특이사항/조건', key: 'details', width: 40 }
+        ];
+        // 중간 헤더에도 details 컬럼 포함
+        (sheet1HeaderValues as any).details = '특이사항/조건';
+    }
+
     // 헤더 스타일 적용 (첫 번째 행)
     const firstHeaderRow1 = sheet1.getRow(1);
     firstHeaderRow1.height = 25; // 첫 헤더 높이 명시
@@ -288,7 +302,8 @@ export async function exportToExcel(
                     score: (classStats.scoreSum / classStats.total).toFixed(1),
                     prev_grade: '',
                     prev_class: '',
-                    prev_number: ''
+                    prev_number: '',
+                    details: ''
                 });
 
                 summaryRow.height = 25; // 요약 행 높이 명시
@@ -345,7 +360,8 @@ export async function exportToExcel(
             score: s.academic_score,
             prev_grade: prevGrade,
             prev_class: prevClass,
-            prev_number: prevNumber
+            prev_number: prevNumber,
+            details: includeDetails ? formatStudentDetails(s, groups, students) : ''
         });
 
         row.height = 25; // 데이터 행 높이 명시
@@ -374,7 +390,8 @@ export async function exportToExcel(
                 score: (classStats.scoreSum / classStats.total).toFixed(1),
                 prev_grade: '',
                 prev_class: '',
-                prev_number: ''
+                prev_number: '',
+                details: ''
             });
             summaryRow.height = 25; // 마지막 요약 행 높이 명시
             summaryRow.eachCell((cell) => {
@@ -427,6 +444,15 @@ export async function exportToExcel(
         { header: '반(배정)', key: 'new_class', width: 7 },
         { header: '번호(배정)', key: 'new_number', width: 9 },
     ];
+
+    if (includeDetails) {
+        sheet2.columns = [
+            ...sheet2.columns,
+            { header: '특이사항/조건', key: 'details', width: 40 }
+        ];
+        // 중간 헤더에도 details 컬럼 포함
+        (sheet2HeaderValues as any).details = '특이사항/조건';
+    }
 
     const firstHeaderRow2 = sheet2.getRow(1);
     firstHeaderRow2.height = 25; // 첫 헤더 높이 명시
@@ -540,7 +566,8 @@ export async function exportToExcel(
             score: s.academic_score,
             new_grade: newGrade,
             new_class: assignedClassNum,
-            new_number: assignedNumberMap.get(s.id) || ''
+            new_number: assignedNumberMap.get(s.id) || '',
+            details: includeDetails ? formatStudentDetails(s, groups, students) : ''
         });
 
         row.height = 25; // 데이터 행 높이 명시
@@ -587,6 +614,53 @@ export async function exportToExcel(
     anchor.download = filename;
     anchor.click();
     window.URL.revokeObjectURL(url);
+}
+
+// 상세 정보 포맷팅
+function formatStudentDetails(student: Student, groups: CustomGroup[], allStudents: Student[]): string {
+    const details: string[] = [];
+
+    // 1. 생활지도
+    if (student.behavior_type !== 'NONE') {
+        const typeMap: Record<string, string> = {
+            'LEADER': '리더',
+            'BEHAVIOR': '행동',
+            'EMOTIONAL': '정서'
+        };
+        const sign = student.behavior_score > 0 ? '+' : '';
+        details.push(`${typeMap[student.behavior_type] || student.behavior_type}(${sign}${student.behavior_score})`);
+    }
+
+    // 2. 그룹
+    student.group_ids?.forEach(gid => {
+        const group = groups.find(g => g.id === gid);
+        if (group) {
+            details.push(`[${group.name}]`);
+        }
+    });
+
+    // 3. 관계 (피함)
+    student.avoid_ids?.forEach(aid => {
+        const other = allStudents.find(s => s.id === aid);
+        if (other) {
+            details.push(`${other.name}(피함)`);
+        }
+    });
+
+    // 4. 관계 (함께)
+    student.keep_ids?.forEach(kid => {
+        const other = allStudents.find(s => s.id === kid);
+        if (other) {
+            details.push(`${other.name}(함께)`);
+        }
+    });
+
+    // 5. 고정 배정
+    if (student.fixed_class) {
+        details.push(`${student.fixed_class}고정`);
+    }
+
+    return details.join(', ');
 }
 
 import ExcelJS from 'exceljs';
