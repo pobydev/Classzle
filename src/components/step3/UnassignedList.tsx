@@ -48,7 +48,7 @@ export function UnassignedList({
                     <p className="text-center text-xs text-muted-foreground py-2">모든 학생이 배정되었습니다.</p>
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2">
-                        {students.map((s) => (
+                        {students.map((s, index) => (
                             <StudentCard
                                 key={s.id}
                                 student={s}
@@ -58,6 +58,7 @@ export function UnassignedList({
                                 isHighlighted={activeRelationIds?.includes(s.id) || false}
                                 isRecommended={recommendedStudentIds.includes(s.id)}
                                 showScore={!!selectedStudentId && (selectedStudentId === s.id || recommendedStudentIds.includes(s.id))}
+                                attendanceNumber={index + 1}
                                 onClick={() => onStudentClick(s.id)}
                                 onHoverRelation={onHoverRelation}
                             />

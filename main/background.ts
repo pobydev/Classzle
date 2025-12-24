@@ -192,6 +192,7 @@ function createWindow() {
 
     // 로딩 후 표시
     mainWindow.once('ready-to-show', () => {
+        mainWindow?.maximize();
         mainWindow?.show();
     });
 

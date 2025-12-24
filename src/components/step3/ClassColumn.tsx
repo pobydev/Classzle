@@ -47,7 +47,7 @@ export function ClassColumn({
             </CardHeader>
             <CardContent className="p-2 min-h-[200px]">
                 <div className="space-y-2">
-                    {students.map((s) => (
+                    {students.map((s, index) => (
                         <StudentCard
                             key={s.id}
                             student={s}
@@ -57,6 +57,7 @@ export function ClassColumn({
                             isHighlighted={activeRelationIds?.includes(s.id) || false}
                             isRecommended={recommendedStudentIds.includes(s.id)}
                             showScore={!!selectedStudentId && (selectedStudentId === s.id || recommendedStudentIds.includes(s.id))}
+                            attendanceNumber={index + 1}
                             onClick={() => onStudentClick(s.id)}
                             onHoverRelation={onHoverRelation}
                         />
