@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
-import { Student, BehaviorType, Gender, CustomGroup } from '@/types';
+import { Student, BehaviorType, Gender, CustomGroup, NumberingMethod } from '@/types';
+import { calculateAttendanceNumbers } from './numbering';
 import { v4 as uuidv4 } from 'uuid';
 
 // 엑셀 파일에서 학생 데이터 파싱
@@ -177,9 +178,10 @@ export async function exportToExcel(
     options: {
         includeDetails?: boolean;
         groups?: CustomGroup[];
+        numberingMethod?: NumberingMethod;
     } = {}
 ) {
-    const { includeDetails = false, groups = [] } = options;
+    const { includeDetails = false, groups = [], numberingMethod = 'mixed' } = options;
     const workbook = new ExcelJS.Workbook();
 
     // 공통 스타일 정의
@@ -265,12 +267,27 @@ export async function exportToExcel(
         const classB = parseInt(b.assigned_class?.replace(/[^0-9]/g, '') || '0');
         if (classA !== classB) return classA - classB;
 
-        // 전출 예정 학생은 가장 마지막 번호 부여
-        const preA = a.is_pre_transfer ? 1 : 0;
-        const preB = b.is_pre_transfer ? 1 : 0;
-        if (preA !== preB) return preA - preB;
+        if (numberingMethod === 'mixed') {
+            const preA = a.is_pre_transfer ? 1 : 0;
+            const preB = b.is_pre_transfer ? 1 : 0;
+            if (preA !== preB) return preA - preB;
+            return a.name.localeCompare(b.name, 'ko');
+        } else {
+            const firstGender = numberingMethod === 'maleFirst' ? 'M' : 'F';
+            if (a.gender !== b.gender) return a.gender === firstGender ? -1 : 1;
+            const preA = a.is_pre_transfer ? 1 : 0;
+            const preB = b.is_pre_transfer ? 1 : 0;
+            if (preA !== preB) return preA - preB;
+            return a.name.localeCompare(b.name, 'ko');
+        }
+    });
 
-        return a.name.localeCompare(b.name, 'ko');
+    // 각 반별 출석 번호 미리 계산
+    const classAttendanceMaps: Record<string, Record<string, number>> = {};
+    const classesList = Array.from(new Set(sortedByClass.map(s => s.assigned_class as string)));
+    classesList.forEach(cn => {
+        const classStudents = sortedByClass.filter(s => s.assigned_class === cn);
+        classAttendanceMaps[cn] = calculateAttendanceNumbers(classStudents, numberingMethod);
     });
 
     let currentClass = '';
@@ -354,7 +371,7 @@ export async function exportToExcel(
         const row = sheet1.addRow({
             new_grade: newGrade,
             new_class: assignedClass.replace('반', ''),
-            new_number: newNumberCounter++,
+            new_number: classAttendanceMaps[assignedClass]?.[s.id] || '',
             name: s.name,
             gender: s.gender === 'M' ? '남' : '여',
             score: s.academic_score,
@@ -463,23 +480,15 @@ export async function exportToExcel(
         cell.alignment = alignmentCenter;
     });
 
-    // 데이터 준비 (이전반 정렬)
+    // 2. 기초 구성을 위해 반 -> 번호 순으로 정렬 (시트 1과 일관성 유지)
     const sortedByPrevClass = [...students].filter(s => s.assigned_class).sort((a, b) => {
-        // prev_info 파싱해서 정렬 (학년-반-번호)
-        const parsePrev = (info: string) => {
-            const parts = info.split('-');
-            return {
-                g: parseInt(parts[0] || '0'),
-                c: parseInt(parts[1] || '0'),
-                n: parseInt(parts[2] || '0')
-            };
-        };
-        const pA = parsePrev(a.prev_info);
-        const pB = parsePrev(b.prev_info);
+        const classA = parseInt(a.assigned_class?.replace(/[^0-9]/g, '') || '0');
+        const classB = parseInt(b.assigned_class?.replace(/[^0-9]/g, '') || '0');
+        if (classA !== classB) return classA - classB;
 
-        if (pA.g !== pB.g) return pA.g - pB.g;
-        if (pA.c !== pB.c) return pA.c - pB.c;
-        return pA.n - pB.n;
+        const numA = classAttendanceMaps[a.assigned_class!]?.[a.id] || 0;
+        const numB = classAttendanceMaps[b.assigned_class!]?.[b.id] || 0;
+        return numA - numB;
     });
 
     // 배정 번호 맵 생성 (학생 ID -> 배정 번호) - 시트1에서 생성된 번호를 유지하기 위함이 아니라, 시트2는 그냥 목록이므로 재계산보다 그냥 출력
@@ -566,7 +575,7 @@ export async function exportToExcel(
             score: s.academic_score,
             new_grade: newGrade,
             new_class: assignedClassNum,
-            new_number: assignedNumberMap.get(s.id) || '',
+            new_number: classAttendanceMaps[s.assigned_class!]?.[s.id] || '',
             details: includeDetails ? formatStudentDetails(s, groups, students) : ''
         });
 

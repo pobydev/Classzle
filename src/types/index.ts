@@ -1,94 +1,98 @@
-// ?�생 ?�활지???�형
+// 학생 생활지도 유형
 export type BehaviorType = 'NONE' | 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL';
 
-// ?�생 ?�별
+// 학생 성별
 export type Gender = 'M' | 'F';
 
-// ?�생 ?�터?�이??
+// 학생 인터페이스
 export interface Student {
-    id: string;                    // ?�번 (Unique Key)
-    name: string;                  // ?�름
-    prev_info: string;             // "3-2-15" (?�전?�년-�?번호)
-    gender: Gender;                // ?�별
-    academic_score: number;        // ?�적 (1~1000)
-    birth?: string;                // ?�년?�일 (YYYY.MM.DD.)
+    id: string;                    // 학번 (Unique Key)
+    name: string;                  // 이름
+    prev_info: string;             // "3-2-15" (이전학년-반-번호)
+    gender: Gender;                // 성별
+    academic_score: number;        // 성적 (1~1000)
+    birth?: string;                // 생년월일 (YYYY.MM.DD.)
 
-    // ?�활지??
+    // 생활지도
     behavior_score: number;        // -2 ~ +3
-    behavior_type: BehaviorType;   // ?�형
-    behavior_note?: string;        // 비고 (?�팁??
-    is_pre_transfer?: boolean;     // ?�출 ?�정 ?��?
+    behavior_type: BehaviorType;   // 유형
+    behavior_note?: string;        // 비고 (툴팁)
+    is_pre_transfer?: boolean;     // 전출 예정 여부
 
-    // 그룹 �?관�?
-    group_ids: string[];           // ?�속??CustomGroup ID 목록
-    avoid_ids: string[];           // ?�해?????�생 ID (?�극)
-    avoid_memos?: Record<string, string>; // 분리 배정 ?�유 (Key: ?��?�?ID, Value: ?�유)
-    keep_ids: string[];            // ?�께?�야 ???�생 ID (?�짝)
-    keep_memos?: Record<string, string>;  // ?�반 배정 ?�유
-    fixed_class?: string;          // 고정 �?(?? "1�?)
-    fixed_class_memo?: string;     // 고정 배정 ?�유
+    // 그룹 및 관계
+    group_ids: string[];           // 소속된 CustomGroup ID 목록
+    avoid_ids: string[];           // 피해야 할 학생 ID (저격)
+    avoid_memos?: Record<string, string>; // 분리 배정 사유 (Key: 상대ID, Value: 사유)
+    keep_ids: string[];            // 함께해야 할 학생 ID (단짝)
+    keep_memos?: Record<string, string>;  // 동반 배정 사유
+    fixed_class?: string;          // 고정 반 (예: "1반")
+    fixed_class_memo?: string;     // 고정 배정 사유
 
     // 배정 결과
-    assigned_class?: string | null; // 배정??�?(?? "1�?)
+    assigned_class?: string | null; // 배정된 반 (예: "1반")
 }
 
-// 커스?� 그룹 ?�터?�이??
+// 커스텀 그룹 인터페이스
 export interface CustomGroup {
     id: string;                    // 그룹 ID
-    name: string;                  // 그룹�?(?? "축구부", "?�수?�급")
-    color: string;                 // UI 뱃�? ?�상 (Tailwind class ?�는 Hex)
-    member_ids: string[];          // ??그룹???�한 ?�생 ID 목록
+    name: string;                  // 그룹명 (예: "축구부", "특수학급")
+    color: string;                 // UI 뱃지 색상 (Tailwind class 또는 Hex)
+    member_ids: string[];          // 이 그룹에 속한 학생 ID 목록
 }
 
-// ???�정 ?�터?�이??
+// 부여 번호 방식
+export type NumberingMethod = 'mixed' | 'maleFirst' | 'femaleFirst';
+
+// 앱 설정 인터페이스
 export interface AppSettings {
-    classCount: number;            // ?�급 ??
-    scoreTolerance: number;        // ?�적 ?�사�??�용 범위 (±)
+    classCount: number;            // 학급 수
+    scoreTolerance: number;        // 성적 유사도 허용 범위 (±)
+    numberingMethod: NumberingMethod; // 번호 부여 방식
 }
 
-// 배정 결과 ?�계 (?�장)
+// 배정 결과 통계 (확장)
 export interface ClassStats {
-    className: string;             // �??�름
-    studentCount: number;          // ?�생 ??
-    averageScore: number;          // ?�균 ?�적
-    behaviorTotal: number;         // ?�활지??총점
-    maleCount: number;             // ?�학????
-    femaleCount: number;           // ?�학????
-    leaderCount: number;           // 리더???�생 ??
-    behaviorTypeCount: number;     // ?�동???�생 ??
-    emotionalCount: number;        // ?�서???�생 ??
-    // ?�수�??�생 ??(?�세 분리)
+    className: string;             // 반 이름
+    studentCount: number;          // 학생 수
+    averageScore: number;          // 평균 성적
+    behaviorTotal: number;         // 생활지도 총점
+    maleCount: number;             // 남학생 수
+    femaleCount: number;           // 여학생 수
+    leaderCount: number;           // 리더십 학생 수
+    behaviorTypeCount: number;     // 행동형 학생 수
+    emotionalCount: number;        // 정서형 학생 수
+    // 점수별 학생 수 (상세 분리)
     scoreMinus3: number;
     scoreMinus2: number;
     scoreMinus1: number;
 
-    // ?�동??
-    behaviorPlus1: number;         // ?�동??+1
-    behaviorPlus2: number;         // ?�동??+2
-    behaviorPlus3: number;         // ?�동??+3
+    // 행동형
+    behaviorPlus1: number;         // 행동형 +1
+    behaviorPlus2: number;         // 행동형 +2
+    behaviorPlus3: number;         // 행동형 +3
 
-    // ?�서??
-    emotionalPlus1: number;        // ?�서??+1
-    emotionalPlus2: number;        // ?�서??+2
-    emotionalPlus3: number;        // ?�서??+3
+    // 정서형
+    emotionalPlus1: number;        // 정서형 +1
+    emotionalPlus2: number;        // 정서형 +2
+    emotionalPlus3: number;        // 정서형 +3
 
-    // ?�반
-    normalCount: number;           // 0??(?�당?�음)
+    // 일반
+    normalCount: number;           // 0점 (해당없음)
 
-    // ?�거???�환 (?�요 ???��?, ?�는 로직?�서 ?�산?�여 ?�용)
+    // 리더십(보합)
     scorePlus1: number;
     scorePlus2: number;
     scorePlus3: number;
 
-    // 커스?� 그룹�??�생 ??
+    // 커스텀 그룹별 학생 수
     groupCounts: Record<string, number>;
 
-    // ?�출 ?�정 ?�생 ??
-    preTransferMaleCount: number;    // ?�출 ?�정 ?�학????
-    preTransferFemaleCount: number;  // ?�출 ?�정 ?�학????
+    // 전출 예정 학생 수
+    preTransferMaleCount: number;    // 전출 예정 남학생 수
+    preTransferFemaleCount: number;  // 전출 예정 여학생 수
 }
 
-// ?�약 조건 ?�반 ?�보
+// 제약 조건 위반 정보
 export interface Violation {
     type: 'AVOID' | 'KEEP' | 'BEHAVIOR_IMBALANCE' | 'GENDER_IMBALANCE' | 'FIXED_CLASS';
     message: string;
@@ -117,7 +121,8 @@ declare global {
         electronAPI?: ElectronAPI;
     }
 }
-// 배정 변�??�역 ?�이??
+
+// 배정 변경 이력 인터페이스
 export interface AssignmentChange {
     studentId: string;
     studentName: string;
@@ -125,7 +130,7 @@ export interface AssignmentChange {
     newClass: string | null;
     timestamp: number;
     type?: 'move' | 'swap';
-    source?: 'auto' | 'manual'; // 변�?출처 추�?
+    source?: 'auto' | 'manual'; // 변경 출처 추가
     partnerName?: string;
     partnerId?: string;
 }

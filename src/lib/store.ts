@@ -26,6 +26,7 @@ interface ClasszleStore {
     // 설정 관련 액션
     setClassCount: (count: number) => void;
     setScoreTolerance: (tolerance: number) => void;
+    setNumberingMethod: (method: AppSettings['numberingMethod']) => void;
 
     // 배정 관련 액션
     assignStudentToClass: (studentId: string, className: string | null) => void;
@@ -52,6 +53,7 @@ interface ClasszleStore {
 const defaultSettings: AppSettings = {
     classCount: 4,
     scoreTolerance: 50,
+    numberingMethod: 'mixed',
 };
 
 export const useClasszleStore = create<ClasszleStore>()(
@@ -144,6 +146,10 @@ export const useClasszleStore = create<ClasszleStore>()(
 
             setScoreTolerance: (tolerance) => set((state) => ({
                 settings: { ...state.settings, scoreTolerance: tolerance }
+            })),
+
+            setNumberingMethod: (method) => set((state) => ({
+                settings: { ...state.settings, numberingMethod: method }
             })),
 
             // 배정 관련 액션

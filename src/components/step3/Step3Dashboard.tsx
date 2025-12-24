@@ -5,6 +5,7 @@ import { useClasszleStore } from '@/lib/store';
 import { assignStudents, calculateClassStats } from '@/lib/algorithm';
 import { validateSwap } from '@/lib/validation';
 import { exportToExcel } from '@/lib/excel';
+import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { Student, Violation, BehaviorType, AssignmentChange } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,13 @@ import {
     DialogDescription
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface Step3DashboardProps {
     onBack: () => void;
@@ -33,6 +41,7 @@ function StudentCard({
     isHighlighted,
     isRecommended,
     showScore,
+    attendanceNumber,
     onClick,
     onHoverRelation,
 }: {
@@ -43,6 +52,7 @@ function StudentCard({
     isHighlighted: boolean;
     isRecommended: boolean;
     showScore: boolean;
+    attendanceNumber?: number;
     onClick: () => void;
     onHoverRelation: (studentIds: string[] | null) => void;
 }) {
@@ -91,6 +101,11 @@ function StudentCard({
       `}
         >
             <div className="flex items-center gap-1.5 overflow-hidden">
+                {attendanceNumber !== undefined && (
+                    <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                        {attendanceNumber}.
+                    </span>
+                )}
                 <span className="font-medium text-sm truncate">{student.name}</span>
                 <span className="text-[10px] text-muted-foreground shrink-0">
                     ({student.gender === 'M' ? '남' : '여'})
@@ -751,7 +766,8 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     const {
         students, groups, settings, setStudents,
         assignStudentToClass, swapStudents,
-        movementHistory, addMovements, clearMovements
+        movementHistory, addMovements, clearMovements,
+        setNumberingMethod
     } = useClasszleStore();
     const [violations, setViolations] = useState<Violation[]>([]);
     const [isAssigning, setIsAssigning] = useState(false);
@@ -793,15 +809,43 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                     const bPre = b.is_pre_transfer ? 1 : 0;
                     if (aPre !== bPre) return aPre - bPre;
 
-                    // 1. 이름 (가나다순) - 남녀 혼합
-                    return a.name.localeCompare(b.name, 'ko');
+                    if (settings.numberingMethod === 'mixed') {
+                        // 1. 이름 (가나다순) - 남녀 혼합
+                        return a.name.localeCompare(b.name, 'ko');
+                    } else if (settings.numberingMethod === 'maleFirst') {
+                        // 남학생 -> 여학생
+                        if (a.gender !== b.gender) return a.gender === 'M' ? -1 : 1;
+                        return a.name.localeCompare(b.name, 'ko');
+                    } else {
+                        // 여학생 -> 남학생
+                        if (a.gender !== b.gender) return a.gender === 'F' ? -1 : 1;
+                        return a.name.localeCompare(b.name, 'ko');
+                    }
                 });
         });
         result['미배정'] = students
             .filter((s) => !s.assigned_class)
             .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
         return result;
-    }, [students, classNames]);
+    }, [students, classNames, settings.numberingMethod]);
+
+    // 반별 출석번호 계산 (Memoized)
+    const attendanceNumbersByClass = useMemo(() => {
+        const result: Record<string, Record<string, number>> = {};
+        classNames.forEach((cn) => {
+            result[cn] = calculateAttendanceNumbers(
+                students.filter(s => s.assigned_class === cn),
+                settings.numberingMethod || 'mixed'
+            );
+        });
+        // 미배정 학생은 단순 순번
+        const unassignedStudents = students.filter(s => !s.assigned_class).sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+        result['미배정'] = {};
+        unassignedStudents.forEach((s, idx) => {
+            result['미배정'][s.id] = idx + 1;
+        });
+        return result;
+    }, [students, classNames, settings.numberingMethod]);
 
     const handleAssign = () => {
         setIsAssigning(true);
@@ -909,8 +953,9 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     const confirmExport = (includeDetails: boolean) => {
         const timestamp = new Date().toISOString().split('T')[0];
         exportToExcel(students, settings.classCount, `반편성_결과_${timestamp}.xlsx`, {
-            includeDetails,
-            groups
+            includeDetails: true,
+            groups,
+            numberingMethod: settings.numberingMethod
         });
         setIsExportDialogOpen(false);
     };
@@ -1084,10 +1129,27 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
 
                 <TabsContent value="board" className="space-y-6 outline-none">
                     {/* 배정 작업 안내 */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-4">
                         <div className="text-sm font-medium text-primary flex items-center gap-2 bg-primary/5 px-3 py-2 rounded-md border border-primary/10">
                             <span className="text-lg">🖱️</span>
                             <span>학생을 클릭하여 선택한 후, 이동할 반을 클릭하거나 다른 학생과 교환하세요.</span>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-lg border border-slate-100">
+                            <label className="text-xs font-bold text-slate-500 whitespace-nowrap">번호 부여 방식</label>
+                            <Select
+                                value={settings.numberingMethod}
+                                onValueChange={(v) => setNumberingMethod(v as any)}
+                            >
+                                <SelectTrigger className="w-[150px] h-9 bg-white border-slate-200 focus:ring-primary/20 text-sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="mixed">성별 혼합</SelectItem>
+                                    <SelectItem value="maleFirst">남학생 → 여학생</SelectItem>
+                                    <SelectItem value="femaleFirst">여학생 → 남학생</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
 
@@ -1124,6 +1186,7 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                                 isHighlighted={activeRelationIds?.includes(s.id) || false}
                                                 isRecommended={recommendedStudentIds.includes(s.id)}
                                                 showScore={!!selectedStudentId && (selectedStudentId === s.id || recommendedStudentIds.includes(s.id))}
+                                                attendanceNumber={attendanceNumbersByClass['미배정']?.[s.id]}
                                                 onClick={() => handleStudentClick(s.id)}
                                                 onHoverRelation={setActiveRelationIds}
                                             />
@@ -1165,6 +1228,7 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                                     isHighlighted={activeRelationIds?.includes(s.id) || false}
                                                     isRecommended={recommendedStudentIds.includes(s.id)}
                                                     showScore={!!selectedStudentId && (selectedStudentId === s.id || recommendedStudentIds.includes(s.id))}
+                                                    attendanceNumber={attendanceNumbersByClass[className]?.[s.id]}
                                                     onClick={() => handleStudentClick(s.id)}
                                                     onHoverRelation={setActiveRelationIds}
                                                 />

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { version } from '../../package.json';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Step1Setup from '@/components/step1/Step1Setup';
 import Step2Constraints from '@/components/step2/Step2Constraints';
@@ -250,6 +251,9 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 flex items-center gap-2">
                     Classzle
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full border border-slate-200 tracking-normal ml-0.5">
+                      v{version}
+                    </span>
                   </h1>
                 </div>
                 <p className="text-[10px] font-medium text-slate-400 leading-tight hidden sm:block">

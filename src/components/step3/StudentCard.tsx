@@ -11,6 +11,7 @@ interface StudentCardProps {
     isHighlighted: boolean;
     isRecommended: boolean;
     showScore: boolean;
+    attendanceNumber?: number;
     onClick: () => void;
     onHoverRelation: (studentIds: string[] | null) => void;
 }
@@ -23,6 +24,7 @@ export function StudentCard({
     isHighlighted,
     isRecommended,
     showScore,
+    attendanceNumber,
     onClick,
     onHoverRelation,
 }: StudentCardProps) {
@@ -71,6 +73,11 @@ export function StudentCard({
       `}
         >
             <div className="flex items-center gap-1.5 overflow-hidden">
+                {attendanceNumber && (
+                    <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                        {attendanceNumber}.
+                    </span>
+                )}
                 <span className="font-medium text-sm truncate">{student.name}</span>
                 <span className="text-[10px] text-muted-foreground shrink-0">
                     ({student.gender === 'M' ? '남' : '여'})
