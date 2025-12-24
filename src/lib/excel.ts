@@ -480,15 +480,23 @@ export async function exportToExcel(
         cell.alignment = alignmentCenter;
     });
 
-    // 2. 기초 구성을 위해 반 -> 번호 순으로 정렬 (시트 1과 일관성 유지)
+    // 2. 이전 반 -> 이전 번호 순으로 정렬
     const sortedByPrevClass = [...students].filter(s => s.assigned_class).sort((a, b) => {
-        const classA = parseInt(a.assigned_class?.replace(/[^0-9]/g, '') || '0');
-        const classB = parseInt(b.assigned_class?.replace(/[^0-9]/g, '') || '0');
-        if (classA !== classB) return classA - classB;
+        const parsePrev = (info: string) => {
+            const parts = info.split('-');
+            return {
+                grade: parseInt(parts[0] || '0'),
+                classNum: parseInt(parts[1] || '0'),
+                studentNum: parseInt(parts[2] || '0')
+            };
+        };
 
-        const numA = classAttendanceMaps[a.assigned_class!]?.[a.id] || 0;
-        const numB = classAttendanceMaps[b.assigned_class!]?.[b.id] || 0;
-        return numA - numB;
+        const prevA = parsePrev(a.prev_info);
+        const prevB = parsePrev(b.prev_info);
+
+        if (prevA.grade !== prevB.grade) return prevA.grade - prevB.grade;
+        if (prevA.classNum !== prevB.classNum) return prevA.classNum - prevB.classNum;
+        return prevA.studentNum - prevB.studentNum;
     });
 
     // 배정 번호 맵 생성 (학생 ID -> 배정 번호) - 시트1에서 생성된 번호를 유지하기 위함이 아니라, 시트2는 그냥 목록이므로 재계산보다 그냥 출력
