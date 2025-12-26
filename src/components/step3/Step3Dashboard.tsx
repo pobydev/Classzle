@@ -864,7 +864,8 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                 settings.classCount,
                 groups,
                 settings.scoreTolerance,
-                assignmentMode
+                assignmentMode,
+                settings.useAdvancedConstraints
             );
 
             // 1차 변경 내역 추출 (단순 이동 리스트)

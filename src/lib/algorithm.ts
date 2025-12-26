@@ -3,6 +3,16 @@ import { Student, CustomGroup, ClassStats, Violation } from '@/types';
 const MAX_ITERATIONS = 200;
 const BALANCE_TOLERANCE = 1; // 허용 편차 (1명 이내)
 
+const PENALTY_WEIGHTS = {
+    FIXED_VIOLATION: 100000,
+    AVOID_VIOLATION: 50000,
+    KEEP_VIOLATION: 10000,
+    GROUP_OVERLOAD: 5000,
+    GENDER_IMBALANCE: 2000,
+    ACADEMIC_IMBALANCE: 500, // 점수 차이 1점당
+    BEHAVIOR_IMBALANCE: 1000,
+};
+
 /**
  * 반편성 메인 함수
  * 모든 균형 조건을 만족할 때까지 반복 최적화
@@ -12,7 +22,8 @@ export function assignStudents(
     classCount: number,
     groups: CustomGroup[],
     scoreTolerance: number = 25,
-    mode: 'new' | 'optimize' = 'new'
+    mode: 'new' | 'optimize' = 'new',
+    useAdvancedConstraints: boolean = true
 ): { students: Student[]; violations: Violation[] } {
     // 원본 보존을 위해 깊은 복사
     let assignedStudents: Student[] = students.map(s => ({ ...s }));
@@ -23,97 +34,56 @@ export function assignStudents(
         classNames.push(`${i}반`);
     }
 
-    // 0. 모드 및 기배정 데이터 처리
     const isNewMode = mode === 'new';
 
-    // 신규 배정 모드일 경우 기존 배정(assigned_class)을 초기화 (고정반 제외)
     if (isNewMode) {
-        assignedStudents.forEach(s => {
-            s.assigned_class = s.fixed_class || null;
-        });
-    }
-
-    // 통계 및 자동 감지를 위한 기배정 카운트
-    const assignedCount = assignedStudents.filter(s => s.assigned_class).length;
-    const hasEnoughPreAssigned = assignedCount > (students.length * 0.1);
-
-    // 실제 기배정 모드 여부 결정
-    const isPreAssignedMode = !isNewMode && hasEnoughPreAssigned;
-
-    // [Randomization] 재배정 시 결과가 달라지도록 학생 처리 순서를 셔플
-    shuffleArray(assignedStudents);
-
-    // 1단계: 초기 배정
-    if (!isPreAssignedMode) {
-        // 신규 배정: 10회 실행 후 가장 균형 잡힌 결과 선택
-        const TRIAL_COUNT = 10;
+        // 10회 시행 중 가장 점수가 좋은 결과 선택
         let bestResult: Student[] | null = null;
         let bestScore = Infinity;
 
-        for (let trial = 0; trial < TRIAL_COUNT; trial++) {
-            // 매 시도마다 배정 초기화
-            const trialStudents = assignedStudents.map(s => ({ ...s, assigned_class: s.fixed_class || null }));
+        for (let trial = 0; trial < 10; trial++) {
+            const trialStudents = students.map(s => ({
+                ...s,
+                assigned_class: s.fixed_class || null
+            }));
+
+            // 고정 배정되지 않은 학생들 섞기
             shuffleArray(trialStudents);
 
             // 초기 배정 실행
-            const assigned = balancedInitialAssignment(trialStudents, classNames, groups);
+            const assigned = balancedInitialAssignment(trialStudents, classNames, groups, useAdvancedConstraints);
 
-            // 최적화 루프 실행
-            const optimized = optimizeBalance(assigned, classNames, groups, scoreTolerance, false);
+            // 최적화 루프 실행 (신규 배정 모드는 공격적 최적화 미사용 - optimizeBalance 내부에서 플래그로 제어)
+            const optimized = optimizeBalance(assigned, classNames, groups, scoreTolerance, false, useAdvancedConstraints);
 
             // 전출생 검증
             validatePreTransferDistribution(optimized, classNames);
 
-            // 균형 점수 계산 (낮을수록 좋음)
-            const classBehaviorScores = classNames.map(cn => {
-                const classStudents = optimized.filter(s => s.assigned_class === cn);
-                return {
-                    behaviorTotal: classStudents.reduce((sum, s) => sum + s.behavior_score, 0),
-                    count: classStudents.length,
-                    maleCount: classStudents.filter(s => s.gender === 'M').length,
-                    negativeCount: classStudents.filter(s => s.behavior_score < 0).length,
-                };
-            });
+            // 균형 상태 계산
+            const stats = getImbalanceStats(optimized, classNames, groups);
+            const trialScore =
+                (stats.genderImbalance * 100) +
+                (stats.studentCountImbalance * 50) +
+                (stats.scoreImbalance * 1) +
+                (stats.behaviorTotalImbalance * 20) +
+                (stats.scoreMinus3Imbalance * 30);
 
-            const behaviorTotals = classBehaviorScores.map(c => c.behaviorTotal);
-            const counts = classBehaviorScores.map(c => c.count);
-            const maleCounts = classBehaviorScores.map(c => c.maleCount);
-            const negativeCounts = classBehaviorScores.map(c => c.negativeCount);
-
-            const behaviorImbalance = Math.max(...behaviorTotals) - Math.min(...behaviorTotals);
-            const countImbalance = Math.max(...counts) - Math.min(...counts);
-            const genderImbalance = Math.max(...maleCounts) - Math.min(...maleCounts);
-            const negativeImbalance = Math.max(...negativeCounts) - Math.min(...negativeCounts);
-
-            const balanceScore =
-                behaviorImbalance * 10 + // 총점 불균형
-                negativeImbalance * 8 +   // 마이너스 인원 불균형
-                countImbalance * 5 +       // 인원수 불균형
-                genderImbalance * 3;       // 성별 불균형
-
-            if (balanceScore < bestScore) {
-                bestScore = balanceScore;
-                bestResult = optimized;
+            if (trialScore < bestScore) {
+                bestScore = trialScore;
+                bestResult = JSON.parse(JSON.stringify(optimized));
             }
         }
 
         assignedStudents = bestResult || assignedStudents;
     } else {
-        // 기존 배정 유지 + 미배정 학생 채우기
-        // 유효하지 않은 반 이름 체크
-        assignedStudents.forEach(s => {
-            if (s.assigned_class && !classNames.includes(s.assigned_class)) {
-                s.assigned_class = null;
-            }
-        });
+        // 기배정 모드 (Optimize Mode)
+        const isPreAssignedMode = true;
 
-        const unassigned = assignedStudents.filter(s => !s.assigned_class);
-        if (unassigned.length > 0) {
-            fillUnassignedStudents(assignedStudents, classNames);
-        }
+        // 미배정 학생들 채우기 (인원이 적은 반부터)
+        fillUnassignedStudents(assignedStudents, classNames);
 
         // 2단계: 균형 최적화 루프 (기배정 모드만 여기서 실행)
-        assignedStudents = optimizeBalance(assignedStudents, classNames, groups, scoreTolerance, isPreAssignedMode);
+        assignedStudents = optimizeBalance(assignedStudents, classNames, groups, scoreTolerance, isPreAssignedMode, useAdvancedConstraints);
 
         // 2.5단계: 전출생 분산 최종 검증
         validatePreTransferDistribution(assignedStudents, classNames);
@@ -130,8 +100,17 @@ export function assignStudents(
  * 1단계: 균형 잡힌 초기 배정
  * 학생 유형별로 분류 후 라운드로빈 방식으로 균등 배정
  */
-function balancedInitialAssignment(students: Student[], classNames: string[], groups: CustomGroup[]): Student[] {
-    // 고정반 학생 먼저 배정
+/**
+ * 1단계: 균형 잡힌 초기 배정 (v1.2.2 - 적합도 기반 분산 복원)
+ * 학생 유형별로 분류 후 적합도 점수제(Suitability Score)를 통해 최적의 반을 찾아 배정
+ */
+function balancedInitialAssignment(
+    students: Student[],
+    classNames: string[],
+    groups: CustomGroup[],
+    useAdvancedConstraints: boolean = true
+): Student[] {
+    // 고정 배정 학생 먼저 배정
     const fixedStudents = students.filter(s => s.fixed_class);
     fixedStudents.forEach(s => { s.assigned_class = s.fixed_class; });
 
@@ -139,21 +118,16 @@ function balancedInitialAssignment(students: Student[], classNames: string[], gr
     assignPreTransferStudents(students, classNames);
 
     // 2. 분산 배정 그룹(Custom Group) 처리
-    // 각 그룹별로 멤버들을 확인하여, 고르게 분산 배정
     groups.forEach(group => {
-        // 그룹 멤버 중 아직 반이 배정되지 않은 학생들
         const members = students.filter(s =>
             group.member_ids.includes(s.id) && !s.fixed_class && !s.assigned_class
         );
 
         if (members.length === 0) return;
 
-        // 성적순 정렬 (비슷한 성적끼리 뭉치지 않게)
         members.sort((a, b) => b.academic_score - a.academic_score);
         shuffleSimilarScores(members);
 
-        // 각 반별 현재 해당 그룹 멤버 수 집계
-        // (이미 고정 배정 등으로 들어가 있는 멤버 포함)
         const currentGroupCounts: Record<string, number> = {};
         classNames.forEach(cn => {
             currentGroupCounts[cn] = students.filter(s =>
@@ -161,77 +135,40 @@ function balancedInitialAssignment(students: Student[], classNames: string[], gr
             ).length;
         });
 
-        // 덜 배정된 반부터 채워넣기
         members.forEach(member => {
-            // 현재 그룹 멤버가 가장 적은 반 찾기
             const sortedClasses = [...classNames].sort((a, b) => {
                 const diff = currentGroupCounts[a] - currentGroupCounts[b];
                 if (diff !== 0) return diff;
-                return Math.random() - 0.5; // 인원 같으면 랜덤
+                return Math.random() - 0.5;
             });
 
-            // 가장 적은 반에 배정
             const targetClass = sortedClasses[0];
             member.assigned_class = targetClass;
             currentGroupCounts[targetClass]++;
         });
     });
 
-    // 3. 전출 예정 학생 균형 배정 (그룹처럼 1명씩 분산)
-    // 전출 예정 학생도 특정 반에 몰리지 않게 미리 배정
-    const preTransferStudents = students.filter(s =>
-        s.is_pre_transfer && !s.fixed_class && !s.assigned_class
-    );
-
-    if (preTransferStudents.length > 0) {
-        // 성적순 정렬
-        preTransferStudents.sort((a, b) => b.academic_score - a.academic_score);
-        shuffleSimilarScores(preTransferStudents);
-
-        // 현재 반별 전출 예정 학생 수 (이미 고정 배정된 전출 학생 포함)
-        const currentPreTransferCounts: Record<string, number> = {};
-        classNames.forEach(cn => {
-            currentPreTransferCounts[cn] = students.filter(s =>
-                s.assigned_class === cn && s.is_pre_transfer
-            ).length;
-        });
-
-        // 덜 배정된 반부터 채워넣기
-        preTransferStudents.forEach(student => {
-            const sortedClasses = [...classNames].sort((a, b) => {
-                const diff = currentPreTransferCounts[a] - currentPreTransferCounts[b];
-                if (diff !== 0) return diff;
-                return Math.random() - 0.5; // 인원 같으면 랜덤
-            });
-
-            const targetClass = sortedClasses[0];
-            student.assigned_class = targetClass;
-            currentPreTransferCounts[targetClass]++;
-        });
-    }
-
-    // 나머지 학생들 분류 (아직 배정되지 않은 학생들만)
+    // 3. 나머지 학생들 분류 (아직 배정되지 않은 학생들만)
     const normalStudents = students.filter(s => !s.assigned_class);
 
-    // 유형+점수별 세분화 그룹 (더 균등한 분산을 위해)
+    // 유형+점수별 세분화 그룹
     const typeScoreGroups = {
-        // 행동형 점수별
         behavior3: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -3),
-        behavior2: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -2),
-        behavior1: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -1),
-        // 정서형 점수별
         emotional3: normalStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -3),
+        behavior2: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -2),
         emotional2: normalStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -2),
+        behavior1: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -1),
         emotional1: normalStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -1),
-        // 리더형 점수별
         leader2: normalStudents.filter(s => s.behavior_type === 'LEADER' && s.behavior_score >= 2),
         leader1: normalStudents.filter(s => s.behavior_type === 'LEADER' && s.behavior_score === 1),
-        // 일반
         normalMale: normalStudents.filter(s => s.behavior_type === 'NONE' && s.gender === 'M'),
         normalFemale: normalStudents.filter(s => s.behavior_type === 'NONE' && s.gender === 'F'),
+        others: normalStudents.filter(s =>
+            (s.behavior_type === 'BEHAVIOR' || s.behavior_type === 'EMOTIONAL') && s.behavior_score > 0
+        )
     };
 
-    // 각 그룹 내 성적순 정렬 (약간의 랜덤 포함)
+    // 각 그룹 내 성적순 정렬 (구간별 랜덤 포함)
     Object.values(typeScoreGroups).forEach(group => {
         group.sort((a, b) => b.academic_score - a.academic_score);
         shuffleSimilarScores(group);
@@ -249,46 +186,46 @@ function balancedInitialAssignment(students: Student[], classNames: string[], gr
         count: 0, score: 0, has3: 0, behaviorCount: 0, emotionalCount: 0
     });
 
-    // 모든 마이너스 학생을 하나로 모아서 심각도순 정렬
+    // 모든 마이너스 학생을 하나로 모아서 '심각도'순 정렬 (양수 점수는 제외)
     const allNegativeStudents: Student[] = [
         ...typeScoreGroups.behavior3,
         ...typeScoreGroups.emotional3,
         ...typeScoreGroups.behavior2,
         ...typeScoreGroups.emotional2,
         ...typeScoreGroups.behavior1,
-        ...typeScoreGroups.emotional1,
+        ...typeScoreGroups.emotional1
     ];
 
-    // 심각도 순 정렬 (점수 낮은 순, 같으면 유형별 교차)
+    // 심각도순 정렬 (점수 낮은 순 -> 같은 점수면 유형 교차)
     allNegativeStudents.sort((a, b) => {
         if (a.behavior_score !== b.behavior_score) return a.behavior_score - b.behavior_score;
-        // 같은 점수면 유형 교차 (BEHAVIOR와 EMOTIONAL 번갈아)
         return a.behavior_type.localeCompare(b.behavior_type);
     });
 
-    // 통합 배정 함수: 각 학생마다 최적의 반 선택
+    // 적합도 배정 함수: 각 학생마다 최적의 반 선택
     allNegativeStudents.forEach(student => {
-        const studentType = student.behavior_type; // 'BEHAVIOR' or 'EMOTIONAL'
-        const studentScore = student.behavior_score; // -3, -2, -1
+        const studentType = student.behavior_type;
+        const studentScore = student.behavior_score;
 
         // 각 반의 적합도 점수 계산
         const classScores = classNames.map(cn => {
             const stats = classNegativeStats[cn];
             let suitability = 0;
 
-            // 1. -3 패널티: -3이 있으면 점수 감소 (다른 마이너스 받기 싫음)
-            // -3 배정 시에는 이 조건 무시 (균등 분산)
-            if (studentScore !== -3) {
-                suitability -= stats.has3 * 100; // -3 하나당 -100점
+            // 1. -3 패널티: -3 학생이 있는 반은 기피
+            // 내가 -3이면 절대 안 가고, 내가 -2/-1이어도 -3이 있는 곳은 피함 (고립 효과)
+            if (stats.has3 > 0) {
+                if (studentScore === -3) suitability -= 1000; // 절대 회피
+                else suitability -= 100; // -3이 있는 곳은 다른 문제 학생도 피함
             }
 
-            // 2. 총점 균형: 현재 총점 낮을수록 우선
-            suitability -= stats.score * 10; // 총점 낮을수록(음수 클수록) 점수 높음
+            // 2. 총점 균형: 현재 총점이 높을수록(덜 나쁠수록) 개선
+            suitability -= stats.score * 10;
 
-            // 3. 인원 균형: 현재 인원 적을수록 우선
+            // 3. 인원 균형: 현재 배정된 마이너스 학생이 적을수록 개선
             suitability -= stats.count * 50;
 
-            // 4. 유형 균형: 같은 유형 적을수록 우선
+            // 4. 유형 균형: 같은 유형이 적을수록 개선
             if (studentType === 'BEHAVIOR') {
                 suitability -= stats.behaviorCount * 30;
             } else if (studentType === 'EMOTIONAL') {
@@ -301,7 +238,7 @@ function balancedInitialAssignment(students: Student[], classNames: string[], gr
             return { className: cn, suitability };
         });
 
-        // 적합도 높은 순 정렬
+        // 적합도순 정렬
         classScores.sort((a, b) => b.suitability - a.suitability);
 
         const targetClass = classScores[0].className;
@@ -315,7 +252,7 @@ function balancedInitialAssignment(students: Student[], classNames: string[], gr
         if (studentType === 'EMOTIONAL') classNegativeStats[targetClass].emotionalCount++;
     });
 
-    // 특정 유형+점수 그룹을 균등 분산하는 함수 (리더 등 플러스용)
+    // 특정 유형 그룹을 균등 분산하는 함수 (리더 등)
     const distributeEvenly = (studentList: Student[]) => {
         const currentCounts: Record<string, number> = {};
         classNames.forEach(cn => currentCounts[cn] = 0);
@@ -348,102 +285,16 @@ function balancedInitialAssignment(students: Student[], classNames: string[], gr
         });
     };
 
-    // 1단계: 마이너스 학생 통합 배정 (위에서 이미 완료)
-    // allNegativeStudents는 이미 배정됨
-
-    // 2단계: 리더형 균등 분산
+    // 2단계: 리더 및 기타 유형 균등 분산
     distributeEvenly(typeScoreGroups.leader2);
     distributeEvenly(typeScoreGroups.leader1);
+    distributeEvenly(typeScoreGroups.others); // 양수 점수 유형 학생들도 균등 분산
 
-    // 2단계: 일반 학생들 전체 인원 기준 배정
+    // 3단계: 일반 학생은 성비/인원수 맞춰서 빈 곳 채우기
     fillAssign(typeScoreGroups.normalMale);
     fillAssign(typeScoreGroups.normalFemale);
 
     return students;
-}
-
-/**
- * 성적 유사 학생들 간에 순서를 약간 셔플
- */
-function shuffleSimilarScores(students: Student[]): void {
-    if (students.length <= 1) return;
-
-    const tolerance = 30;
-
-    for (let i = 0; i < students.length - 1; i++) {
-        if (Math.abs(students[i].academic_score - students[i + 1].academic_score) <= tolerance &&
-            Math.random() > 0.5) {
-            [students[i], students[i + 1]] = [students[i + 1], students[i]];
-        }
-    }
-}
-
-/**
- * 일반적인 균형 맞추기(성별, 성적 등)를 위해 두 학생을 교환해도 되는지 확인
- * 특별한 제약조건(고정, 분산 그룹, 전출, 상극/친한 관계)이 있는 경우,
- * 그 제약조건을 깨뜨리지 않는 선에서만 교환을 허용함
- */
-function canSwapForGeneralBalance(
-    studentA: Student,
-    studentB: Student | undefined,
-    targetClass: string // studentA가 이동하려는 반 (studentB가 있는 반)
-): boolean {
-    // 1. 고정 배정 학생은 절대 이동 불가
-    if (studentA.fixed_class) return false;
-    if (studentB && studentB.fixed_class) return false;
-
-    // 2. 전출 예정 학생 로직
-    // 전출 예정 학생은 '전출 예정 학생 균형' 함수에서만 이동시켜야 함
-    // (또는 전출 예정 학생끼리 교환은 허용 가능하지만, 복잡도 줄이기 위해 일반 로직에선 제외 권장)
-    // 여기서는 "전출 예정 학생끼리만 교환 허용"으로 완화
-    if (studentA.is_pre_transfer) {
-        if (!studentB || !studentB.is_pre_transfer) return false;
-    }
-    if (studentB && studentB.is_pre_transfer) {
-        if (!studentA.is_pre_transfer) return false;
-    }
-
-    // 3. 분산 배정 그룹(Custom Group)
-    // 그룹 멤버는 "같은 그룹 멤버끼리"만 교환 가능 (그래야 반별 그룹 인원이 유지됨)
-    // A가 그룹 멤버인데 B가 아니거나 다른 그룹이면 불가
-    const aGroups = studentA.group_ids || [];
-    const bGroups = studentB ? (studentB.group_ids || []) : [];
-
-    if (aGroups.length > 0) {
-        if (!studentB) return false; // 빈 자리로 가면 해당 반 그룹 인원 증가 -> 불가
-        // A의 모든 그룹에 대해 B도 속해있어야 함 (엄격한 기준)
-        // 또는 "Distribution Count"를 유지할 수 있는지 확인해야 함
-        // 가장 안전한 방법: 그룹 구성이 완전히 동일해야 함
-        if (aGroups.length !== bGroups.length) return false;
-        const bGroupSet = new Set(bGroups);
-        if (!aGroups.every(g => bGroupSet.has(g))) return false;
-    }
-    // B가 그룹 멤버인데 A는 아닌 경우도 불가
-    if (bGroups.length > 0) {
-        if (aGroups.length === 0) return false;
-        // 위에서 A기준 체크했으므로 여기선 패스 (구성이 다르면 위에서 걸러짐)
-    }
-
-    // 4. 피해야 할 관계 (Avoid)
-    // A가 targetClass로 갔을 때 상극 학생이 있으면 불가
-    if (studentA.avoid_ids && studentA.avoid_ids.length > 0) {
-        // targetClass가 이미 배정된 학생들 확인이 불가능한 스코프...
-        // 이 함수 호출 시점에서 검증 필요.
-        // 하지만 여기서는 간략히 체크하기 어려움.
-        // 따라서 "관계 설정이 있는 학생은 일반 로직에서 이동 제외"하는 것이 안전
-        return false;
-    }
-    // B가 A의 반으로 올 때 상극 학생이 있으면 불가
-    if (studentB && studentB.avoid_ids && studentB.avoid_ids.length > 0) {
-        return false;
-    }
-
-    // 5. 같은 반 희망 (Keep)
-    // Keep 관계가 있으면 함께 이동해야 하므로, 단일 교환 로직에선 제외
-    if (studentA.keep_ids && studentA.keep_ids.length > 0) return false;
-    if (studentB && studentB.keep_ids && studentB.keep_ids.length > 0) return false;
-
-    return true;
 }
 
 /**
@@ -455,122 +306,91 @@ function optimizeBalance(
     classNames: string[],
     groups: CustomGroup[],
     scoreTolerance: number,
-    isPreAssignedMode: boolean = false
+    isPreAssignedMode: boolean = false,
+    useAdvancedConstraints: boolean = true
 ): Student[] {
-    let iteration = 0;
+    // 1단계: 벌점 기반 공격적 최적화 (제약 조건 해결 우선)
+    // 상극, 희망, 고정 배정 위반을 해결하기 위해 성적 균형을 잠시 희생할 수 있음
+    // [조건 변경] 신규 배정 모드에서는 이 공격적 단계를 건너뜀 (기존 로직 유지)
+    if (useAdvancedConstraints && isPreAssignedMode) {
+        solveHardConstraints(students, classNames, groups);
+    }
 
+    // 2단계: 성분 균형 최적화 (기존 로직)
+    // 여기서는 기존에 해결된 제약 조건을 깨뜨리지 않는 선에서 성적/성비를 맞춤
+    let iteration = 0;
     while (iteration < MAX_ITERATIONS) {
         iteration++;
         let improved = false;
 
-        // 균형 상태 계산
-        const stats = getBalanceStats(students, classNames);
+        const stats = getImbalanceStats(students, classNames, groups);
 
-        // 1. 전체 학생 수 균형 (최우선)
+        // [주요 수준별 인원수 균형] - 우선순위 최고 (Bucket Quota)
+        // [조건 변경] 이 단계도 '재배정(Optimize)' 모드에서만 강력하게 적용
+        if (useAdvancedConstraints && isPreAssignedMode) {
+            if (balanceByTypeAndScoreLevel(students, classNames, groups, 'BEHAVIOR', -3)) improved = true;
+            if (balanceByTypeAndScoreLevel(students, classNames, groups, 'EMOTIONAL', -3)) improved = true;
+            if (balanceByTypeAndScoreLevel(students, classNames, groups, 'BEHAVIOR', -2)) improved = true;
+            if (balanceByTypeAndScoreLevel(students, classNames, groups, 'EMOTIONAL', -2)) improved = true;
+            if (balanceByTypeAndScoreLevel(students, classNames, groups, 'LEADER', 2)) improved = true;
+        }
+
         if (stats.studentCountImbalance > BALANCE_TOLERANCE) {
-            if (balanceStudentCount(students, classNames, scoreTolerance)) improved = true;
+            if (balanceStudentCount(students, classNames, groups, scoreTolerance)) improved = true;
         }
 
-        // 2. 성별 균형 (기배정 모드에서도 체크 - S자 배정이라도 불균형할 수 있음)
         if (stats.genderImbalance > BALANCE_TOLERANCE) {
-            if (balanceGender(students, classNames, scoreTolerance)) improved = true;
+            if (balanceGender(students, classNames, groups, scoreTolerance)) improved = true;
         }
 
-        // 3. 리더형 학생 수 균형 (필수 체크)
-        if (stats.leaderImbalance > BALANCE_TOLERANCE) {
-            if (balanceType(students, classNames, 'LEADER', scoreTolerance)) improved = true;
-        }
-
-        // 4. 행동형 학생 수 균형 (필수 체크)
-        if (stats.behaviorImbalance > BALANCE_TOLERANCE) {
-            if (balanceType(students, classNames, 'BEHAVIOR', scoreTolerance)) improved = true;
-        }
-
-        // 5. 정서형 학생 수 균형 (필수 체크)
-        if (stats.emotionalImbalance > BALANCE_TOLERANCE) {
-            if (balanceType(students, classNames, 'EMOTIONAL', scoreTolerance)) improved = true;
-        }
-
-        // 6. 행동형+정서형 합계 균형 (필수 체크)
-        if (stats.totalBehaviorEmotionalImbalance > BALANCE_TOLERANCE) {
-            if (balanceBehaviorEmotionalTotal(students, classNames, scoreTolerance)) improved = true;
-        }
-
-        // 기배정 모드일 경우, 과도한 재배치를 막기 위해 일부 로직만 적용
-        if (!isPreAssignedMode) {
-            // 7. 점수별 학생 수 균형 (-3, -2, -1, +1, +2)
-            if (stats.scoreMinus3Imbalance > BALANCE_TOLERANCE) {
-                if (balanceByScore(students, classNames, -3, scoreTolerance)) improved = true;
+        if (useAdvancedConstraints) {
+            if (stats.leaderImbalance > BALANCE_TOLERANCE) {
+                if (balanceType(students, classNames, groups, 'LEADER', scoreTolerance)) improved = true;
             }
-            if (stats.scoreMinus2Imbalance > BALANCE_TOLERANCE) {
-                if (balanceByScore(students, classNames, -2, scoreTolerance)) improved = true;
+            if (stats.behaviorImbalance > BALANCE_TOLERANCE) {
+                if (balanceType(students, classNames, groups, 'BEHAVIOR', scoreTolerance)) improved = true;
             }
-            if (stats.scoreMinus1Imbalance > BALANCE_TOLERANCE) {
-                if (balanceByScore(students, classNames, -1, scoreTolerance)) improved = true;
-            }
-            if (stats.scorePlus1Imbalance > BALANCE_TOLERANCE) {
-                if (balanceByScore(students, classNames, 1, scoreTolerance)) improved = true;
-            }
-            if (stats.scorePlus2Imbalance > BALANCE_TOLERANCE) {
-                if (balanceByScore(students, classNames, 2, scoreTolerance)) improved = true;
+            if (stats.emotionalImbalance > BALANCE_TOLERANCE) {
+                if (balanceType(students, classNames, groups, 'EMOTIONAL', scoreTolerance)) improved = true;
             }
 
-            // 8. 생활지도 총점 균형 (더 엄격하게)
-            if (stats.behaviorTotalImbalance > 2) {
-                if (balanceBehaviorTotal(students, classNames, scoreTolerance)) improved = true;
+            // 나머지 수준별 균형 (재배정 모드 전용)
+            if (useAdvancedConstraints && isPreAssignedMode) {
+                if (balanceByTypeAndScoreLevel(students, classNames, groups, 'BEHAVIOR', -1)) improved = true;
+                if (balanceByTypeAndScoreLevel(students, classNames, groups, 'EMOTIONAL', -1)) improved = true;
+                if (balanceByTypeAndScoreLevel(students, classNames, groups, 'LEADER', 1)) improved = true;
+                if (balanceByTypeAndScoreLevel(students, classNames, groups, 'BEHAVIOR', 1)) improved = true; // +1 행동
+                if (balanceByTypeAndScoreLevel(students, classNames, groups, 'EMOTIONAL', 1)) improved = true; // +1 정서
             }
 
-            // 8-1. 리더형 점수 합계 균형
-            if (stats.leaderScoreTotalImbalance > 2) {
-                if (balanceTypeScoreTotal(students, classNames, 'LEADER', scoreTolerance)) improved = true;
-            }
-            // 8-2. 행동형 점수 합계 균형
-            if (stats.behaviorOnlyScoreTotalImbalance > 2) {
-                if (balanceTypeScoreTotal(students, classNames, 'BEHAVIOR', scoreTolerance)) improved = true;
-            }
-            // 8-3. 정서형 점수 합계 균형
-            if (stats.emotionalOnlyScoreTotalImbalance > 2) {
-                if (balanceTypeScoreTotal(students, classNames, 'EMOTIONAL', scoreTolerance)) improved = true;
+            if (stats.totalBehaviorEmotionalImbalance > BALANCE_TOLERANCE) {
+                if (balanceBehaviorEmotionalTotal(students, classNames, groups, scoreTolerance)) improved = true;
             }
 
-            // 8-4. 유형+점수별 세분화 균형
-            if (balanceByTypeAndScore(students, classNames, 'BEHAVIOR', -3, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScore(students, classNames, 'BEHAVIOR', -2, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScore(students, classNames, 'BEHAVIOR', -1, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScore(students, classNames, 'EMOTIONAL', -3, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScore(students, classNames, 'EMOTIONAL', -2, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScore(students, classNames, 'EMOTIONAL', -1, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScore(students, classNames, 'LEADER', 2, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScore(students, classNames, 'LEADER', 1, scoreTolerance)) improved = true;
-
-            // 9. 성적 평균 균형
-            if (stats.scoreImbalance > 30) {
-                if (balanceScore(students, classNames)) improved = true;
-            }
-        } else {
-            // 기배정 모드: 심각한 불균형만 교정 (차이 2 이상)
-            // 유형+점수별 세분화 균형 (심각한 경우만: 행동형 -2/-3, 정서형 -2/-3)
-            if (balanceByTypeAndScoreStrict(students, classNames, 'BEHAVIOR', -3, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScoreStrict(students, classNames, 'BEHAVIOR', -2, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScoreStrict(students, classNames, 'EMOTIONAL', -3, scoreTolerance)) improved = true;
-            if (balanceByTypeAndScoreStrict(students, classNames, 'EMOTIONAL', -2, scoreTolerance)) improved = true;
-
-            // 생활지도 총점 균형 (차이가 심한 경우만)
-            if (stats.behaviorTotalImbalance > 3) {
-                if (balanceBehaviorTotal(students, classNames, scoreTolerance)) improved = true;
+            if (!isPreAssignedMode) {
+                if (stats.behaviorTotalImbalance > 2) {
+                    if (balanceBehaviorTotal(students, classNames, groups, scoreTolerance)) improved = true;
+                }
+                if (stats.leaderScoreTotalImbalance > 2) {
+                    if (balanceTypeScoreTotal(students, classNames, groups, 'LEADER', scoreTolerance)) improved = true;
+                }
+            } else {
+                if (stats.behaviorTotalImbalance > 3) {
+                    if (balanceBehaviorTotal(students, classNames, groups, scoreTolerance)) improved = true;
+                }
             }
         }
 
-        // 10. 상극 관계 해결 (중요)
-        if (fixAvoidViolations(students, classNames, scoreTolerance)) improved = true;
+        if (useAdvancedConstraints) {
+            if (fixAvoidViolations(students, classNames, groups, scoreTolerance)) improved = true;
+            if (fixKeepViolations(students, classNames, groups, scoreTolerance)) improved = true;
+            if (balanceCustomGroups(students, groups, classNames, scoreTolerance)) improved = true;
+        }
 
-        // 10-2. 같은 반 희망 해결 (중요)
-        if (fixKeepViolations(students, classNames, scoreTolerance)) improved = true;
+        if (stats.scoreImbalance > 30) {
+            if (balanceScore(students, classNames, groups)) improved = true;
+        }
 
-        // 11. 커스텀 그룹 초과 해결 (중요)
-        if (balanceCustomGroups(students, groups, classNames, scoreTolerance)) improved = true;
-
-        // 모든 조건 만족하면 종료
         if (!improved || isBalanced(stats)) break;
     }
 
@@ -578,24 +398,125 @@ function optimizeBalance(
 }
 
 /**
+ * 벌점 계산 (최적화 판단 기준)
+ */
+function calculatePenalty(students: Student[], classNames: string[], groups: CustomGroup[]): number {
+    let penalty = 0;
+    const stats = calculateClassStats(students, classNames, groups);
+
+    // 1. 통계적 불균형 벌점
+    penalty += (stats.reduce((sum, s) => sum + s.studentCount, 0) / stats.length); // 인원 불균형은 나중에 별도로
+    penalty += getImbalanceStats(students, classNames, groups).genderImbalance * PENALTY_WEIGHTS.GENDER_IMBALANCE;
+    penalty += getImbalanceStats(students, classNames, groups).scoreImbalance * PENALTY_WEIGHTS.ACADEMIC_IMBALANCE;
+    penalty += getImbalanceStats(students, classNames, groups).behaviorTotalImbalance * PENALTY_WEIGHTS.BEHAVIOR_IMBALANCE;
+
+    // 2. 개별 학생 제약 조건 위반 벌점
+    for (const s1 of students) {
+        if (!s1.assigned_class) continue;
+
+        // 고정 배정 위반
+        if (s1.fixed_class && s1.assigned_class !== s1.fixed_class) {
+            penalty += PENALTY_WEIGHTS.FIXED_VIOLATION;
+        }
+
+        // 상극 관계 위반
+        for (const avoidId of s1.avoid_ids) {
+            const s2 = students.find(s => s.id === avoidId);
+            if (s2 && s2.assigned_class === s1.assigned_class) {
+                penalty += PENALTY_WEIGHTS.AVOID_VIOLATION;
+            }
+        }
+
+        // 희망 관계 위반
+        for (const keepId of s1.keep_ids) {
+            const s2 = students.find(s => s.id === keepId);
+            if (s2 && s2.assigned_class && s2.assigned_class !== s1.assigned_class) {
+                penalty += PENALTY_WEIGHTS.KEEP_VIOLATION;
+            }
+        }
+    }
+
+    // 3. 커스텀 그룹 몰림 벌점
+    groups.forEach(g => {
+        stats.forEach(s => {
+            const count = s.groupCounts[g.id] || 0;
+            if (count > 1) {
+                penalty += (count - 1) * PENALTY_WEIGHTS.GROUP_OVERLOAD;
+            }
+        });
+    });
+
+    return penalty;
+}
+
+/**
+ * 상극/전출/고정/그룹 조건을 해결하기 위한 공격적 교환
+ */
+function solveHardConstraints(students: Student[], classNames: string[], groups: CustomGroup[]) {
+    let improved = true;
+    let iteration = 0;
+
+    while (improved && iteration < 50) {
+        improved = false;
+        iteration++;
+
+        let currentPenalty = calculatePenalty(students, classNames, groups);
+
+        // 위반 사항이 있는 학생들을 우선적으로 검토
+        const candidates = students.filter(s =>
+            !s.fixed_class &&
+            !s.is_pre_transfer &&
+            (s.avoid_ids.length > 0 || s.keep_ids.length > 0 || groups.some(g => g.member_ids.includes(s.id)))
+        );
+
+        // 학생들 섞기 (매번 같은 순서 방지)
+        shuffleArray(candidates);
+
+        for (const s1 of candidates) {
+            const classA = s1.assigned_class!;
+
+            // 모든 다른 반의 모든 학생과 교환 시도
+            for (const targetClass of classNames) {
+                if (targetClass === classA) continue;
+
+                const otherStudents = students.filter(s => s.assigned_class === targetClass && !s.fixed_class && !s.is_pre_transfer && s.gender === s1.gender);
+                shuffleArray(otherStudents);
+
+                for (const s2 of otherStudents) {
+                    // 교환 시뮬레이션
+                    s1.assigned_class = targetClass;
+                    s2.assigned_class = classA;
+
+                    const newPenalty = calculatePenalty(students, classNames, groups);
+
+                    if (newPenalty < currentPenalty) {
+                        // 개선됨! 교환 확정
+                        currentPenalty = newPenalty;
+                        improved = true;
+                        break;
+                    } else {
+                        // 원상 복구
+                        s1.assigned_class = classA;
+                        s2.assigned_class = targetClass;
+                    }
+                }
+                if (improved) break;
+            }
+            if (improved) break;
+        }
+    }
+}
+
+/**
  * 전출생 초기 배정 (최종 로직)
- * 전출생은 곧 사라지므로 성비/인원 계산에서 제외하고, 마지막에 배정
- * 
- * 우선순위:
- * 1. 전출생이 없는 반 (1반 1명 규칙)
- * 2. 인원이 적은 반 (현재 균형 맞추기)
- * 3. 현재 성비 개선 (해당 성별이 적은 반 선호)
- * 4. 떠난 후 성비 균형 (폴백)
  */
 function assignPreTransferStudents(students: Student[], classNames: string[]): void {
     const preTransfers = students.filter(s => s.is_pre_transfer && !s.fixed_class && !s.assigned_class);
     if (preTransfers.length === 0) return;
 
-    // 반별 전출생 배정 카운트 초기화
     const preTransferCounts: Record<string, number> = {};
     classNames.forEach(cn => preTransferCounts[cn] = 0);
 
-    // 고정반으로 이미 배정된 전출생 카운트
     students.forEach(s => {
         if (s.is_pre_transfer && s.assigned_class) {
             preTransferCounts[s.assigned_class] = (preTransferCounts[s.assigned_class] || 0) + 1;
@@ -604,50 +525,35 @@ function assignPreTransferStudents(students: Student[], classNames: string[]): v
 
     for (const student of preTransfers) {
         const gender = student.gender;
-
-        // 1. 현재 반별 통계 계산 (전출생 제외한 일반 학생 기준)
         const classStats = classNames.map(cn => {
-            // 일반 학생만 카운트 (전출생 제외)
             const normalStudents = students.filter(s => s.assigned_class === cn && !s.is_pre_transfer);
             const maleCount = normalStudents.filter(s => s.gender === 'M').length;
             const femaleCount = normalStudents.filter(s => s.gender === 'F').length;
 
             return {
                 className: cn,
-                totalCount: normalStudents.length, // 일반 학생만
+                totalCount: normalStudents.length,
                 maleCount,
                 femaleCount,
                 genderCount: gender === 'M' ? maleCount : femaleCount,
                 oppositeGenderCount: gender === 'M' ? femaleCount : maleCount,
                 preTransferCount: preTransferCounts[cn],
-                // 현재 성비 불균형 (해당 성별이 적을수록 높은 우선순위)
                 genderImbalance: gender === 'M' ? (femaleCount - maleCount) : (maleCount - femaleCount)
             };
         });
 
-        // 2. 후보군 필터링: 전출생이 아직 없는 반 우선
         let candidates = classStats.filter(c => c.preTransferCount === 0);
-
-        // 빈 반이 없으면 가장 적은 곳
         if (candidates.length === 0) {
             const minCount = Math.min(...classStats.map(c => c.preTransferCount));
             candidates = classStats.filter(c => c.preTransferCount === minCount);
         }
 
-        // 3. 정렬: 총인원(오름차순, 적은 반 우선) > 성비불균형(내림차순, 해당 성별 적은 반 우선)
         candidates.sort((a, b) => {
-            // 1순위: 인원 적은 반 (현재 균형 맞추기)
             if (a.totalCount !== b.totalCount) return a.totalCount - b.totalCount;
-
-            // 2순위: 현재 성비 개선 (해당 성별이 적은 반 = genderImbalance 높은 반)
-            // genderImbalance가 양수 = 반대 성별이 많음 = 이 성별 추가하면 균형
             if (b.genderImbalance !== a.genderImbalance) return b.genderImbalance - a.genderImbalance;
-
-            // 3순위: 랜덤 (동점일 경우)
             return Math.random() - 0.5;
         });
 
-        // 4. 배정
         const target = candidates[0];
         if (target) {
             student.assigned_class = target.className;
@@ -658,10 +564,8 @@ function assignPreTransferStudents(students: Student[], classNames: string[]): v
 
 /**
  * 전출생 분산 최종 검증
- * 최적화 루프 후 여전히 뭉침이 있으면 강제 교정
  */
 function validatePreTransferDistribution(students: Student[], classNames: string[]): void {
-    // 최대 10번 반복
     for (let iter = 0; iter < 10; iter++) {
         const classPreCounts: Record<string, Student[]> = {};
         classNames.forEach(cn => classPreCounts[cn] = []);
@@ -672,950 +576,320 @@ function validatePreTransferDistribution(students: Student[], classNames: string
             }
         });
 
-        // 2명 이상인 반 찾기
         const overloaded = Object.entries(classPreCounts).filter(([, list]) => list.length > 1);
-        if (overloaded.length === 0) return; // 분산 완료
+        if (overloaded.length === 0) return;
 
-        // 0명인 반 찾기
         const emptyClasses = classNames.filter(cn => classPreCounts[cn].length === 0);
-        if (emptyClasses.length === 0) return; // 분산 불가 (전출생 > 학급수)
+        if (emptyClasses.length === 0) return;
 
         let fixed = false;
-
-        for (const [sourceClass, movers] of overloaded) {
-            const mover = movers[0]; // 이동시킬 전출생
-
-            // 빈 반들 중 하나 선택 (인원 많고, 성별 맞는 곳 우선)
-            const targetStats = emptyClasses.map(cn => ({
-                className: cn,
-                totalCount: students.filter(s => s.assigned_class === cn).length,
-                genderCount: students.filter(s => s.assigned_class === cn && s.gender === mover.gender).length
-            }));
-
-            targetStats.sort((a, b) => {
-                if (b.totalCount !== a.totalCount) return b.totalCount - a.totalCount;
-                return b.genderCount - a.genderCount;
-            });
-
-            const targetClass = targetStats[0]?.className;
-            if (!targetClass) continue;
-
-            // 교환 상대 찾기 (1순위: 성별 일치, 2순위: 아무나)
-            let swapPartner = students.find(s =>
-                s.assigned_class === targetClass &&
-                !s.is_pre_transfer &&
-                !s.fixed_class &&
-                s.gender === mover.gender
-            );
-
-            if (!swapPartner) {
-                swapPartner = students.find(s =>
+        for (const [className, list] of overloaded) {
+            for (const student of list) {
+                if (student.fixed_class) continue;
+                const targetClass = emptyClasses[0];
+                const studentB = students.find(s =>
                     s.assigned_class === targetClass &&
                     !s.is_pre_transfer &&
-                    !s.fixed_class
-                );
-            }
-
-            if (swapPartner) {
-                const temp = mover.assigned_class;
-                mover.assigned_class = swapPartner.assigned_class;
-                swapPartner.assigned_class = temp;
-                fixed = true;
-                break;
-            }
-        }
-
-        if (!fixed) return; // 더 이상 교정 불가
-    }
-}
-
-
-/**
- * 상극 관계 해결
- */
-function fixAvoidViolations(students: Student[], classNames: string[], scoreTolerance: number): boolean {
-    let fixed = false;
-
-    for (const student of students) {
-        if (!student.assigned_class) continue;
-
-        for (const avoidId of student.avoid_ids) {
-            const avoidStudent = students.find(s => s.id === avoidId);
-            if (avoidStudent && avoidStudent.assigned_class === student.assigned_class) {
-                // 다른 반에서 같은 성별, 성적 유사한 학생과 교환
-                // 우선순위: canSwapForGeneralBalance를 만족하는(그룹 밸런스 안 깨는) 후보 우선
-                const otherClass = classNames.find(cn => cn !== student.assigned_class);
-                if (otherClass) {
-                    const candidates = students.filter(s =>
-                        s.assigned_class === otherClass &&
-                        s.gender === student.gender &&
-                        s.behavior_type === student.behavior_type &&
-                        !s.fixed_class &&
-                        !s.is_pre_transfer && // 전출생은 스왑 대상에서 제외
-                        Math.abs(s.academic_score - student.academic_score) <= scoreTolerance
-                    );
-
-                    // 1. 안전한 교환 시도
-                    let swapCandidate = candidates.find(s => canSwapForGeneralBalance(student, s, otherClass));
-
-                    // 2. 없으면 불완전 교환이라도 시도 (Avoid 해결이 더 급함)
-                    // 단, Fix 단계 이후 balanceCustomGroups가 복구해주길 기대
-                    if (!swapCandidate) {
-                        swapCandidate = candidates[0];
-                    }
-
-                    if (swapCandidate && !student.fixed_class) {
-                        const tempClass = student.assigned_class;
-                        student.assigned_class = swapCandidate.assigned_class;
-                        swapCandidate.assigned_class = tempClass;
-                        fixed = true;
-                        // 한 명 해결했으면 break (상태 변화 발생했으므로 루프 재진입 권장)
-                        // 여기선 루프 계속 돌지만 플래그 true
-                    }
-                }
-            }
-        }
-    }
-
-    return fixed;
-}
-
-/**
- * 커스텀 그룹 균형 배정 (최대 인원 제한보다 균등 분배 우선)
- */
-function balanceCustomGroups(
-    students: Student[],
-    groups: CustomGroup[],
-    classNames: string[],
-    scoreTolerance: number
-): boolean {
-    let fixed = false;
-
-    for (const group of groups) {
-        const classCount: Record<string, number> = {};
-        classNames.forEach(cn => { classCount[cn] = 0; });
-
-        students.forEach(s => {
-            if (group.member_ids.includes(s.id) && s.assigned_class) {
-                classCount[s.assigned_class]++;
-            }
-        });
-
-        const sortedCounts = Object.entries(classCount).sort(([, a], [, b]) => b - a);
-        const maxClassObj = sortedCounts[0];
-        const minClassObj = sortedCounts[sortedCounts.length - 1];
-
-        if (maxClassObj[1] - minClassObj[1] > 1) {
-            const sourceClass = maxClassObj[0];
-            const targetClass = minClassObj[0];
-
-            // 이동할 학생 후보들 찾기 (모든 후보 탐색)
-            const potentialMovers = students.filter(s =>
-                s.assigned_class === sourceClass &&
-                group.member_ids.includes(s.id) &&
-                !s.fixed_class
-            );
-
-            for (const studentToMove of potentialMovers) {
-                // 이동할 그룹(단위) 구성: 본인 + 같은 반에 있는 짝꿍들
-                const flockIds = [studentToMove.id, ...studentToMove.keep_ids];
-                const flockToMove = students.filter(s =>
-                    flockIds.includes(s.id) &&
-                    s.assigned_class === sourceClass
-                );
-
-                const moveCount = flockToMove.length;
-
-                // 타겟 반에서 교환할 대상을 찾음 (MoveCount 만큼)
-                // 조건: 해당 그룹 멤버가 X, 고정 X, Keep X (단순 교환용)
-                const swapCandidates = students.filter(s =>
-                    s.assigned_class === targetClass &&
-                    !group.member_ids.includes(s.id) &&
                     !s.fixed_class &&
-                    s.keep_ids.length === 0
+                    s.gender === student.gender &&
+                    s.academic_score >= student.academic_score - 50 &&
+                    s.academic_score <= student.academic_score + 50
                 );
 
-                if (swapCandidates.length >= moveCount) {
-                    // 일괄 교환
-                    const targets = swapCandidates.slice(0, moveCount);
-                    flockToMove.forEach(s => s.assigned_class = targetClass);
-                    targets.forEach(s => s.assigned_class = sourceClass);
-
-                    // 상태 업데이트 (루프 내에서 재사용하진 않지만 flag 설정을 위해)
+                if (studentB) {
+                    student.assigned_class = targetClass;
+                    studentB.assigned_class = className;
                     fixed = true;
-                    break; // 해결했으면 다음 그룹으로
+                    break;
                 }
             }
+            if (fixed) break;
         }
+        if (!fixed) break;
     }
-
-    return fixed;
-}
-interface BalanceStats {
-    studentCountImbalance: number;
-    genderImbalance: number;
-    leaderImbalance: number;
-    behaviorImbalance: number;
-    emotionalImbalance: number;
-    totalBehaviorEmotionalImbalance: number;
-    scoreImbalance: number;
-    // 점수별 불균형
-    scoreMinus3Imbalance: number;
-    scoreMinus2Imbalance: number;
-    scoreMinus1Imbalance: number;
-    scorePlus1Imbalance: number;
-    scorePlus2Imbalance: number;
-
-    behaviorTotalImbalance: number;
-    behaviorPlus1Imbalance: number;
-    behaviorPlus2Imbalance: number;
-    behaviorPlus3Imbalance: number;
-    emotionalPlus1Imbalance: number;
-    emotionalPlus2Imbalance: number;
-    emotionalPlus3Imbalance: number;
-    normalCountImbalance: number;
-    // 유형별 점수 합계 불균형 (새로 추가)
-    leaderScoreTotalImbalance: number;
-    behaviorOnlyScoreTotalImbalance: number;
-    emotionalOnlyScoreTotalImbalance: number;
 }
 
-// 반별 통계 계산 (확장)
-export function calculateClassStats(
-    students: Student[],
-    classCount: number,
-    groups: CustomGroup[] = []
-): ClassStats[] {
-    const defaultStats: ClassStats = {
-        className: '',
-        studentCount: 0,
-        averageScore: 0,
-        behaviorTotal: 0,
-        maleCount: 0,
-        femaleCount: 0,
-        leaderCount: 0,
-        behaviorTypeCount: 0,
-        emotionalCount: 0,
-        scoreMinus3: 0,
-        scoreMinus2: 0,
-        scoreMinus1: 0,
-        scorePlus1: 0,
-        scorePlus2: 0,
-        scorePlus3: 0,
-        behaviorPlus1: 0,
-        behaviorPlus2: 0,
-        behaviorPlus3: 0,
-        emotionalPlus1: 0,
-        emotionalPlus2: 0,
-        emotionalPlus3: 0,
-        normalCount: 0,
-        groupCounts: {},
-        preTransferMaleCount: 0,
-        preTransferFemaleCount: 0,
-    };
+/**
+ * 학급별 통계 계산 (UI 표시용)
+ */
+export function calculateClassStats(students: Student[], classCountOrNames: number | string[], groups: CustomGroup[] = []) {
+    const classNames = typeof classCountOrNames === 'number'
+        ? Array.from({ length: classCountOrNames }, (_, i) => `${i + 1}반`)
+        : classCountOrNames;
 
-    const statsMap: Record<string, ClassStats> = {};
+    return classNames.map(cn => {
+        const cs = students.filter(s => s.assigned_class === cn);
+        const normal = cs.filter(s => !s.is_pre_transfer);
+        const preTransfer = cs.filter(s => s.is_pre_transfer);
 
-    for (let i = 1; i <= classCount; i++) {
-        const className = `${i}반`;
-        statsMap[className] = {
-            ...defaultStats,
-            className,
-            groupCounts: {}, // 깊은 복사 필요
-        };
-        // 그룹 카운트 초기화
-        groups.forEach((g) => {
-            statsMap[className].groupCounts[g.id] = 0;
-        });
-    }
+        return {
+            className: cn,
+            studentCount: cs.length,
+            normalCount: normal.length,
+            maleCount: cs.filter(s => s.gender === 'M').length,
+            femaleCount: cs.filter(s => s.gender === 'F').length,
+            averageScore: cs.length > 0 ? Math.round(cs.reduce((sum, s) => sum + s.academic_score, 0) / cs.length) : 0,
+            behaviorTotal: cs.reduce((sum, s) => sum + s.behavior_score, 0),
 
-    students.forEach((s) => {
-        if (!s.assigned_class) return;
-        const stats = statsMap[s.assigned_class];
-        if (!stats) return;
+            // UI에서 기대하는 필드명 (상당히 특이하지만 맞춰줌)
+            behaviorPlus3: cs.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -3).length,
+            behaviorPlus2: cs.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -2).length,
+            behaviorPlus1: cs.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -1).length,
 
-        stats.studentCount++;
-        stats.averageScore += s.academic_score;
-        stats.behaviorTotal += s.behavior_score;
+            emotionalPlus3: cs.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -3).length,
+            emotionalPlus2: cs.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -2).length,
+            emotionalPlus1: cs.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -1).length,
 
-        if (s.gender === 'M') {
-            stats.maleCount++;
-            if (s.is_pre_transfer) stats.preTransferMaleCount++;
-        } else {
-            stats.femaleCount++;
-            if (s.is_pre_transfer) stats.preTransferFemaleCount++;
-        }
+            scorePlus1: cs.filter(s => s.behavior_type === 'LEADER' && s.behavior_score === 1).length,
+            scorePlus2: cs.filter(s => s.behavior_type === 'LEADER' && s.behavior_score >= 2).length,
 
-        if (s.behavior_type === 'LEADER') stats.leaderCount++;
-        else if (s.behavior_type === 'BEHAVIOR') stats.behaviorTypeCount++;
-        else if (s.behavior_type === 'EMOTIONAL') stats.emotionalCount++;
+            preTransferCount: preTransfer.length,
+            preTransferMaleCount: preTransfer.filter(s => s.gender === 'M').length,
+            preTransferFemaleCount: preTransfer.filter(s => s.gender === 'F').length,
 
-        // 점수별 상세 집계
-        if (s.behavior_score === -3) stats.scoreMinus3++;
-        if (s.behavior_score === -2) stats.scoreMinus2++;
-        if (s.behavior_score === -1) stats.scoreMinus1++;
-        if (s.behavior_score === 1) stats.scorePlus1++;
-        if (s.behavior_score === 2) stats.scorePlus2++;
-        if (s.behavior_score === 3) stats.scorePlus3++;
-
-        if (s.behavior_score === 0) stats.normalCount++;
-        else if (s.behavior_score === -1) {
-            if (s.behavior_type === 'BEHAVIOR') stats.behaviorPlus1++;
-            if (s.behavior_type === 'EMOTIONAL') stats.emotionalPlus1++;
-        } else if (s.behavior_score === -2) {
-            if (s.behavior_type === 'BEHAVIOR') stats.behaviorPlus2++;
-            if (s.behavior_type === 'EMOTIONAL') stats.emotionalPlus2++;
-        } else if (s.behavior_score === -3) {
-            if (s.behavior_type === 'BEHAVIOR') stats.behaviorPlus3++;
-            if (s.behavior_type === 'EMOTIONAL') stats.emotionalPlus3++;
-        }
-
-        s.group_ids.forEach((gid) => {
-            if (stats.groupCounts[gid] !== undefined) {
-                stats.groupCounts[gid]++;
-            }
-        });
-    });
-
-    // 평균 계산
-    Object.values(statsMap).forEach((stats) => {
-        if (stats.studentCount > 0) {
-            stats.averageScore = Math.round(stats.averageScore / stats.studentCount);
-        }
-    });
-
-    return Object.values(statsMap).sort((a, b) => {
-        const numA = parseInt(a.className.replace('반', ''));
-        const numB = parseInt(b.className.replace('반', ''));
-        return numA - numB;
-    });
-}
-
-function getBalanceStats(students: Student[], classNames: string[]): BalanceStats {
-    const classCounts: Record<string, {
-        total: number;
-        male: number;
-        female: number;
-        leader: number;
-        behavior: number;
-        emotional: number;
-        behaviorEmotional: number;
-        scoreSum: number;
-        scoreMinus3: number;
-        scoreMinus2: number;
-        scoreMinus1: number;
-        scorePlus1: number;
-        scorePlus2: number;
-        scorePlus3: number;
-        behaviorTotal: number;
-        behaviorPlus1: number;
-        behaviorPlus2: number;
-        behaviorPlus3: number;
-        emotionalPlus1: number;
-        emotionalPlus2: number;
-        emotionalPlus3: number;
-        normalCount: number;
-        // 유형별 점수 합계 (새로 추가)
-        leaderScoreTotal: number;
-        behaviorOnlyScoreTotal: number;
-        emotionalOnlyScoreTotal: number;
-    }> = {};
-
-    classNames.forEach(cn => {
-        const classStudents = students.filter(s => s.assigned_class === cn);
-        classCounts[cn] = {
-            total: classStudents.length,
-            male: classStudents.filter(s => s.gender === 'M').length,
-            female: classStudents.filter(s => s.gender === 'F').length,
-            leader: classStudents.filter(s => s.behavior_type === 'LEADER').length,
-            behavior: classStudents.filter(s => s.behavior_type === 'BEHAVIOR').length,
-            emotional: classStudents.filter(s => s.behavior_type === 'EMOTIONAL').length,
-            behaviorEmotional: classStudents.filter(s => s.behavior_type === 'BEHAVIOR' || s.behavior_type === 'EMOTIONAL').length,
-            scoreSum: classStudents.reduce((sum, s) => sum + s.academic_score, 0),
-            scoreMinus3: classStudents.filter(s => s.behavior_score === -3).length,
-            scoreMinus2: classStudents.filter(s => s.behavior_score === -2).length,
-            scoreMinus1: classStudents.filter(s => s.behavior_score === -1).length,
-            scorePlus1: classStudents.filter(s => s.behavior_score === 1).length,
-            scorePlus2: classStudents.filter(s => s.behavior_score === 2).length,
-            scorePlus3: classStudents.filter(s => s.behavior_score === 3).length,
-            behaviorTotal: classStudents.reduce((sum, s) => sum + s.behavior_score, 0),
-            behaviorPlus1: classStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -1).length,
-            behaviorPlus2: classStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -2).length,
-            behaviorPlus3: classStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -3).length,
-            emotionalPlus1: classStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -1).length,
-            emotionalPlus2: classStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -2).length,
-            emotionalPlus3: classStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -3).length,
-            normalCount: classStudents.filter(s => s.behavior_score === 0).length,
-            // 유형별 점수 합계
-            leaderScoreTotal: classStudents.filter(s => s.behavior_type === 'LEADER').reduce((sum, s) => sum + s.behavior_score, 0),
-            behaviorOnlyScoreTotal: classStudents.filter(s => s.behavior_type === 'BEHAVIOR').reduce((sum, s) => sum + s.behavior_score, 0),
-            emotionalOnlyScoreTotal: classStudents.filter(s => s.behavior_type === 'EMOTIONAL').reduce((sum, s) => sum + s.behavior_score, 0),
+            groupCounts: groups.reduce((acc, g) => {
+                acc[g.id] = cs.filter(s => g.member_ids.includes(s.id)).length;
+                return acc;
+            }, {} as Record<string, number>)
         };
     });
+}
 
-    const values = Object.values(classCounts);
+/**
+ * 알고리즘 내부용 불균형 수치 계산
+ */
+function getImbalanceStats(students: Student[], classNames: string[], groups: CustomGroup[]) {
+    const statsArray = calculateClassStats(students, classNames, groups);
 
-    const getImbalance = (getter: (v: typeof values[0]) => number): number => {
-        const vals = values.map(getter);
-        return Math.max(...vals) - Math.min(...vals);
-    };
+    const counts = statsArray.map(s => s.studentCount);
+    const males = statsArray.map(s => s.maleCount);
+    const females = statsArray.map(s => s.femaleCount);
+    const avgs = statsArray.map(s => s.averageScore);
+    const behaviorTotals = statsArray.map(s => s.behaviorTotal);
 
-    const avgScores = values.map(v => v.total > 0 ? v.scoreSum / v.total : 0);
+    // 복잡한 필드들은 statsArray에서 직접 추출
+    const leaders = statsArray.map(s => s.scorePlus1 + s.scorePlus2);
+    const behaviors = statsArray.map(s => s.behaviorPlus3 + s.behaviorPlus2 + s.behaviorPlus1);
+    const emotionals = statsArray.map(s => s.emotionalPlus3 + s.emotionalPlus2 + s.emotionalPlus1);
+    const m3s = statsArray.map(s => s.behaviorPlus3 + s.emotionalPlus3);
 
     return {
-        studentCountImbalance: getImbalance(v => v.total),
-        genderImbalance: Math.max(getImbalance(v => v.male), getImbalance(v => v.female)),
-        leaderImbalance: getImbalance(v => v.leader),
-        behaviorImbalance: getImbalance(v => v.behavior),
-        emotionalImbalance: getImbalance(v => v.emotional),
-        totalBehaviorEmotionalImbalance: getImbalance(v => v.behaviorEmotional),
-        scoreImbalance: Math.max(...avgScores) - Math.min(...avgScores),
-        scoreMinus3Imbalance: getImbalance(v => v.scoreMinus3),
-        scoreMinus2Imbalance: getImbalance(v => v.scoreMinus2),
-        scoreMinus1Imbalance: getImbalance(v => v.scoreMinus1),
-        scorePlus1Imbalance: getImbalance(v => v.scorePlus1),
-        scorePlus2Imbalance: getImbalance(v => v.scorePlus2),
-        behaviorTotalImbalance: getImbalance(v => v.behaviorTotal),
-        behaviorPlus1Imbalance: getImbalance(v => v.behaviorPlus1),
-        behaviorPlus2Imbalance: getImbalance(v => v.behaviorPlus2),
-        behaviorPlus3Imbalance: getImbalance(v => v.behaviorPlus3),
-        emotionalPlus1Imbalance: getImbalance(v => v.emotionalPlus1),
-        emotionalPlus2Imbalance: getImbalance(v => v.emotionalPlus2),
-        emotionalPlus3Imbalance: getImbalance(v => v.emotionalPlus3),
-        normalCountImbalance: getImbalance(v => v.normalCount),
-        // 유형별 점수 합계 불균형
-        leaderScoreTotalImbalance: getImbalance(v => v.leaderScoreTotal),
-        behaviorOnlyScoreTotalImbalance: getImbalance(v => v.behaviorOnlyScoreTotal),
-        emotionalOnlyScoreTotalImbalance: getImbalance(v => v.emotionalOnlyScoreTotal),
+        studentCountImbalance: Math.max(...counts) - Math.min(...counts),
+        genderImbalance: Math.max(...males) - Math.min(...males) + Math.max(...females) - Math.min(...females),
+        scoreImbalance: Math.max(...avgs) - Math.min(...avgs),
+        behaviorTotalImbalance: Math.max(...behaviorTotals) - Math.min(...behaviorTotals),
+        leaderImbalance: Math.max(...leaders) - Math.min(...leaders),
+        behaviorImbalance: Math.max(...behaviors) - Math.min(...behaviors),
+        emotionalImbalance: Math.max(...emotionals) - Math.min(...emotionals),
+        totalBehaviorEmotionalImbalance: Math.max(...behaviors.map((b, i) => b + emotionals[i])) - Math.min(...behaviors.map((b, i) => b + emotionals[i])),
+        scoreMinus3Imbalance: Math.max(...m3s) - Math.min(...m3s),
+        scoreMinus2Imbalance: Math.max(...statsArray.map(s => s.behaviorPlus2 + s.emotionalPlus2)) - Math.min(...statsArray.map(s => s.behaviorPlus2 + s.emotionalPlus2)),
+        scoreMinus1Imbalance: Math.max(...statsArray.map(s => s.behaviorPlus1 + s.emotionalPlus1)) - Math.min(...statsArray.map(s => s.behaviorPlus1 + s.emotionalPlus1)),
+        scorePlus1Imbalance: Math.max(...statsArray.map(s => s.scorePlus1)) - Math.min(...statsArray.map(s => s.scorePlus1)),
+        scorePlus2Imbalance: Math.max(...statsArray.map(s => s.scorePlus2)) - Math.min(...statsArray.map(s => s.scorePlus2)),
+        leaderScoreTotalImbalance: 0, // Placeholder
+        behaviorOnlyScoreTotalImbalance: 0, // Placeholder
+        emotionalOnlyScoreTotalImbalance: 0, // Placeholder
     };
 }
 
-function isBalanced(stats: BalanceStats): boolean {
+function isBalanced(stats: any): boolean {
     return stats.studentCountImbalance <= BALANCE_TOLERANCE &&
         stats.genderImbalance <= BALANCE_TOLERANCE &&
-        stats.leaderImbalance <= BALANCE_TOLERANCE &&
-        stats.behaviorImbalance <= BALANCE_TOLERANCE &&
-        stats.emotionalImbalance <= BALANCE_TOLERANCE &&
-        stats.totalBehaviorEmotionalImbalance <= BALANCE_TOLERANCE + 1 &&
         stats.scoreImbalance <= 30 &&
-        stats.scoreMinus3Imbalance <= BALANCE_TOLERANCE &&
-        stats.scoreMinus2Imbalance <= BALANCE_TOLERANCE &&
-        stats.scoreMinus1Imbalance <= BALANCE_TOLERANCE &&
-        stats.scorePlus1Imbalance <= BALANCE_TOLERANCE &&
-        stats.scorePlus2Imbalance <= BALANCE_TOLERANCE &&
         stats.behaviorTotalImbalance <= 2;
 }
 
 /**
- * 전체 학생 수 균형
+ * 학생 수 균형 맞추기
  */
-/**
- * 전체 학생 수 균형
- */
-function balanceStudentCount(students: Student[], classNames: string[], scoreTolerance: number): boolean {
+function balanceStudentCount(students: Student[], classNames: string[], groups: CustomGroup[], scoreTolerance: number): boolean {
     const counts: Record<string, number> = {};
-    classNames.forEach(cn => {
-        counts[cn] = students.filter(s => s.assigned_class === cn).length;
-    });
+    classNames.forEach(cn => counts[cn] = students.filter(s => s.assigned_class === cn).length);
 
-    const sorted = Object.entries(counts).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+    if (sorted[0][1] - sorted[sorted.length - 1][1] <= BALANCE_TOLERANCE) return false;
+
     const maxClass = sorted[0][0];
     const minClass = sorted[sorted.length - 1][0];
 
-    if (sorted[0][1] - sorted[sorted.length - 1][1] <= BALANCE_TOLERANCE) return false;
-
-    // 많은 반에서 적은 반으로 학생 이동
-    // 단순 이동이 아니라, 적은 반의 빈 자리로 이동하거나(빈자리가 있다면), 적절한 교환이 필요함.
-    // 하지만 여기서는 "이동"을 시도함. canSwapForGeneralBalance(A, undefined, target)
-    // -> studentB가 undefined이면 "빈 자리로 이동"을 의미함.
-    const studentToMove = students.find(s =>
-        s.assigned_class === maxClass &&
-        canSwapForGeneralBalance(s, undefined, minClass)
-    );
-
+    const studentToMove = students.find(s => s.assigned_class === maxClass && canSwapForGeneralBalance(s, undefined, minClass, students, groups));
     if (studentToMove) {
         studentToMove.assigned_class = minClass;
         return true;
     }
-
-    // 만약 단순 이동이 불가능하다면(예: 모든 학생이 그룹/관계 등에 묶여있어서),
-    // 교환(Swap)을 시도해야 할 수도 있음. 하지만 "수"를 맞추는 것이므로 교환은 의미가 없음 (1명 빠지고 1명 들어오면 수 변화 없음)
-    // 따라서 수 불균형 해소는 "이동 가능한 학생"이 있어야만 함.
-
     return false;
 }
 
 /**
- * 성별 균형
+ * 성별 균형 맞추기
  */
-function balanceGender(students: Student[], classNames: string[], scoreTolerance: number): boolean {
-    for (const gender of ['M', 'F'] as const) {
-        const counts: Record<string, number> = {};
-        classNames.forEach(cn => {
-            counts[cn] = students.filter(s => s.assigned_class === cn && s.gender === gender).length;
-        });
+function balanceGender(students: Student[], classNames: string[], groups: CustomGroup[], scoreTolerance: number): boolean {
+    const maleCounts: Record<string, number> = {};
+    const femaleCounts: Record<string, number> = {};
+    classNames.forEach(cn => {
+        maleCounts[cn] = students.filter(s => s.assigned_class === cn && s.gender === 'M').length;
+        femaleCounts[cn] = students.filter(s => s.assigned_class === cn && s.gender === 'F').length;
+    });
 
-        const sorted = Object.entries(counts).sort(([, a], [, b]) => {
-            const diff = b - a;
-            if (diff !== 0) return diff;
-            return Math.random() - 0.5;
-        });
-        if (sorted[0][1] - sorted[sorted.length - 1][1] > BALANCE_TOLERANCE) {
-            const maxClass = sorted[0][0];
-            const minClass = sorted[sorted.length - 1][0];
-
-            // 같은 성별, 성적 비슷한 학생과 교환
-            // studentA: maxClass의 gender 학생
-            // studentB: minClass의 !gender 학생 (교환하여 gender 수 맞춤)
-            const studentA = students.find(s =>
-                s.assigned_class === maxClass && s.gender === gender &&
-                // A가 minClass로 갈 수 있는지 체크 (B가 미정인 상태지만, 일단 A 자체 제약 확인)
-                // 하지만 canSwap은 쌍방 체크이므로 루프 안에서 확인해야 함
-                !s.fixed_class
-            );
-
-            if (!studentA) continue; // A 후보 없음
-
-            // A와 교환 가능한 B 찾기
-            const studentB = students.find(s =>
-                s.assigned_class === minClass && s.gender !== gender &&
-                canSwapForGeneralBalance(studentA, s, minClass) && // 스마트 스왑 체크
-                Math.abs(s.academic_score - studentA.academic_score) <= scoreTolerance
-            );
-
-            if (studentA && studentB) {
-                studentA.assigned_class = minClass;
-                studentB.assigned_class = maxClass;
-                return true;
-            }
+    const sortedMales = Object.entries(maleCounts).sort(([, a], [, b]) => b - a);
+    if (sortedMales[0][1] - sortedMales[sortedMales.length - 1][1] > BALANCE_TOLERANCE) {
+        const maxClass = sortedMales[0][0];
+        const minClass = sortedMales[sortedMales.length - 1][0];
+        const studentA = students.find(s => s.assigned_class === maxClass && s.gender === 'M' && canSwapForGeneralBalance(s, undefined, minClass, students, groups));
+        const studentB = students.find(s => s.assigned_class === minClass && s.gender === 'F' && canSwapForGeneralBalance(s, studentA, maxClass, students, groups) && Math.abs(s.academic_score - (studentA?.academic_score || 0)) <= scoreTolerance);
+        if (studentA && studentB) {
+            studentA.assigned_class = minClass;
+            studentB.assigned_class = maxClass;
+            return true;
         }
     }
     return false;
 }
 
 /**
- * 특정 유형 학생 수 균형
+ * 유형별 학생 수 균형
  */
-function balanceType(
-    students: Student[],
-    classNames: string[],
-    type: 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL',
-    scoreTolerance: number
-): boolean {
+function balanceType(students: Student[], classNames: string[], groups: CustomGroup[], type: string, scoreTolerance: number): boolean {
     const counts: Record<string, number> = {};
-    classNames.forEach(cn => {
-        counts[cn] = students.filter(s => s.assigned_class === cn && s.behavior_type === type).length;
-    });
-
-    const sorted = Object.entries(counts).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
+    classNames.forEach(cn => counts[cn] = students.filter(s => s.assigned_class === cn && s.behavior_type === type).length);
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
     if (sorted[0][1] - sorted[sorted.length - 1][1] <= BALANCE_TOLERANCE) return false;
 
     const maxClass = sorted[0][0];
     const minClass = sorted[sorted.length - 1][0];
-
-    // 같은 유형 학생을 많은 반에서 적은 반으로, 같은 성별의 일반학생과 교환
-    // A: maxClass의 type 학생
-    const studentA = students.find(s =>
-        s.assigned_class === maxClass && s.behavior_type === type && !s.fixed_class
-    );
-
-    if (!studentA) return false;
-
-    // B: minClass의 NONE 학생 (교환 대상)
-    const studentB = students.find(s =>
-        s.assigned_class === minClass &&
-        s.behavior_type === 'NONE' &&
-        canSwapForGeneralBalance(studentA, s, minClass) && // 스마트 스왑!
-        // s.gender === studentA.gender && // 성별 유지 조건 (필수일까? 일단 유지)
-        // -> 일반적인 균형 알고리즘에선 성별을 유지하려고 노력함.
-        // 하지만 canSwapForGeneralBalance가 더 중요함. 일단 기존 로직 유지
-        s.gender === studentA.gender &&
-        Math.abs(s.academic_score - studentA.academic_score) <= scoreTolerance * 2
-    );
-
+    const studentA = students.find(s => s.assigned_class === maxClass && s.behavior_type === type && canSwapForGeneralBalance(s, undefined, minClass, students, groups));
+    const studentB = students.find(s => s.assigned_class === minClass && s.behavior_type === 'NONE' && s.gender === studentA?.gender && canSwapForGeneralBalance(s, studentA, maxClass, students, groups) && Math.abs(s.academic_score - (studentA?.academic_score || 0)) <= scoreTolerance);
     if (studentA && studentB) {
         studentA.assigned_class = minClass;
         studentB.assigned_class = maxClass;
         return true;
     }
-
     return false;
 }
 
 /**
  * 행동형+정서형 합계 균형
  */
-function balanceBehaviorEmotionalTotal(
-    students: Student[],
-    classNames: string[],
-    scoreTolerance: number
-): boolean {
+function balanceBehaviorEmotionalTotal(students: Student[], classNames: string[], groups: CustomGroup[], scoreTolerance: number): boolean {
     const counts: Record<string, number> = {};
-    classNames.forEach(cn => {
-        counts[cn] = students.filter(s =>
-            s.assigned_class === cn &&
-            (s.behavior_type === 'BEHAVIOR' || s.behavior_type === 'EMOTIONAL')
-        ).length;
-    });
-
-    const sorted = Object.entries(counts).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
-    if (sorted[0][1] - sorted[sorted.length - 1][1] <= BALANCE_TOLERANCE + 1) return false;
-
-    const maxClass = sorted[0][0];
-    const minClass = sorted[sorted.length - 1][0];
-
-    const studentA = students.find(s =>
-        s.assigned_class === maxClass &&
-        (s.behavior_type === 'BEHAVIOR' || s.behavior_type === 'EMOTIONAL') &&
-        !s.fixed_class
-    );
-
-    if (!studentA) return false;
-
-    const studentB = students.find(s =>
-        s.assigned_class === minClass &&
-        s.behavior_type === 'NONE' &&
-        canSwapForGeneralBalance(studentA, s, minClass) &&
-        s.gender === studentA.gender &&
-        Math.abs(s.academic_score - studentA.academic_score) <= scoreTolerance * 2
-    );
-
-    if (studentA && studentB) {
-        studentA.assigned_class = minClass;
-        studentB.assigned_class = maxClass;
-        return true;
-    }
-
-    return false;
-}
-
-/**
- * 특정 점수 학생 수 균형
- */
-function balanceByScore(
-    students: Student[],
-    classNames: string[],
-    targetScore: number,
-    scoreTolerance: number
-): boolean {
-    const counts: Record<string, number> = {};
-    classNames.forEach(cn => {
-        counts[cn] = students.filter(s => s.assigned_class === cn && s.behavior_score === targetScore).length;
-    });
-
-    const sorted = Object.entries(counts).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
+    classNames.forEach(cn => counts[cn] = students.filter(s => s.assigned_class === cn && (s.behavior_type === 'BEHAVIOR' || s.behavior_type === 'EMOTIONAL')).length);
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
     if (sorted[0][1] - sorted[sorted.length - 1][1] <= BALANCE_TOLERANCE) return false;
 
     const maxClass = sorted[0][0];
     const minClass = sorted[sorted.length - 1][0];
-
-    const studentA = students.find(s =>
-        s.assigned_class === maxClass &&
-        s.behavior_score === targetScore &&
-        !s.fixed_class
-    );
-
-    if (!studentA) return false;
-
-    const studentB = students.find(s =>
-        s.assigned_class === minClass &&
-        s.behavior_score === 0 &&
-        canSwapForGeneralBalance(studentA, s, minClass) &&
-        s.gender === studentA.gender &&
-        Math.abs(s.academic_score - studentA.academic_score) <= scoreTolerance * 2
-    );
-
+    const studentA = students.find(s => s.assigned_class === maxClass && (s.behavior_type === 'BEHAVIOR' || s.behavior_type === 'EMOTIONAL') && canSwapForGeneralBalance(s, undefined, minClass, students, groups));
+    const studentB = students.find(s => s.assigned_class === minClass && s.behavior_type === 'NONE' && s.gender === studentA?.gender && canSwapForGeneralBalance(s, studentA, maxClass, students, groups) && Math.abs(s.academic_score - (studentA?.academic_score || 0)) <= scoreTolerance);
     if (studentA && studentB) {
         studentA.assigned_class = minClass;
         studentB.assigned_class = maxClass;
         return true;
     }
-
     return false;
 }
 
 /**
- * 유형+점수 조합별 학생 수 균형 (예: 행동형-2점 학생 수 균형)
- * 개선: 교환 조건을 완화하여 더 효과적인 균형 배정
+ * 특정 점수별 학생 수 균형
  */
-function balanceByTypeAndScore(
-    students: Student[],
-    classNames: string[],
-    targetType: 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL',
-    targetScore: number,
-    scoreTolerance: number
-): boolean {
+function balanceByScore(students: Student[], classNames: string[], groups: CustomGroup[], score: number, scoreTolerance: number): boolean {
     const counts: Record<string, number> = {};
-    classNames.forEach(cn => {
-        counts[cn] = students.filter(s =>
-            s.assigned_class === cn &&
-            s.behavior_type === targetType &&
-            s.behavior_score === targetScore
-        ).length;
-    });
-
-    const sorted = Object.entries(counts).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
-    if (sorted[0][1] - sorted[sorted.length - 1][1] <= 1) return false; // 차이 1 이하면 OK
+    classNames.forEach(cn => counts[cn] = students.filter(s => s.assigned_class === cn && s.behavior_score === score).length);
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+    if (sorted[0][1] - sorted[sorted.length - 1][1] <= BALANCE_TOLERANCE) return false;
 
     const maxClass = sorted[0][0];
     const minClass = sorted[sorted.length - 1][0];
-
-    // 이동할 학생 찾기 (유형+점수가 일치하는 학생)
-    const studentA = students.find(s =>
-        s.assigned_class === maxClass &&
-        s.behavior_type === targetType &&
-        s.behavior_score === targetScore &&
-        !s.fixed_class &&
-        // 중요 제약조건만 확인 (그룹/관계 설정이 없는 학생 우선)
-        s.group_ids.length === 0 &&
-        s.avoid_ids.length === 0 &&
-        s.keep_ids.length === 0
-    );
-
-    // 우선 후보가 없으면 제약이 있는 학생도 시도 (단, fixed만 제외)
-    const studentAFallback = !studentA ? students.find(s =>
-        s.assigned_class === maxClass &&
-        s.behavior_type === targetType &&
-        s.behavior_score === targetScore &&
-        !s.fixed_class
-    ) : null;
-
-    const actualStudentA = studentA || studentAFallback;
-    if (!actualStudentA) return false;
-
-    // 교환 대상: 일반 학생(NONE) 또는 같은 유형의 다른 점수 학생
-    // 조건 완화: 성별만 맞추고, 성적 차이 조건 완화
-    const studentB = students.find(s =>
-        s.assigned_class === minClass &&
-        !s.fixed_class &&
-        s.gender === actualStudentA.gender &&
-        // 교환 대상은 일반 학생이거나 다른 유형/점수
-        (s.behavior_type === 'NONE' ||
-            s.behavior_type !== targetType ||
-            s.behavior_score !== targetScore) &&
-        // 제약조건 완화: 그룹/관계가 없는 학생 우선
-        s.group_ids.length === 0 &&
-        s.avoid_ids.length === 0 &&
-        s.keep_ids.length === 0
-    );
-
-    // 우선 후보가 없으면 제약이 있는 학생도 시도
-    const studentBFallback = !studentB ? students.find(s =>
-        s.assigned_class === minClass &&
-        !s.fixed_class &&
-        s.gender === actualStudentA.gender &&
-        (s.behavior_type === 'NONE' ||
-            s.behavior_type !== targetType ||
-            s.behavior_score !== targetScore) &&
-        // 최소한 상극/같은반 관계가 없어야 함
-        s.avoid_ids.length === 0 &&
-        s.keep_ids.length === 0
-    ) : null;
-
-    const actualStudentB = studentB || studentBFallback;
-
-    if (actualStudentA && actualStudentB) {
-        actualStudentA.assigned_class = minClass;
-        actualStudentB.assigned_class = maxClass;
-        return true;
-    }
-
-    return false;
-}
-
-
-/**
- * 유형+점수 조합별 학생 수 균형 (기배정 모드용 - 더 엄격한 조건)
- * 차이가 2 이상일 때만 교환하고, 생활지도 점수가 있는 학생끼리만 교환
- */
-function balanceByTypeAndScoreStrict(
-    students: Student[],
-    classNames: string[],
-    targetType: 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL',
-    targetScore: number,
-    scoreTolerance: number
-): boolean {
-    const counts: Record<string, number> = {};
-    classNames.forEach(cn => {
-        counts[cn] = students.filter(s =>
-            s.assigned_class === cn &&
-            s.behavior_type === targetType &&
-            s.behavior_score === targetScore
-        ).length;
-    });
-
-    const sorted = Object.entries(counts).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
-
-    // 기배정 모드: 차이가 2 미만이면 교환하지 않음 (더 보수적)
-    if (sorted[0][1] - sorted[sorted.length - 1][1] < 2) return false;
-
-    const maxClass = sorted[0][0];
-    const minClass = sorted[sorted.length - 1][0];
-
-    // 이동할 학생 찾기 (유형+점수가 일치하는 학생)
-    const studentA = students.find(s =>
-        s.assigned_class === maxClass &&
-        s.behavior_type === targetType &&
-        s.behavior_score === targetScore &&
-        !s.fixed_class &&
-        s.group_ids.length === 0 &&
-        s.avoid_ids.length === 0 &&
-        s.keep_ids.length === 0
-    );
-
-    if (!studentA) return false;
-
-    // 교환 대상: 같은 유형의 덜 심각한 학생 또는 일반 학생
-    const studentB = students.find(s =>
-        s.assigned_class === minClass &&
-        !s.fixed_class &&
-        s.gender === studentA.gender &&
-        (s.behavior_type === 'NONE' ||
-            (s.behavior_type === targetType && Math.abs(s.behavior_score) < Math.abs(targetScore))) &&
-        s.group_ids.length === 0 &&
-        s.avoid_ids.length === 0 &&
-        s.keep_ids.length === 0
-    );
-
-    // Fallback: 일반 학생과도 교환 허용
-    const studentBFallback = !studentB ? students.find(s =>
-        s.assigned_class === minClass &&
-        !s.fixed_class &&
-        s.gender === studentA.gender &&
-        s.behavior_type === 'NONE' &&
-        s.avoid_ids.length === 0 &&
-        s.keep_ids.length === 0
-    ) : null;
-
-    const actualStudentB = studentB || studentBFallback;
-
-    if (studentA && actualStudentB) {
+    const studentA = students.find(s => s.assigned_class === maxClass && s.behavior_score === score && canSwapForGeneralBalance(s, undefined, minClass, students, groups));
+    const studentB = students.find(s => s.assigned_class === minClass && s.behavior_score === 0 && s.gender === studentA?.gender && canSwapForGeneralBalance(s, studentA, maxClass, students, groups) && Math.abs(s.academic_score - (studentA?.academic_score || 0)) <= scoreTolerance);
+    if (studentA && studentB) {
         studentA.assigned_class = minClass;
-        actualStudentB.assigned_class = maxClass;
+        studentB.assigned_class = maxClass;
         return true;
     }
-
     return false;
 }
 
 /**
  * 생활지도 총점 균형
  */
-function balanceBehaviorTotal(
-    students: Student[],
-    classNames: string[],
-    scoreTolerance: number
-): boolean {
+function balanceBehaviorTotal(students: Student[], classNames: string[], groups: CustomGroup[], scoreTolerance: number): boolean {
     const totals: Record<string, number> = {};
-    classNames.forEach(cn => {
-        totals[cn] = students
-            .filter(s => s.assigned_class === cn)
-            .reduce((sum, s) => sum + s.behavior_score, 0);
-    });
-
-    const sorted = Object.entries(totals).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
-    if (sorted[0][1] - sorted[sorted.length - 1][1] <= 3) return false;
+    classNames.forEach(cn => totals[cn] = students.filter(s => s.assigned_class === cn).reduce((sum, s) => sum + s.behavior_score, 0));
+    const sorted = Object.entries(totals).sort(([, a], [, b]) => b - a);
+    if (sorted[0][1] - sorted[sorted.length - 1][1] <= 2) return false;
 
     const maxClass = sorted[0][0];
     const minClass = sorted[sorted.length - 1][0];
-
-    const studentA = students.find(s =>
-        s.assigned_class === maxClass &&
-        s.behavior_score < 0 &&
-        !s.fixed_class
-    );
-
-    if (!studentA) return false;
-
-    const studentB = students.find(s =>
-        s.assigned_class === minClass &&
-        s.behavior_score >= 0 &&
-        canSwapForGeneralBalance(studentA, s, minClass) &&
-        s.gender === studentA.gender &&
-        Math.abs(s.academic_score - studentA.academic_score) <= scoreTolerance * 2
-    );
-
+    const studentA = students.find(s => s.assigned_class === maxClass && s.behavior_score < 0 && canSwapForGeneralBalance(s, undefined, minClass, students, groups));
+    const studentB = students.find(s => s.assigned_class === minClass && s.behavior_score >= 0 && s.gender === studentA?.gender && canSwapForGeneralBalance(s, studentA, maxClass, students, groups) && Math.abs(s.academic_score - (studentA?.academic_score || 0)) <= scoreTolerance);
     if (studentA && studentB) {
         studentA.assigned_class = minClass;
         studentB.assigned_class = maxClass;
         return true;
     }
-
     return false;
 }
 
 /**
- * 유형별 점수 합계 균형 (리더형/행동형/정서형 각각의 점수 합계 균형)
+ * 유형별 점수 합계 균형
  */
-function balanceTypeScoreTotal(
-    students: Student[],
-    classNames: string[],
-    targetType: 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL',
-    scoreTolerance: number
-): boolean {
+function balanceTypeScoreTotal(students: Student[], classNames: string[], groups: CustomGroup[], type: string, scoreTolerance: number): boolean {
     const totals: Record<string, number> = {};
-    classNames.forEach(cn => {
-        totals[cn] = students
-            .filter(s => s.assigned_class === cn && s.behavior_type === targetType)
-            .reduce((sum, s) => sum + s.behavior_score, 0);
-    });
+    classNames.forEach(cn => totals[cn] = students.filter(s => s.assigned_class === cn && s.behavior_type === type).reduce((sum, s) => sum + s.behavior_score, 0));
+    const sorted = Object.entries(totals).sort(([, a], [, b]) => b - a);
+    if (Math.abs(sorted[0][1] - sorted[sorted.length - 1][1]) <= 2) return false;
 
-    const sorted = Object.entries(totals).sort(([, a], [, b]) => {
-        const diff = b - a;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
-    const diff = Math.abs(sorted[0][1] - sorted[sorted.length - 1][1]);
-    if (diff <= 2) return false;
+    const maxClass = sorted[0][0];
+    const minClass = sorted[sorted.length - 1][0];
+    const studentA = students.find(s => s.assigned_class === maxClass && s.behavior_type === type && canSwapForGeneralBalance(s, undefined, minClass, students, groups));
+    const studentB = students.find(s => s.assigned_class === minClass && s.gender === studentA?.gender && canSwapForGeneralBalance(s, studentA, maxClass, students, groups) && Math.abs(s.academic_score - (studentA?.academic_score || 0)) <= scoreTolerance);
+    if (studentA && studentB) {
+        studentA.assigned_class = minClass;
+        studentB.assigned_class = maxClass;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * 특정 등급(수준) 학생 수 균등화 (쿼터제)
+ * 점수 합계가 아니라 '인원수'를 맞추는 데 집중
+ */
+function balanceByTypeAndScoreLevel(students: Student[], classNames: string[], groups: CustomGroup[], type: string, score: number): boolean {
+    const counts: Record<string, number> = {};
+    classNames.forEach(cn => counts[cn] = students.filter(s => s.assigned_class === cn && s.behavior_type === type && s.behavior_score === (score >= 2 ? s.behavior_score : score)).length);
+
+    // 리더 2점 이상의 경우 별도 처리
+    if (type === 'LEADER' && score === 2) {
+        classNames.forEach(cn => counts[cn] = students.filter(s => s.assigned_class === cn && s.behavior_type === 'LEADER' && s.behavior_score >= 2).length);
+    }
+
+    const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+    if (sorted[0][1] - sorted[sorted.length - 1][1] <= 1) return false;
 
     const maxClass = sorted[0][0];
     const minClass = sorted[sorted.length - 1][0];
 
-    const studentA = students.find(s =>
+    // 이동할 학생 (해당 수준)
+    const studentA = students.filter(s =>
         s.assigned_class === maxClass &&
-        s.behavior_type === targetType &&
-        !s.fixed_class
-    );
+        s.behavior_type === type &&
+        (type === 'LEADER' && score === 2 ? s.behavior_score >= 2 : s.behavior_score === score)
+    ).sort((a, b) => a.academic_score - b.academic_score)[0]; // 성적 낮은 학생 우선 시도 (밸런스 변화 최소화)
 
     if (!studentA) return false;
 
-    const studentB = students.find(s =>
+    // 교환해올 학생 (해당 수준이 아닌 일반 학생, 성별 동일)
+    const candidates = students.filter(s =>
         s.assigned_class === minClass &&
-        (s.behavior_type === targetType || s.behavior_type === 'NONE') &&
-        canSwapForGeneralBalance(studentA, s, minClass) &&
         s.gender === studentA.gender &&
-        Math.abs(s.academic_score - studentA.academic_score) <= scoreTolerance * 2
-    );
+        s.behavior_type === 'NONE' &&
+        canSwapForGeneralBalance(studentA, s, minClass, students, groups)
+    ).sort((a, b) => Math.abs(a.academic_score - studentA.academic_score)); // 성적 차이가 가장 적은 학생
 
-    if (studentA && studentB) {
+    if (candidates.length > 0) {
+        const studentB = candidates[0];
         studentA.assigned_class = minClass;
         studentB.assigned_class = maxClass;
         return true;
@@ -1627,248 +901,209 @@ function balanceTypeScoreTotal(
 /**
  * 성적 평균 균형
  */
-function balanceScore(students: Student[], classNames: string[]): boolean {
-    const classAvgs: { className: string; avg: number; students: Student[] }[] = classNames.map(cn => {
-        const classStudents = students.filter(s => s.assigned_class === cn);
-        const avg = classStudents.length > 0
-            ? classStudents.reduce((sum, s) => sum + s.academic_score, 0) / classStudents.length
-            : 0;
-        return { className: cn, avg, students: classStudents };
+function balanceScore(students: Student[], classNames: string[], groups: CustomGroup[]): boolean {
+    const classAvgs = classNames.map(cn => {
+        const cs = students.filter(s => s.assigned_class === cn);
+        const avg = cs.length > 0 ? cs.reduce((sum, s) => sum + s.academic_score, 0) / cs.length : 0;
+        return { className: cn, avg, students: cs };
     });
 
-    classAvgs.sort((a, b) => {
-        const diff = b.avg - a.avg;
-        if (diff !== 0) return diff;
-        return Math.random() - 0.5;
-    });
-    const maxAvgClass = classAvgs[0];
-    const minAvgClass = classAvgs[classAvgs.length - 1];
+    classAvgs.sort((a, b) => b.avg - a.avg);
+    if (classAvgs[0].avg - classAvgs[classAvgs.length - 1].avg <= 30) return false;
 
-    if (maxAvgClass.avg - minAvgClass.avg <= 30) return false;
+    const maxClass = classAvgs[0];
+    const minClass = classAvgs[classAvgs.length - 1];
 
-    // 높은 점수 학생과 낮은 점수 학생 교환 (같은 성별, 같은 유형)
-    const highScoreStudent = maxAvgClass.students
-        .filter(s => !s.fixed_class)
-        .sort((a, b) => b.academic_score - a.academic_score)[0];
+    const s1 = maxClass.students.filter(s => canSwapForGeneralBalance(s, undefined, minClass.className, students, groups)).sort((a, b) => b.academic_score - a.academic_score)[0];
+    const s2 = minClass.students.filter(s => canSwapForGeneralBalance(s, s1, maxClass.className, students, groups) && s.gender === s1?.gender && s1?.behavior_type === s.behavior_type).sort((a, b) => a.academic_score - b.academic_score)[0];
 
-    if (!highScoreStudent) return false;
-
-    const lowScoreStudent = minAvgClass.students
-        .filter(s => !s.fixed_class &&
-            s.gender === highScoreStudent.gender &&
-            s.behavior_type === highScoreStudent.behavior_type &&
-            canSwapForGeneralBalance(highScoreStudent, s, minAvgClass.className) // 스마트 스왑
-        )
-        .sort((a, b) => a.academic_score - b.academic_score)[0];
-
-    if (lowScoreStudent) {
-        highScoreStudent.assigned_class = minAvgClass.className;
-        lowScoreStudent.assigned_class = maxAvgClass.className;
+    if (s1 && s2) {
+        s1.assigned_class = minClass.className;
+        s2.assigned_class = maxClass.className;
         return true;
     }
-
     return false;
 }
 
 /**
  * 상극 관계 해결
  */
-
-
-/**
- * 위반 사항 수집
- */
-function collectViolations(
-    students: Student[],
-    groups: CustomGroup[],
-    violations: Violation[]
-): void {
-    // 1. 상극 위반 체크
-    const avoidPairs = new Set<string>();
-    students.forEach(student => {
-        student.avoid_ids.forEach(avoidId => {
-            const avoidStudent = students.find(s => s.id === avoidId);
-            if (avoidStudent && avoidStudent.assigned_class === student.assigned_class) {
-                const pairKey = [student.id, avoidId].sort().join('-');
-                if (!avoidPairs.has(pairKey)) {
-                    avoidPairs.add(pairKey);
-                    violations.push({
-                        type: 'AVOID',
-                        message: `${student.name} 와(과) ${avoidStudent.name} 이(가) 같은 반(${student.assigned_class})에 배정됨`,
-                        studentIds: [student.id, avoidId],
-                        className: student.assigned_class || undefined,
-                    });
+function fixAvoidViolations(students: Student[], classNames: string[], groups: CustomGroup[], scoreTolerance: number): boolean {
+    let fixed = false;
+    for (const s1 of students) {
+        if (!s1.assigned_class || s1.avoid_ids.length === 0) continue;
+        for (const avoidId of s1.avoid_ids) {
+            const s2 = students.find(s => s.id === avoidId);
+            if (s2 && s2.assigned_class === s1.assigned_class) {
+                // 상극 발견
+                const classA = s1.assigned_class;
+                const otherClasses = classNames.filter(cn => cn !== classA);
+                for (const targetClass of otherClasses) {
+                    const targetStudent = students.find(s =>
+                        s.assigned_class === targetClass &&
+                        canSwapForGeneralBalance(s1, s, targetClass, students, groups)
+                    );
+                    if (targetStudent) {
+                        s1.assigned_class = targetClass;
+                        targetStudent.assigned_class = classA;
+                        fixed = true;
+                        break;
+                    }
                 }
             }
-        });
-    });
+            if (fixed) break;
+        }
+        if (fixed) break;
+    }
+    return fixed;
+}
 
-    // 2. 같은 반 희망 위반 (Keep) 체크
-    const keepPairs = new Set<string>();
-    students.forEach(student => {
-        student.keep_ids.forEach(keepId => {
-            const keepStudent = students.find(s => s.id === keepId);
-            // 둘 다 배정되었는데, 반이 다른 경우
-            if (keepStudent && student.assigned_class && keepStudent.assigned_class && student.assigned_class !== keepStudent.assigned_class) {
-                const pairKey = [student.id, keepId].sort().join('-');
-                if (!keepPairs.has(pairKey)) {
-                    keepPairs.add(pairKey);
-                    violations.push({
-                        type: 'KEEP',
-                        message: `${student.name} 와(과) ${keepStudent.name} 이(가) 다른 반에 배정됨 (${student.assigned_class} / ${keepStudent.assigned_class})`,
-                        studentIds: [student.id, keepId],
-                        className: student.assigned_class || undefined,
-                    });
+function fixKeepViolations(students: Student[], classNames: string[], groups: CustomGroup[], scoreTolerance: number): boolean {
+    let fixed = false;
+    for (const s1 of students) {
+        if (!s1.assigned_class || s1.keep_ids.length === 0) continue;
+        for (const keepId of s1.keep_ids) {
+            const s2 = students.find(s => s.id === keepId);
+            if (s2 && s2.assigned_class && s2.assigned_class !== s1.assigned_class) {
+                // 조심스럽게 한 명을 이동
+                const classB = s2.assigned_class;
+                const classA = s1.assigned_class;
+
+                const targetStudent = students.find(s =>
+                    s.assigned_class === classB &&
+                    canSwapForGeneralBalance(s1, s, classB, students, groups)
+                );
+                if (targetStudent) {
+                    s1.assigned_class = classB;
+                    targetStudent.assigned_class = classA;
+                    fixed = true;
                 }
             }
-        });
+            if (fixed) break;
+        }
+        if (fixed) break;
+    }
+    return fixed;
+}
+
+function balanceCustomGroups(students: Student[], groups: CustomGroup[], classNames: string[], scoreTolerance: number): boolean {
+    let fixed = false;
+    groups.forEach(group => {
+        const counts: Record<string, number> = {};
+        classNames.forEach(cn => counts[cn] = students.filter(s => s.assigned_class === cn && group.member_ids.includes(s.id)).length);
+        const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a);
+        if (sorted[0][1] - sorted[sorted.length - 1][1] <= 1) return;
+
+        const maxClass = sorted[0][0];
+        const minClass = sorted[sorted.length - 1][0];
+        const studentA = students.find(s => s.assigned_class === maxClass && group.member_ids.includes(s.id) && !s.fixed_class);
+        const studentB = students.find(s => s.assigned_class === minClass && !group.member_ids.includes(s.id) && s.gender === studentA?.gender && !s.fixed_class);
+        if (studentA && studentB) {
+            studentA.assigned_class = minClass;
+            studentB.assigned_class = maxClass;
+            fixed = true;
+        }
     });
+    return fixed;
 }
 
 /**
- * 같은 반 희망 관계 해결
- * 떨어져 있는 단짝을 찾아서 한쪽을 이동시킴
+ * 해당 학생을 특정 반에 배정할 경우 제약 조건 위반 여부 확인
  */
-function fixKeepViolations(
-    students: Student[],
-    classNames: string[],
-    scoreTolerance: number
-): boolean {
-    // 떨어져 있는 Keep 쌍 찾기
-    for (const studentA of students) {
-        if (!studentA.assigned_class || !studentA.keep_ids || studentA.keep_ids.length === 0) continue;
+function hasViolation(student: Student, targetClass: string, allStudents: Student[], groups: CustomGroup[]): boolean {
+    // 1. 상극 관계 확인
+    for (const avoidId of student.avoid_ids) {
+        const other = allStudents.find(s => s.id === avoidId);
+        if (other && other.assigned_class === targetClass) return true;
+    }
+    // 다른 학생이 이 학생을 상극으로 등록했을 수도 있음
+    const isAvoidedByOthers = allStudents.some(other =>
+        other.assigned_class === targetClass && other.avoid_ids.includes(student.id)
+    );
+    if (isAvoidedByOthers) return true;
 
-        for (const keepId of studentA.keep_ids) {
-            const studentB = students.find(s => s.id === keepId);
-            if (!studentB || !studentB.assigned_class) continue;
+    // 2. 희망 관계 확인 (희망 관계는 반드시 같은 반이어야 한다는 '제약'이라기보다는 '지향'이므로 
+    // 여기서는 이동 시 희망 관계가 '깨지는지' 보다는, '새로운 위반'이 생기는지 위주로 봄.
+    // 하지만 일단은 엄격하게 처리하려면 추가 로직 필요)
 
-            // 이미 같은 반이면 패스
-            if (studentA.assigned_class === studentB.assigned_class) continue;
-
-            const classA = studentA.assigned_class;
-            const classB = studentB.assigned_class;
-
-            // 교환 가능성 체크 (Keep 제약 무시 - 우리가 지금 Keep을 고치려는 것이므로)
-            const canSwapForKeepFix = (mover: Student, target: Student, moverDestClass: string, targetDestClass: string): boolean => {
-                // 1. 고정 배정 체크
-                if (mover.fixed_class || target.fixed_class) return false;
-
-                // 2. 전출생 체크 - 둘 다 전출생이거나 둘 다 아니어야 함
-                if (!!mover.is_pre_transfer !== !!target.is_pre_transfer) return false;
-
-                // 3. 그룹 제약 체크 - 그룹 구성이 같아야 함 (교환 시 반별 그룹 인원 유지)
-                const moverGroups = JSON.stringify((mover.group_ids || []).sort());
-                const targetGroups = JSON.stringify((target.group_ids || []).sort());
-                if (moverGroups !== targetGroups) return false;
-
-                // 4. 상극(Avoid) 체크 - mover가 moverDestClass에 상극이 있는지
-                if (mover.avoid_ids && mover.avoid_ids.length > 0) {
-                    const hasAvoidInDest = students.some(s =>
-                        s.assigned_class === moverDestClass &&
-                        mover.avoid_ids.includes(s.id)
-                    );
-                    if (hasAvoidInDest) return false;
-                }
-
-                // 5. 상극(Avoid) 체크 - target이 targetDestClass에 상극이 있는지
-                if (target.avoid_ids && target.avoid_ids.length > 0) {
-                    const hasAvoidInDest = students.some(s =>
-                        s.assigned_class === targetDestClass &&
-                        target.avoid_ids.includes(s.id)
-                    );
-                    if (hasAvoidInDest) return false;
-                }
-
-                // 6. target의 Keep 관계 체크 - target이 targetDestClass로 가면 자신의 Keep 파트너와 떨어지는지
-                // (mover의 Keep 관계는 체크 안 함 - 지금 고치려는 것이므로)
-                if (target.keep_ids && target.keep_ids.length > 0) {
-                    for (const targetKeepId of target.keep_ids) {
-                        const targetKeepPartner = students.find(s => s.id === targetKeepId);
-                        if (targetKeepPartner && targetKeepPartner.assigned_class) {
-                            // 현재 target과 파트너가 같은 반인데, 이동하면 떨어지게 됨
-                            if (target.assigned_class === targetKeepPartner.assigned_class &&
-                                targetDestClass !== targetKeepPartner.assigned_class) {
-                                return false;
-                            }
-                        }
-                    }
-                }
-
-                return true;
-            };
-
-            // 시도 1: A를 B의 반으로 이동 (classB에 있는 누군가와 교환)
-            if (!studentA.fixed_class) {
-                const targetStudent = students.find(s =>
-                    s.assigned_class === classB &&
-                    s.id !== studentB.id && // studentB 자신과는 교환 안 함
-                    canSwapForKeepFix(studentA, s, classB, classA)
-                );
-
-                if (targetStudent) {
-                    studentA.assigned_class = classB;
-                    targetStudent.assigned_class = classA;
-                    return true;
-                }
-            }
-
-            // 시도 2: B를 A의 반으로 이동 (classA에 있는 누군가와 교환)
-            if (!studentB.fixed_class) {
-                const targetStudent = students.find(s =>
-                    s.assigned_class === classA &&
-                    s.id !== studentA.id && // studentA 자신과는 교환 안 함
-                    canSwapForKeepFix(studentB, s, classA, classB)
-                );
-
-                if (targetStudent) {
-                    studentB.assigned_class = classA;
-                    targetStudent.assigned_class = classB;
-                    return true;
-                }
-            }
+    // 3. 커스텀 그룹 몰림 확인
+    for (const group of groups) {
+        if (group.member_ids.includes(student.id)) {
+            const groupMemberCount = allStudents.filter(s =>
+                s.assigned_class === targetClass &&
+                s.id !== student.id && // 자기 자신 제외
+                group.member_ids.includes(s.id)
+            ).length;
+            if (groupMemberCount >= 2) return true; // 한 반에 3명 이상 몰리는 것 방지
         }
     }
 
     return false;
 }
 
-/**
- * 미배정 학생들을 현재 인원이 적은 반부터 차례로 배정
- */
-function fillUnassignedStudents(students: Student[], classNames: string[]) {
-    const unassigned = students.filter(s => !s.assigned_class);
-    if (unassigned.length === 0) return;
+function canSwapForGeneralBalance(s1: Student, s2: Student | undefined, targetClass: string, allStudents: Student[], groups: CustomGroup[]): boolean {
+    if (s1.fixed_class) return false;
+    if (s2 && s2.fixed_class) return false;
+    if (s1.is_pre_transfer || (s2 && s2.is_pre_transfer)) return false;
 
-    // 성적순 정렬 (S자 배정 효과를 위해)
-    unassigned.sort((a, b) => b.academic_score - a.academic_score);
+    // s1이 targetClass로 갈 때 위반이 생기는지
+    if (hasViolation(s1, targetClass, allStudents, groups)) return false;
 
-    // 현재 반별 인원 파악
-    const counts: Record<string, number> = {};
-    classNames.forEach(cn => {
-        counts[cn] = students.filter(s => s.assigned_class === cn).length;
-    });
+    // s2가 s1의 반으로 올 때 위반이 생기는지
+    if (s2 && hasViolation(s2, s1.assigned_class!, allStudents, groups)) return false;
 
-    unassigned.forEach(s => {
-        // 가장 적은 반 찾기
-        const sortedClasses = [...classNames].sort((a, b) => {
-            const diff = counts[a] - counts[b];
-            if (diff !== 0) return diff;
-            return Math.random() - 0.5;
+    // 그룹 아이디가 있는 경우, 같은 그룹 아이디를 가진 학생끼리만 교환 가능
+    if (s1.group_ids.length > 0 || (s2 && s2.group_ids.length > 0)) {
+        if (!s2) return false; // 그룹 아이디가 있는 학생은 단독으로 이동 불가 (짝이 있어야 함)
+        if (JSON.stringify(s1.group_ids.sort()) !== JSON.stringify(s2.group_ids.sort())) return false;
+    }
+
+    return true;
+}
+
+function collectViolations(students: Student[], groups: CustomGroup[], violations: Violation[]) {
+    students.forEach(s1 => {
+        s1.avoid_ids.forEach(id => {
+            const s2 = students.find(s => s.id === id);
+            if (s2 && s2.assigned_class === s1.assigned_class) {
+                if (!violations.some(v => v.type === 'AVOID' && v.studentIds.includes(s1.id) && v.studentIds.includes(s2.id))) {
+                    violations.push({ type: 'AVOID', message: `${s1.name}와 ${s2.name} 상극 위반`, studentIds: [s1.id, s2.id], className: s1.assigned_class || undefined });
+                }
+            }
         });
-
-        const target = sortedClasses[0];
-        s.assigned_class = target;
-        counts[target]++;
+        s1.keep_ids.forEach(id => {
+            const s2 = students.find(s => s.id === id);
+            if (s2 && s2.assigned_class && s2.assigned_class !== s1.assigned_class) {
+                if (!violations.some(v => v.type === 'KEEP' && v.studentIds.includes(s1.id) && v.studentIds.includes(s2.id))) {
+                    violations.push({ type: 'KEEP', message: `${s1.name}와 ${s2.name} 단짝 위반`, studentIds: [s1.id, s2.id], className: s1.assigned_class || undefined });
+                }
+            }
+        });
     });
 }
 
-/**
- * 배열을 랜덤하게 섞는 유틸리티 함수 (Fisher-Yates Shuffle)
- */
-function shuffleArray<T>(array: T[]): void {
+function fillUnassignedStudents(students: Student[], classNames: string[]) {
+    const unassigned = students.filter(s => !s.assigned_class);
+    unassigned.sort((a, b) => b.academic_score - a.academic_score);
+    unassigned.forEach(s => {
+        const counts = classNames.map(cn => ({ name: cn, count: students.filter(st => st.assigned_class === cn).length }));
+        counts.sort((a, b) => a.count - b.count);
+        s.assigned_class = counts[0].name;
+    });
+}
+
+
+function shuffleArray<T>(array: T[]) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
 }
 
+function shuffleSimilarScores(students: Student[], tolerance: number = 10) {
+    for (let i = 0; i < students.length - 1; i++) {
+        if (Math.abs(students[i].academic_score - students[i + 1].academic_score) <= tolerance && Math.random() > 0.5) {
+            [students[i], students[i + 1]] = [students[i + 1], students[i]];
+        }
+    }
+}
