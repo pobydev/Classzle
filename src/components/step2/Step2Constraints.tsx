@@ -22,7 +22,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PencilSimple, Trash } from '@phosphor-icons/react';
+import { PencilSimple, Trash, WarningCircle } from '@phosphor-icons/react';
+
 
 interface Step2ConstraintsProps {
     onBack: () => void;
@@ -56,6 +57,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
         setFixedClass,
         updateStudent,
         deleteGroup,
+
     } = useClasszleStore();
 
     const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
@@ -409,6 +411,8 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
 
     return (
         <div className="space-y-6 pb-20 relative">
+            {/* 상단 통합 설정 영역 (삭제됨 - 항상 고급 모드 적용) */}
+
             {/* 상단 탭 버튼들 */}
             <div className="flex space-x-2 border-b pb-4 overflow-x-auto">
                 <Button

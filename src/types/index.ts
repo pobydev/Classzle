@@ -48,6 +48,7 @@ export interface AppSettings {
     classCount: number;            // 학급 수
     scoreTolerance: number;        // 성적 유사도 허용 범위 (±)
     numberingMethod: NumberingMethod; // 번호 부여 방식
+    useAdvancedConstraints: boolean;
 }
 
 // 배정 결과 통계 (확장)
