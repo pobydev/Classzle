@@ -148,31 +148,8 @@ function balancedInitialAssignment(
         });
     });
 
-    // 3. 나머지 학생들 분류 (아직 배정되지 않은 학생들만)
+    // 3. 나머지 학생들 분류 & 세분화 그룹핑 (Strict Bucket)
     const normalStudents = students.filter(s => !s.assigned_class);
-
-    // 유형+점수별 세분화 그룹
-    const typeScoreGroups = {
-        behavior3: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -3),
-        emotional3: normalStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -3),
-        behavior2: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -2),
-        emotional2: normalStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -2),
-        behavior1: normalStudents.filter(s => s.behavior_type === 'BEHAVIOR' && s.behavior_score === -1),
-        emotional1: normalStudents.filter(s => s.behavior_type === 'EMOTIONAL' && s.behavior_score === -1),
-        leader2: normalStudents.filter(s => s.behavior_type === 'LEADER' && s.behavior_score >= 2),
-        leader1: normalStudents.filter(s => s.behavior_type === 'LEADER' && s.behavior_score === 1),
-        normalMale: normalStudents.filter(s => s.behavior_type === 'NONE' && s.gender === 'M'),
-        normalFemale: normalStudents.filter(s => s.behavior_type === 'NONE' && s.gender === 'F'),
-        others: normalStudents.filter(s =>
-            (s.behavior_type === 'BEHAVIOR' || s.behavior_type === 'EMOTIONAL') && s.behavior_score > 0
-        )
-    };
-
-    // 각 그룹 내 성적순 정렬 (구간별 랜덤 포함)
-    Object.values(typeScoreGroups).forEach(group => {
-        group.sort((a, b) => b.academic_score - a.academic_score);
-        shuffleSimilarScores(group);
-    });
 
     // 반별 마이너스 학생 통계 추적 (유형별 분리)
     const classNegativeStats: Record<string, {
@@ -186,87 +163,129 @@ function balancedInitialAssignment(
         count: 0, score: 0, has3: 0, behaviorCount: 0, emotionalCount: 0
     });
 
-    // 모든 마이너스 학생을 하나로 모아서 '심각도'순 정렬 (양수 점수는 제외)
-    const allNegativeStudents: Student[] = [
-        ...typeScoreGroups.behavior3,
-        ...typeScoreGroups.emotional3,
-        ...typeScoreGroups.behavior2,
-        ...typeScoreGroups.emotional2,
-        ...typeScoreGroups.behavior1,
-        ...typeScoreGroups.emotional1
-    ];
+    // [중요] 각 점수/유형별로 엄격하게 분리하여 배정 (사용자 요청: +1도 3,4명씩 균등해야 함)
+    // 그룹핑 키: 유형_점수 (예: BEHAVIOR_-3, EMOTIONAL_1 ...)
+    const buckets: Record<string, Student[]> = {};
+    const bucketKeys: string[] = [];
 
-    // 심각도순 정렬 (점수 낮은 순 -> 같은 점수면 유형 교차)
-    allNegativeStudents.sort((a, b) => {
-        if (a.behavior_score !== b.behavior_score) return a.behavior_score - b.behavior_score;
-        return a.behavior_type.localeCompare(b.behavior_type);
+    // 우선순위 정의 (배정 순서)
+    // 1. -3점 (가장 중요, 격리 필요)
+    // 2. -2점, -1점 (균등 분산)
+    // 3. Leader (균등 분산)
+    // 4. 양수 점수 (균등 분산)
+
+    // 버킷 초기화 & 분류
+    normalStudents.forEach(s => {
+        let key = '';
+        if (s.behavior_type !== 'NONE') {
+            key = `${s.behavior_type}_${s.behavior_score}`;
+        } else if (s.behavior_type === 'NONE' && s.behavior_score !== 0) {
+            // 유형은 없는데 점수가 있는 경우 (예외적 상황이지만 처리)
+            key = `NONE_${s.behavior_score}`;
+        } else {
+            // 일반 학생 (나중에 배정)
+            return;
+        }
+
+        if (!buckets[key]) {
+            buckets[key] = [];
+            bucketKeys.push(key);
+        }
+        buckets[key].push(s);
     });
 
-    // 적합도 배정 함수: 각 학생마다 최적의 반 선택
-    allNegativeStudents.forEach(student => {
-        const studentType = student.behavior_type;
-        const studentScore = student.behavior_score;
+    // 버킷 정렬 순서 정의
+    const getPriority = (key: string): number => {
+        const [type, scoreStr] = key.split('_');
+        const score = parseInt(scoreStr, 10);
 
-        // 각 반의 적합도 점수 계산
-        const classScores = classNames.map(cn => {
-            const stats = classNegativeStats[cn];
-            let suitability = 0;
+        if (score === -3) return 0; // 최우선
+        if (score < 0) return 10;   // 그 다음 음수
+        if (type === 'LEADER') return 20; // 리더
+        return 30; // 양수 점수 등
+    };
 
-            // 1. -3 패널티: -3 학생이 있는 반은 기피
-            // 내가 -3이면 절대 안 가고, 내가 -2/-1이어도 -3이 있는 곳은 피함 (고립 효과)
-            if (stats.has3 > 0) {
-                if (studentScore === -3) suitability -= 1000; // 절대 회피
-                else suitability -= 100; // -3이 있는 곳은 다른 문제 학생도 피함
-            }
-
-            // 2. 총점 균형: 현재 총점이 높을수록(덜 나쁠수록) 개선
-            suitability -= stats.score * 10;
-
-            // 3. 인원 균형: 현재 배정된 마이너스 학생이 적을수록 개선
-            suitability -= stats.count * 50;
-
-            // 4. 유형 균형: 같은 유형이 적을수록 개선
-            if (studentType === 'BEHAVIOR') {
-                suitability -= stats.behaviorCount * 30;
-            } else if (studentType === 'EMOTIONAL') {
-                suitability -= stats.emotionalCount * 30;
-            }
-
-            // 5. 랜덤 요소 (동점 방지)
-            suitability += Math.random() * 5;
-
-            return { className: cn, suitability };
-        });
-
-        // 적합도순 정렬
-        classScores.sort((a, b) => b.suitability - a.suitability);
-
-        const targetClass = classScores[0].className;
-        student.assigned_class = targetClass;
-
-        // 통계 업데이트
-        classNegativeStats[targetClass].count++;
-        classNegativeStats[targetClass].score += studentScore;
-        if (studentScore === -3) classNegativeStats[targetClass].has3++;
-        if (studentType === 'BEHAVIOR') classNegativeStats[targetClass].behaviorCount++;
-        if (studentType === 'EMOTIONAL') classNegativeStats[targetClass].emotionalCount++;
+    bucketKeys.sort((a, b) => {
+        const pA = getPriority(a);
+        const pB = getPriority(b);
+        if (pA !== pB) return pA - pB;
+        // 같은 우선순위 내에서는 점수 오름차순 (작은 점수 먼저)
+        const scoreA = parseInt(a.split('_')[1], 10);
+        const scoreB = parseInt(b.split('_')[1], 10);
+        return scoreA - scoreB;
     });
 
-    // 특정 유형 그룹을 균등 분산하는 함수 (리더 등)
-    const distributeEvenly = (studentList: Student[]) => {
-        const currentCounts: Record<string, number> = {};
-        classNames.forEach(cn => currentCounts[cn] = 0);
+    // 엄격한 균형 배정 함수 (Strict Bucket Distribution)
+    // 목표: 그룹 내 인원수 차이가 0~1명이 되도록 강제
+    const assignStrictlyBalanced = (targetStudents: Student[], avoidMinus3: boolean) => {
+        if (targetStudents.length === 0) return;
 
-        studentList.forEach(student => {
-            const sortedClasses = [...classNames].sort((a, b) => {
-                const diff = currentCounts[a] - currentCounts[b];
-                if (diff !== 0) return diff;
-                return Math.random() - 0.5;
-            });
-            student.assigned_class = sortedClasses[0];
-            currentCounts[sortedClasses[0]]++;
+        // 성적순 정렬 + 셔플
+        // (같은 점수 그룹 내에서도 성적을 골고루 퍼뜨리기 위함)
+        targetStudents.sort((a, b) => b.academic_score - a.academic_score);
+        shuffleSimilarScores(targetStudents);
+
+        // 이 그룹만의 반별 카운트 추적
+        const groupCounts: Record<string, number> = {};
+        classNames.forEach(cn => groupCounts[cn] = 0);
+
+        targetStudents.forEach(student => {
+            // 1. 현재 이 그룹 인원이 가장 적은 반들 찾기 (Must)
+            const minCount = Math.min(...Object.values(groupCounts));
+            let candidates = classNames.filter(cn => groupCounts[cn] === minCount);
+
+            // 2. (옵션) -3점 격리 로직
+            // 후보군 중에서 -3점이 없는 곳을 선호
+            if (avoidMinus3) {
+                const safeCandidates = candidates.filter(cn => classNegativeStats[cn].has3 === 0);
+                if (safeCandidates.length > 0) {
+                    candidates = safeCandidates;
+                }
+            }
+
+            // 3. (옵션) 2차 적합도: 전체 생활지도 총점/인원수 고려
+            // 후보군이 여러 개라면, 전체 밸런스가 좋은 곳으로
+            if (candidates.length > 1) {
+                candidates.sort((a, b) => {
+                    // 점수 합이 낮은(덜 나쁜) 곳 선호
+                    const scoreDiff = classNegativeStats[a].score - classNegativeStats[b].score;
+                    if (scoreDiff !== 0) return classNegativeStats[b].score - classNegativeStats[a].score; // score는 음수일수록 나쁨 -> 큰값(0에 가까운값) 선호? 
+                    // score: -5 vs -2. -2 is better (higher). 
+                    // Descending sort for score intent: (a,b) => b-a puts Higher values first.
+                    // If a=-5, b=-2. -2 - (-5) = 3. Positive -> b comes first. Correct.
+                    return classNegativeStats[b].score - classNegativeStats[a].score;
+                });
+            }
+
+            // 최종 선택 (랜덤)
+            const target = candidates[0]; // 정렬했으므로 첫번째가 Best
+
+            // 할당
+            student.assigned_class = target;
+            groupCounts[target]++;
+
+            // 전역 통계 업데이트
+            classNegativeStats[target].count++;
+            classNegativeStats[target].score += student.behavior_score;
+            if (student.behavior_score === -3) classNegativeStats[target].has3++;
+            if (student.behavior_type === 'BEHAVIOR') classNegativeStats[target].behaviorCount++;
+            if (student.behavior_type === 'EMOTIONAL') classNegativeStats[target].emotionalCount++;
         });
     };
+
+    // 각 버킷별로 순차 배정 실행
+    bucketKeys.forEach(key => {
+        const score = parseInt(key.split('_')[1], 10);
+        // -3점이 아닌 학생들은 -3점이 있는 반을 피하려고 노력함 (Repulsion)
+        // 단, 본인이 -3점이면 피할 필요 없음 (이미 분산 로직이 minCount로 동작하므로)
+        const avoidMinus3 = (score !== -3);
+        assignStrictlyBalanced(buckets[key], avoidMinus3);
+    });
+
+    // 4. 일반 학생 (NONE 타입) 배정
+    // 이미 특수 학생들은 자리가 잡혔으므로, 빈 공간을 성비/성적 고려하여 채움
+    const normalMales = normalStudents.filter(s => s.behavior_type === 'NONE' && s.gender === 'M');
+    const normalFemales = normalStudents.filter(s => s.behavior_type === 'NONE' && s.gender === 'F');
 
     // 라운드로빈 배정 함수 (전체 인원 기준)
     const fillAssign = (studentList: Student[]) => {
@@ -285,14 +304,8 @@ function balancedInitialAssignment(
         });
     };
 
-    // 2단계: 리더 및 기타 유형 균등 분산
-    distributeEvenly(typeScoreGroups.leader2);
-    distributeEvenly(typeScoreGroups.leader1);
-    distributeEvenly(typeScoreGroups.others); // 양수 점수 유형 학생들도 균등 분산
-
-    // 3단계: 일반 학생은 성비/인원수 맞춰서 빈 곳 채우기
-    fillAssign(typeScoreGroups.normalMale);
-    fillAssign(typeScoreGroups.normalFemale);
+    fillAssign(normalMales);
+    fillAssign(normalFemales);
 
     return students;
 }
