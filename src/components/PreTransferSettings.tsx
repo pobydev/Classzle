@@ -8,29 +8,46 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { CheckCircle } from '@phosphor-icons/react';
 
 interface PreTransferSettingsProps {
     students: Student[];
     tempPreTransferIds: string[];
     onToggleTempPreTransfer: (studentId: string) => void;
+    hasUnsavedChanges?: boolean;
 }
 
 export default function PreTransferSettings({
     students,
     tempPreTransferIds,
-    onToggleTempPreTransfer
+    onToggleTempPreTransfer,
+    hasUnsavedChanges = false
 }: PreTransferSettingsProps) {
     const [classFilter, setClassFilter] = useState<string>('all');
+    const [searchQuery, setSearchQuery] = useState<string>('');
 
     // Extract unique class numbers for filtering
     const availableClasses = Array.from(new Set(students.map(s => s.prev_info.split('-')[1] || '')))
         .sort((a, b) => parseInt(a) - parseInt(b))
         .filter(c => c);
 
-    const preTransferStudents = students.filter(s => tempPreTransferIds.includes(s.id));
+    const preTransferStudents = students
+        .filter(s => tempPreTransferIds.includes(s.id))
+        .sort((a, b) => {
+            // 반별, 번호순 정렬
+            const classA = parseInt(a.prev_info.split('-')[1] || '0');
+            const classB = parseInt(b.prev_info.split('-')[1] || '0');
+            if (classA !== classB) return classA - classB;
+            const numA = parseInt(a.prev_info.split('-')[2] || '0');
+            const numB = parseInt(b.prev_info.split('-')[2] || '0');
+            return numA - numB;
+        });
+
     const availableStudents = students
         .filter(s => !tempPreTransferIds.includes(s.id))
-        .filter(s => classFilter === 'all' || s.prev_info.split('-')[1] === classFilter);
+        .filter(s => classFilter === 'all' || s.prev_info.split('-')[1] === classFilter)
+        .filter(s => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
     // Group available students by class
     const studentsByClass = availableStudents.reduce((acc, s) => {
@@ -39,6 +56,8 @@ export default function PreTransferSettings({
         acc[cls].push(s);
         return acc;
     }, {} as Record<string, typeof students>);
+
+    const isSaved = !hasUnsavedChanges && tempPreTransferIds.length > 0;
 
     return (
         <div className="space-y-6">
@@ -77,6 +96,12 @@ export default function PreTransferSettings({
                             </SelectContent>
                         </Select>
                     </div>
+                    <Input
+                        placeholder="이름 검색..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-8 text-sm mb-2"
+                    />
                     <div className="flex-1 overflow-y-auto p-1">
                         {Object.entries(studentsByClass)
                             .sort((a, b) => {
@@ -122,15 +147,21 @@ export default function PreTransferSettings({
 
                 {/* 오른쪽: 선택된 학생 목록 (2/3) */}
                 <div className="w-2/3 border rounded-lg p-4 flex flex-col overflow-hidden">
-                    <div className="mb-3 font-bold text-lg">
-                        전출 예정 학생 ({preTransferStudents.length}명)
+                    <div className="mb-3 font-bold text-lg flex items-center gap-2">
+                        <span>전출 예정 학생 ({preTransferStudents.length}명)</span>
+                        {isSaved && (
+                            <span className="flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                <CheckCircle weight="fill" className="w-4 h-4" />
+                                저장됨
+                            </span>
+                        )}
                     </div>
-                    <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg p-2 border">
+                    <div className="flex-1 overflow-y-auto rounded-lg p-2 border bg-gray-50">
                         <div className="grid grid-cols-2 gap-2">
                             {preTransferStudents.map(student => (
                                 <div
                                     key={student.id}
-                                    className="p-3 rounded text-sm bg-white border hover:bg-accent/50 transition-colors"
+                                    className="p-3 rounded text-sm border bg-white hover:bg-accent/50 transition-colors"
                                 >
                                     <div className="flex justify-between items-center">
                                         <span className="font-medium">{student.name} ({student.prev_info})</span>
@@ -157,3 +188,4 @@ export default function PreTransferSettings({
         </div>
     );
 }
+

@@ -13,6 +13,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+    Users,
+    ArrowsLeftRight,
+    ArrowRight,
+    CheckCircle,
+    WarningCircle,
+    Info,
+    User,
+    Buildings,
+    TrendUp,
+    Clock,
+    Swap
+} from '@phosphor-icons/react';
 
 export function AssignmentReportDialog({
     open,
@@ -28,54 +41,174 @@ export function AssignmentReportDialog({
         groups: any[];
         history: AssignmentChange[];
     }) {
-    // 1. 囹듸옙囹??旅욘쪐 ?占썲윲 囹몌옙占?
+    // 1. 관계별 상세 정보 (이전 학년도 반별 그룹화)
     const relationStats = useMemo(() => {
         const stats = {
             keepTotal: 0,
             keepMet: 0,
             avoidTotal: 0,
             avoidMet: 0,
-            details: [] as any[]
+            // 이전 반별로 그룹화된 상세 정보
+            classDetails: {} as Record<string, any[]>
         };
 
-        students.forEach(s => {
-            // 令덅빱? 獄??獵븝옙 ?邕ㅿ옙??
-            s.keep_ids.forEach(kid => {
-                const partner = students.find(p => p.id === kid);
-                if (partner && s.id < partner.id) { // 辱쀧궍??獄삥떀?
-                    stats.keepTotal++;
-                    const isSame = s.assigned_class === partner.assigned_class && s.assigned_class !== null;
-                    if (isSame) stats.keepMet++;
-                    stats.details.push({
-                        type: 'keep',
-                        names: [s.name, partner.name],
-                        status: isSame ? '만족' : '미충족',
-                        classes: [s.assigned_class || '미배정', partner.assigned_class || '미배정']
-                    });
-                }
-            });
+        // 학년-반 추출 함수 (prev_info: "1-2" -> "1학년 2반")
+        const getPrevClassLabel = (prevInfo: string) => {
+            const parts = prevInfo.split('-');
+            if (parts.length >= 2) {
+                return `${parts[0]}학년 ${parts[1]}반`;
+            }
+            return prevInfo || '정보 없음';
+        };
 
-            // 기피 조건
-            s.avoid_ids.forEach(aid => {
-                const partner = students.find(p => p.id === aid);
-                if (partner && s.id < partner.id) {
-                    stats.avoidTotal++;
-                    const isSame = s.assigned_class === partner.assigned_class && s.assigned_class !== null;
-                    if (!isSame) stats.avoidMet++;
-                    stats.details.push({
-                        type: 'avoid',
-                        names: [s.name, partner.name],
-                        status: !isSame ? '만족' : '충돌',
-                        classes: [s.assigned_class || '미배정', partner.assigned_class || '미배정']
-                    });
+        // 학년-반-번호 파싱 및 비교 함수
+        const compareStudents = (a: Student, b: Student) => {
+            const partsA = (a.prev_info || '').split('-').map(p => parseInt(p) || 0);
+            const partsB = (b.prev_info || '').split('-').map(p => parseInt(p) || 0);
+
+            for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                const valA = partsA[i] || 0;
+                const valB = partsB[i] || 0;
+                if (valA !== valB) return valA - valB;
+            }
+            return a.name.localeCompare(b.name, 'ko');
+        };
+
+        // 모든 이전 반 목록 및 초기화
+        const prevClasses = Array.from(new Set(students.map(s => getPrevClassLabel(s.prev_info)))) as string[];
+        prevClasses.sort((a, b) => {
+            const matchA = a.match(/(\d+)학년\s+(\d+)반/);
+            const matchB = b.match(/(\d+)학년\s+(\d+)반/);
+            if (matchA && matchB) {
+                const gradeA = parseInt(matchA[1]);
+                const classA = parseInt(matchA[2]);
+                const gradeB = parseInt(matchB[1]);
+                const classB = parseInt(matchB[2]);
+                if (gradeA !== gradeB) return gradeA - gradeB;
+                return classA - classB;
+            }
+            return a.localeCompare(b, 'ko');
+        });
+        prevClasses.forEach(pc => { stats.classDetails[pc] = []; });
+
+        const processedGlobalPairs = new Set<string>();
+
+        students.forEach(s => {
+            const sPrevClass = getPrevClassLabel(s.prev_info);
+
+            // 공통 로직 처리 함수
+            const processRelation = (partnerId: string, type: 'keep' | 'avoid') => {
+                const partner = students.find(p => p.id === partnerId);
+                if (!partner) return;
+
+                const pPrevClass = getPrevClassLabel(partner.prev_info);
+                const pairId = [s.id, partner.id].sort().join('-');
+
+                // 1. 통계 집계 (전역 중복 방지)
+                const isMet = type === 'keep'
+                    ? (s.assigned_class === partner.assigned_class && s.assigned_class !== null)
+                    : (s.assigned_class !== partner.assigned_class && s.assigned_class !== null);
+
+                if (!processedGlobalPairs.has(pairId)) {
+                    if (type === 'keep') {
+                        stats.keepTotal++;
+                        if (isMet) stats.keepMet++;
+                    } else {
+                        stats.avoidTotal++;
+                        if (isMet) stats.avoidMet++;
+                    }
+                    processedGlobalPairs.add(pairId);
                 }
-            });
+
+                // 2. 리스트 출력 로직 (같은 반이면 앞번호 학생 기준 1회만, 다른 반이면 양쪽 모두 출력)
+                let shouldAddToList = false;
+                if (sPrevClass !== pPrevClass) {
+                    shouldAddToList = true; // 다른 반이면 무조건 내 반 목록에 추가
+                } else {
+                    // 같은 반인 경우, 정렬 순서상 앞선 학생일 때만 추가
+                    if (compareStudents(s, partner) < 0) {
+                        shouldAddToList = true;
+                    }
+                }
+
+                if (shouldAddToList && stats.classDetails[sPrevClass]) {
+                    const detail = {
+                        type,
+                        names: [s.name, partner.name],
+                        status: isMet ? '만족' : (type === 'keep' ? '미충족' : '충돌'),
+                        classes: [s.assigned_class || '미배정', partner.assigned_class || '미배정'],
+                        // 정렬을 위해 원본 학생 객체 저장 (옵션)
+                        sortKeyStudent: s
+                    };
+                    stats.classDetails[sPrevClass].push(detail);
+                }
+            };
+
+            s.keep_ids.forEach(kid => processRelation(kid, 'keep'));
+            s.avoid_ids.forEach(aid => processRelation(aid, 'avoid'));
+        });
+
+        // 각 반별 리스트 정렬 (이전 번호 순)
+        Object.values(stats.classDetails).forEach(list => {
+            list.sort((a, b) => compareStudents(a.sortKeyStudent, b.sortKeyStudent));
         });
 
         return stats;
     }, [students]);
 
-    // 2. 影욆퀓?②쾺?獄삣윜占??占썲윲
+    // 1.5. 이동 학생 명단 계산
+    const movementStats = useMemo(() => {
+        if (history.length === 0) return [];
+
+        // 학생별 최초 상태 찾기
+        const studentFirstChangeMap = new Map<string, string | null>();
+        // history는 시간순이므로 정순으로 돌면서 처음 발견되는 oldClass를 저장
+        history.forEach(change => {
+            if (!studentFirstChangeMap.has(change.studentId)) {
+                studentFirstChangeMap.set(change.studentId, change.oldClass);
+            }
+            if (change.type === 'swap' && change.partnerId && !studentFirstChangeMap.has(change.partnerId)) {
+                studentFirstChangeMap.set(change.partnerId, change.newClass); // swap 파트너의 old는 newClass임
+            }
+        });
+
+        const movements = students.filter(s => {
+            if (!s.assigned_class) return false;
+            const initialClass = studentFirstChangeMap.get(s.id);
+            return initialClass !== undefined && initialClass !== s.assigned_class && initialClass !== null;
+        }).map(s => ({
+            id: s.id,
+            name: s.name,
+            prev_info: s.prev_info,
+            initialClass: studentFirstChangeMap.get(s.id),
+            finalClass: s.assigned_class
+        }));
+
+        // 최초 배정반(initialClass) 기준, 그리고 이전 정보(학년-반-번호) 및 이름순으로 정밀 정렬
+        return movements.sort((a, b) => {
+            // 1. 최초 반 자연 정렬 (1반, 2반, 10반...)
+            const classA = a.initialClass || '';
+            const classB = b.initialClass || '';
+
+            const classCompare = classA.localeCompare(classB, 'ko', { numeric: true });
+            if (classCompare !== 0) return classCompare;
+
+            // 2. 이전 정보(prev_info) 정밀 정렬 ("3-2-15" 성분별 비교)
+            const partsA = (a.prev_info || '').split('-').map(p => parseInt(p) || 0);
+            const partsB = (b.prev_info || '').split('-').map(p => parseInt(p) || 0);
+
+            for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                const valA = partsA[i] || 0;
+                const valB = partsB[i] || 0;
+                if (valA !== valB) return valA - valB;
+            }
+
+            // 3. 마지막으로 이름순
+            return a.name.localeCompare(b.name, 'ko');
+        });
+    }, [students, history]);
+
+    // 2. 그룹별 배정 현황
     const groupStats = useMemo(() => {
         return groups.map(g => ({
             name: g.name,
@@ -87,7 +220,7 @@ export function AssignmentReportDialog({
         }));
     }, [students, groups]);
 
-    // 3. ?野?옙 獄삣윜占?(囹모쪛깍옙, ?占쏙옙)
+    // 3. 특수 배정 (고정배정, 전출)
     const specialStats = useMemo(() => ({
         fixed: students.filter(s => s.fixed_class).map(s => ({
             name: s.name,
@@ -102,11 +235,11 @@ export function AssignmentReportDialog({
     }), [students]);
 
     const handlePrint = () => {
-        // 影ｅ윜???占쏙옙?占쏜쬃??占썲컧獄??帝걟??
+        // 기존 iframe 제거
         const oldFrame = document.getElementById('print-frame');
         if (oldFrame) document.body.removeChild(oldFrame);
 
-        // ??壅э옙??帝같占??占쏙옙????뽳옙
+        // 새 iframe 생성
         const iframe = document.createElement('iframe');
         iframe.id = 'print-frame';
         iframe.style.position = 'fixed';
@@ -121,18 +254,18 @@ export function AssignmentReportDialog({
         if (!printWindow) return;
 
         const historyHtml = history.length === 0
-            ? '<tr><td colspan="5" style="text-align:center; padding: 40px; color: #999;">縕먲옙囹??歷좑옙???占쏜졐?占쏜졊?</td></tr>'
+            ? '<tr><td colspan="5" style="text-align:center; padding: 40px; color: #999;">배정 변경 이력이 없습니다.</td></tr>'
             : history.map((c, i) => `
                 <tr>
                     <td style="text-align:center;">${i + 1}</td>
                     <td style="text-align:center;">${c.source === 'auto' ? '자동' : '수동'}</td>
                     <td style="text-align:center; font-size: 11px;">${new Date(c.timestamp).toLocaleTimeString()}</td>
                     <td style="font-weight: bold;">
-                        ${c.type === 'swap' ? `${c.studentName}<br>??${c.partnerName}` : c.studentName}
+                        ${c.type === 'swap' ? `${c.studentName}<br>↔${c.partnerName}` : c.studentName}
                     </td>
                     <td>
                         ${c.type === 'swap'
-                    ? `${c.studentName}: ${c.oldClass} ??${c.newClass}<br>${c.partnerName}: ${c.newClass} ??${c.oldClass}`
+                    ? `${c.studentName}: ${c.oldClass} →${c.newClass}<br>${c.partnerName}: ${c.newClass} →${c.oldClass}`
                     : `${c.oldClass || '미배정'} → ${c.newClass || '미배정'}`
                 }
                     </td>
@@ -140,67 +273,111 @@ export function AssignmentReportDialog({
             `).join('');
 
         const groupHtml = groupStats.length === 0
-            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">??⑨옙??蘊깍옙占?獄삣윜占?影욆퀓????占쏜졐?占쏜졊?</p>'
+            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 분산 배정 그룹이 없습니다.</p>'
             : groupStats.map(g => `
                 <div style="margin-bottom: 12px;">
-                    <strong style="font-size: 11pt; color: #333;">??${g.name}</strong>
+                    <strong style="font-size: 11pt; color: #333;">그룹명: ${g.name}</strong>
                     <div style="margin-top: 5px; padding-left: 15px; font-size: 10pt; line-height: 1.6;">
                         ${g.students.length === 0
-                    ? '<span style="color: #999;">獄경쐢占??占쏙옙</span>'
+                    ? '<span style="color: #999;">소속 학생 없음</span>'
                     : g.students.map(s => `${s.name} (${s.class})`).join(', ')
                 }
                     </div>
                 </div>
             `).join('');
 
-        const relationHtml = relationStats.details.length === 0
-            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">??⑨옙??囹듸옙囹?邀썲쐦????占쏜졐?占쏜졊?</p>'
+        const relationHtml = Object.keys(relationStats.classDetails).length === 0
+            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 관계 조건이 없습니다.</p>'
+            : Object.entries(relationStats.classDetails)
+                .filter(([_, details]) => details.length > 0)
+                .map(([className, details]) => `
+                <div style="margin-top: 20px; break-inside: auto;">
+                    <h3 style="font-size: 13pt; color: #444; margin-bottom: 8px; border-left: 4px solid #6366f1; padding-left: 10px; break-after: avoid;">
+                        이전 학년도: ${className}
+                    </h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 5px; break-inside: auto;">
+                        <thead style="display: table-header-group;">
+                            <tr style="background-color: #f8fafc;">
+                                <th style="width: 70px;">유형</th>
+                                <th>대상 학생 (최종 배정반)</th>
+                                <th style="width: 70px;">상태</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${details.map(d => `
+                                <tr>
+                                    <td style="text-align:center;">
+                                        <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: bold; 
+                                            ${d.type === 'keep'
+                        ? 'background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;'
+                        : 'background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;'}">
+                                            ${d.type === 'keep' ? '💕 희망' : '🚫 회피'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        ${d.names[0]} (${d.classes[0]}) - ${d.names[1]} (${d.classes[1]})
+                                    </td>
+                                    <td style="text-align:center; font-weight: bold; color: ${d.status === '만족' ? '#059669' : '#dc2626'}">${d.status}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `).join('');
+
+        const movementHtml = movementStats.length === 0
+            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">이동한 학생이 없습니다.</p>'
             : `
-            <table style="width: 100%; border-collapse: collapse; margin-top: 5px;">
-                <thead>
-                    <tr style="background-color: #f5f5f5;">
-                        <th style="width: 60px;">囹긺┷占?/th>
-                        <th>?占???邕ㅿ옙</th>
-                        <th>獄삣윜占?囹뜹쐦??(獄?</th>
-                        <th style="width: 60px;">?占쏙옙</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${relationStats.details.map(d => `
-                        <tr>
-                            <td style="text-align:center;">${d.type === 'keep' ? '?獵븝옙' : '?榕꿜깉'}</td>
-                            <td>${d.names.join(', ')}</td>
-                            <td style="text-align:center;">${d.classes.join(', ')}</td>
-                            <td style="text-align:center; font-weight: bold; color: ${d.status === '?歟볣솷' ? '#2e7d32' : '#d32f2f'}">${d.status}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
+                <div style="margin-top: 20px; break-inside: auto;">
+                    <p style="font-size: 10pt; color: #666; margin-bottom: 10px; break-after: avoid;">
+                        * 최초 배정된 반에서 최종 배정된 반이 변경된 학생들의 목록입니다. (최초 반 번호순 정렬)
+                    </p>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 5px; break-inside: auto;">
+                        <thead style="display: table-header-group;">
+                            <tr style="background-color: #f8fafc;">
+                                <th style="width: 50px;">No</th>
+                                <th>학생명</th>
+                                <th>최초 배정반</th>
+                                <th>최종 배정반</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${movementStats.map((s, i) => `
+                                <tr>
+                                    <td style="text-align:center;">${i + 1}</td>
+                                    <td style="text-align:center; font-weight: bold;">${s.name}</td>
+                                    <td style="text-align:center;">${s.initialClass}</td>
+                                    <td style="text-align:center; font-weight: bold; color: #4f46e5;">${s.finalClass}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
 
         const specialHtml = `
             <div style="padding: 10px; border: 1px solid #333; border-radius: 4px;">
                 <div style="margin-bottom: 12px;">
-                    <strong style="font-size: 11pt; color: #333;">??囹모쪛깍옙 獄삣윜占??邕ㅿ옙</strong>
+                    <strong style="font-size: 11pt; color: #333;">고정 배정 학생 현황</strong>
                     <div style="margin-top: 5px; padding-left: 15px;">
                         ${specialStats.fixed.length === 0
-                ? '<span style="color: #999; font-size: 10pt;">囹모쪛깍옙 ?邕ㅿ옙 ?占쏙옙</span>'
+                ? '<span style="color: #999; font-size: 10pt;">고정 배정 학생 없음</span>'
                 : specialStats.fixed.map(s => `
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
-                                    <span>${s.name} (${s.target} ?獵븝옙)</span>
+                                    <span>${s.name} (${s.target} 반 희망)</span>
                                     <span style="color: ${s.isMet ? '#2e7d32' : '#d32f2f'}; font-weight: bold; font-size: 9pt;">
-                                        ${s.isMet ? `?歟볣솷(${s.class})` : `?占쏙옙(${s.class})`}
+                                        ${s.isMet ? `만족(${s.class || '미배정'})` : `미충족(${s.class || '미배정'})`}
                                     </span>
                                 </div>
                             `).join('')}
                     </div>
                 </div>
                 <div style="margin-top: 15px; border-top: 1px dashed #eee; padding-top: 15px;">
-                    <strong style="font-size: 11pt; color: #333;">???占쏙옙 ?占쏙옙 ?邕ㅿ옙</strong>
+                    <strong style="font-size: 11pt; color: #333;">전출 예정 학생 현황</strong>
                     <div style="margin-top: 5px; padding-left: 15px; font-size: 10pt; line-height: 1.6;">
                         ${specialStats.preTransfer.length === 0
-                ? '<span style="color: #999;">?占쏙옙 ?邕ㅿ옙 ?占쏙옙</span>'
-                : specialStats.preTransfer.map(s => `${s.name} (${s.class})`).join(', ')
+                ? '<span style="color: #999;">전출 예정 학생 없음</span>'
+                : specialStats.preTransfer.map(s => `${s.name} (${s.class || '미배정'})`).join(', ')
             }
                     </div>
                 </div>
@@ -208,67 +385,37 @@ export function AssignmentReportDialog({
         `;
 
         const html = `
-            <!DOCTYPE html>
+        <!DOCTYPE html>
             <html>
                 <head>
-                    <title>獄?獄삣윜占?囹뜹쐦??縕먩퉲占??/title>
+                    <title>학생 배정 상세 리포트</title>
                     <style>
-                    @page { size: A4; margin: 20mm; }
-                    body { font-family: sans-serif; margin: 0; padding: 0; line-height: 1.5; color: #333; }
-                    .header { text-align: center; margin-bottom: 30px; }
-                    .header h1 { font-size: 24pt; margin: 0; }
-                    .header p { text-align: right; font-size: 10pt; color: #666; }
-                    h2 { font-size: 16pt; border-bottom: 2px solid #333; padding-bottom: 5px; margin-top: 30px; page-break-after: avoid; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-                    th, td { border: 1px solid #333; padding: 8px; font-size: 11pt; word-break: break-all; vertical-align: middle; }
-                    th { background-color: #f5f5f5; font-weight: bold; }
-                    tr { page-break-inside: avoid; }
-                        .summary-table th {width: 40%; }
-                    .summary-table td { text-align: center; }
-                        .history-table th:nth-child(1) {width: 40px; }
-                        .history-table th:nth-child(2) {width: 60px; }
-                        .history-table th:nth-child(3) {width: 100px; }
-                        .history-table th:nth-child(4) {width: 150px; }
+                        @page { size: A4; margin: 20mm; }
+                        body { font-family: sans-serif; margin: 0; padding: 0; line-height: 1.5; color: #333; }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .header h1 { font-size: 24pt; margin: 0; }
+                        .header p { text-align: right; font-size: 10pt; color: #666; }
+                        h2 { font-size: 16pt; border-bottom: 2px solid #333; padding-bottom: 5px; margin-top: 30px; break-after: avoid; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; break-inside: auto; }
+                        thead { display: table-header-group; }
+                        th, td { border: 1px solid #333; padding: 8px; font-size: 11pt; word-break: break-all; vertical-align: middle; }
+                        th { background-color: #f5f5f5; font-weight: bold; }
+                        tr { break-inside: avoid; break-after: auto; }
+                        .summary-table th { width: 40%; }
+                        .summary-table td { text-align: center; }
+                        .history-table th:nth-child(1) { width: 40px; }
+                        .history-table th:nth-child(2) { width: 60px; }
+                        .history-table th:nth-child(3) { width: 100px; }
+                        .history-table th:nth-child(4) { width: 150px; }
                     </style>
                 </head>
                 <body>
                     <div class="header">
-                        <p>容뷴텈占?逆곤옙: ${new Date().toLocaleString()}</p>
-                        <h1>獄?獄삣윜占?囹뜹쐦??縕먩퉲占??/h1>
+                        <p>출력 일시: ${new Date().toLocaleString()}</p>
+                        <h1>학생 배정 상세 리포트</h1>
                     </div>
 
-                    <h2>1. 邀썲쐦???旅욘쪐 ??밭깂</h2>
-                    <table class="summary-table">
-                        <thead>
-                            <tr>
-                                <th>??? ????/th>
-                                <th>?旅욘쪐 / ?占썹쑝</th>
-                                <th>?旅욘쪐??(%)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>令덅빱? 獄??獵븝옙</td>
-                                <td>${relationStats.keepMet} / ${relationStats.keepTotal}</td>
-                                <td>${relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</td>
-                            </tr>
-                            <tr>
-                                <td>?逆ㅳ윸????囹듸옙囹?/td>
-                                <td>${relationStats.avoidMet} / ${relationStats.avoidTotal}</td>
-                                <td>${relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</td>
-                            </tr>
-                            <tr>
-                                <td>囹모쪛깍옙 獄삣윜占?辱쀯옙??/td>
-                                <td>${specialStats.fixed.filter(s => s.isMet).length} / ${specialStats.fixed.length}</td>
-                                <td>${specialStats.fixed.length > 0 ? Math.round((specialStats.fixed.filter(s => s.isMet).length / specialStats.fixed.length) * 100) : 100}%</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <h3 style="margin-top: 15px; font-size: 13pt;">?占?囹듸옙囹몌옙占??占쏙옙 獄삣윜占???낂쇃</h3>
-                    ${relationHtml}
-
-                    <h2>2. 蘊깍옙占?獄삣윜占?影욆퀓??獄??野?옙 獄삣윜占??占썲윲</h2>
+                    <h2>1. 그룹별 배정 현황 및 특수 배정 현황</h2>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div style="padding: 10px; border: 1px solid #333; border-radius: 4px;">
                             ${groupHtml}
@@ -276,16 +423,50 @@ export function AssignmentReportDialog({
                         ${specialHtml}
                     </div>
 
-                    <h2>3. ?占쏙옙 縕먲옙囹??歷좑옙 (容?${history.length}令?</h2>
+                    <h2>2. 제약 조건 이행 요약</h2>
+                    <table class="summary-table">
+                        <thead>
+                            <tr>
+                                <th>구분 (제약 조건)</th>
+                                <th>이행수 / 전체수</th>
+                                <th>이행률(%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>함께 배정 희망</td>
+                                <td>${relationStats.keepMet} / ${relationStats.keepTotal}</td>
+                                <td>${relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</td>
+                            </tr>
+                            <tr>
+                                <td>기피 대상 피함</td>
+                                <td>${relationStats.avoidMet} / ${relationStats.avoidTotal}</td>
+                                <td>${relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</td>
+                            </tr>
+                            <tr>
+                                <td>고정 배정 학생 이행</td>
+                                <td>${specialStats.fixed.filter(s => s.isMet).length} / ${specialStats.fixed.length}</td>
+                                <td>${specialStats.fixed.length > 0 ? Math.round((specialStats.fixed.filter(s => s.isMet).length / specialStats.fixed.length) * 100) : 100}%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3 style="margin-top: 15px; font-size: 13pt;">학급별 관계 상세 현황</h3>
+                    ${relationHtml}
+
+                    <h2>3. 이동 학생 명단 (총 ${movementStats.length}명)</h2>
+                    ${movementHtml}
+
+                    <h2>4. 변경 누적 이력 (총 ${history.length}건)</h2>
                     <table class="history-table">
 
                         <thead>
                             <tr>
                                 <th>No</th>
-                                <th>囹긺┷占?/th>
-                                <th>?帝걟占?/th>
-                                <th>?占???邕ㅿ옙</th>
-                                <th>?占쏙옙 縕먲옙囹??歷ι뭘</th>
+                                <th>변경구분</th>
+                                <th>변경시각</th>
+                                <th>대상 학생</th>
+                                <th>전환 상세 내용</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -294,16 +475,16 @@ export function AssignmentReportDialog({
                     </table>
 
                     <div style="margin-top: 50px; text-align: center; font-size: 9pt; color: #999;">
-                        Classzle - ?占썹???獄??蘊꾬옙???占쏙옙 獄ㅿ옙?獄?邀썲쐦占?
+                        Classzle - 스마트한 학생 배정을 위한 인공지능 배정 도구
                     </div>
                 </body>
             </html>
-        `;
+    `;
 
         if (window.electronAPI) {
             window.electronAPI.printPreview(html);
         } else {
-            // 影ｅ윜??獄삥떀占? iframe ?燁묌뭘 (????섊?)
+            // 웹 환경용 iframe 인쇄 로직
             const oldFrame = document.getElementById('print-frame');
             if (oldFrame) document.body.removeChild(oldFrame);
 
@@ -319,15 +500,14 @@ export function AssignmentReportDialog({
 
             const printWindow = iframe.contentWindow;
             if (printWindow) {
-                // ???占썸뿭?蘊꾦뭘 ?轝좑옙玉붻릊??容븟??
                 const webHtml = html.replace('</body>', `
-                    <script>
-                        window.onload = function() {
-                            window.print();
-                        };
-                    </script>
-                    </body>
-                `);
+        <script>
+    window.onload = function () {
+        window.print();
+    };
+                    </script >
+                    </body >
+        `);
                 printWindow.document.write(webHtml);
                 printWindow.document.close();
             }
@@ -339,7 +519,7 @@ export function AssignmentReportDialog({
             <DialogContent id="report-dialog-content" className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-2xl flex items-center gap-2">
-                        ?占?獄삣윜占?囹뜹쐦???占쏙옙 玉붺쭜靜⇔??
+                        학생 배정 상세 분석 리포트
                     </DialogTitle>
                 </DialogHeader>
 
@@ -351,133 +531,182 @@ export function AssignmentReportDialog({
                                 value="fulfillment"
                                 className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2"
                             >
-                                邀썲쐦???旅욘쪐 ?占썲윲
+                                이행 현황
+                            </TabsTrigger>
+                            <TabsTrigger
+                                value="movements"
+                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2 flex items-center gap-1.5"
+                            >
+                                <TrendUp size={16} />
+                                이동 명단 ({movementStats.length})
                             </TabsTrigger>
                             <TabsTrigger
                                 value="history"
-                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2"
+                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2 flex items-center gap-1.5"
                             >
-                                ?占쏙옙 縕먲옙囹??歷좑옙 ({history.length})
+                                <Clock size={16} />
+                                변경 이력 ({history.length})
                             </TabsTrigger>
                         </TabsList>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6">
                         <TabsContent value="fulfillment" className="m-0 space-y-6">
-                            {/* 囹듸옙囹??旅욘쪐 ??밭깂 */}
+                            {/* 관계 제약 이행 요약 */}
                             <div className="grid grid-cols-2 gap-4">
                                 <Card className="bg-pink-50/30 border-pink-100 flex flex-col items-center justify-center text-center py-4 rounded-xl shadow-sm">
-                                    <div className="text-sm font-medium text-pink-700 mb-1">?占?令덅빱? 獄??獵븝옙</div>
+                                    <div className="text-sm font-medium text-pink-700 mb-1">함께 배정 희망</div>
                                     <div className="text-2xl font-bold text-pink-600">
                                         {relationStats.keepMet} / {relationStats.keepTotal}
                                     </div>
-                                    <p className="text-xs text-pink-600/70">?€쵟占??旅욘쪐?? {relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</p>
+                                    <p className="text-xs text-pink-600/70">쌍별 이행률: {relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</p>
                                 </Card>
                                 <Card className="bg-red-50/30 border-red-100 flex flex-col items-center justify-center text-center py-4 rounded-xl shadow-sm">
-                                    <div className="text-sm font-medium text-red-700 mb-1">?墉??逆ㅳ윸????囹듸옙囹</div>
+                                    <div className="text-sm font-medium text-red-700 mb-1">기피 대상 피함</div>
                                     <div className="text-2xl font-bold text-red-600">
                                         {relationStats.avoidMet} / {relationStats.avoidTotal}
                                     </div>
-                                    <p className="text-xs text-red-600/70">蘊깍옙???歟볣솷獄? {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
+                                    <p className="text-xs text-red-600/70">충돌 회피율: {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
                                 </Card>
                             </div>
 
-                            {/* 囹듸옙囹??占쏙옙 ?歷π　?*/}
-                            <Card className="rounded-xl border-indigo-100 shadow-md shadow-indigo-500/5 bg-white">
-                                <CardHeader className="py-3 border-b bg-muted/20">
-                                    <CardTitle className="text-sm font-bold flex items-center gap-2">?占?囹듸옙囹몌옙占??占쏙옙 獄삣윜占???낂쇃</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="divide-y divide-gray-100">
-                                        {relationStats.details.length === 0 ? (
-                                            <div className="p-8 text-center text-muted-foreground text-sm">??⑨옙??囹듸옙囹?邀썲쐦????占쏜졐?占쏜졊?</div>
-                                        ) : relationStats.details.map((detail, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 text-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <Badge variant="outline" className={detail.type === 'keep' ? 'border-pink-200 text-pink-700 bg-pink-50' : 'border-red-200 text-red-700 bg-red-50'}>
-                                                        {detail.type === 'keep' ? '?占??獵븝옙' : '?墉??榕꿜깉'}
-                                                    </Badge>
-                                                    <span className="font-medium">
-                                                        {detail.names.map((name: string, i: number) => (
-                                                            <span key={i}>
-                                                                {name} <span className="text-muted-foreground font-normal text-xs">({detail.classes[i]})</span>
-                                                                {i < detail.names.length - 1 ? ', ' : ''}
-                                                            </span>
+                            {/* 관계 상세 현황 (반별 그룹화) */}
+                            <div className="space-y-4">
+                                <h4 className="font-bold text-sm flex items-center gap-2">학급별 관계 상세 현황</h4>
+                                {Object.keys(relationStats.classDetails).length === 0 ? (
+                                    <div className="p-8 text-center text-muted-foreground text-sm border-2 border-dashed rounded-xl">설정된 관계 제약 조건이 없습니다.</div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        {Object.entries(relationStats.classDetails)
+                                            .filter(([_, details]) => details.length > 0)
+                                            .map(([className, details]) => (
+                                                <div key={className} className="space-y-3">
+                                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                        <Buildings size={18} className="text-slate-400" weight="fill" />
+                                                        <span className="text-[13px]">이전 학년도: {className}</span>
+                                                    </h4>
+                                                    <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                                        {details.map((detail, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between p-4 px-5 text-sm hover:bg-slate-50 transition-colors">
+                                                                <div className="flex items-center gap-4">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className={detail.type === 'keep'
+                                                                            ? 'border-blue-200 text-blue-700 bg-blue-50/50 rounded-full px-2.5 py-0.5'
+                                                                            : 'border-red-200 text-red-700 bg-red-50/50 rounded-full px-2.5 py-0.5'
+                                                                        }
+                                                                    >
+                                                                        {detail.type === 'keep' ? '함께 희망' : '서로 회피'}
+                                                                    </Badge>
+                                                                    <span className="font-semibold text-slate-700 flex items-center gap-3">
+                                                                        <span className="flex items-center gap-1.5">
+                                                                            <User size={16} className="text-slate-400" />
+                                                                            {detail.names[0]}
+                                                                            <Badge variant="secondary" className="text-[11px] px-1.5 h-5 font-normal text-slate-500 bg-slate-100 hover:bg-slate-200">{detail.classes[0]}</Badge>
+                                                                        </span>
+                                                                        <ArrowsLeftRight size={14} className="text-slate-300" />
+                                                                        <span className="flex items-center gap-1.5">
+                                                                            <User size={16} className="text-slate-400" />
+                                                                            {detail.names[1]}
+                                                                            <Badge variant="secondary" className="text-[11px] px-1.5 h-5 font-normal text-slate-500 bg-slate-100 hover:bg-slate-200">{detail.classes[1]}</Badge>
+                                                                        </span>
+                                                                    </span>
+                                                                </div>
+                                                                <Badge
+                                                                    className={`min-w-[60px] justify-center text-[11px] font-bold ${detail.status === '만족'
+                                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                                                        : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                                                                        }`}
+                                                                    variant="outline"
+                                                                >
+                                                                    {detail.status === '만족' ? <CheckCircle size={14} className="mr-1" weight="fill" /> : <WarningCircle size={14} className="mr-1" weight="fill" />}
+                                                                    {detail.status}
+                                                                </Badge>
+                                                            </div>
                                                         ))}
-                                                    </span>
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-4">
-                                                    <Badge variant={detail.status === '?歟볣솷' ? 'default' : 'destructive'} className="w-16 justify-center">
-                                                        {detail.status}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))}
                                     </div>
-                                </CardContent>
-                            </Card>
+                                )}
+                            </div>
 
-                            {/* ?€쑉??占?影욆퀓??獄??野?옙 獄삣윜占?*/}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* ?€쑉??占?影욆퀓??*/}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
                                 <div className="space-y-4">
-                                    <h4 className="font-bold text-sm flex items-center gap-2">?靜ㅋ 影욆퀓???邕ㅿ옙 獄삣윜占???낂쇃</h4>
+                                    <h4 className="font-bold text-sm flex items-center gap-2 text-slate-800">
+                                        <Users size={18} className="text-indigo-500" weight="bold" />
+                                        분산 배정 그룹별 현황
+                                    </h4>
                                     <div className="space-y-3">
                                         {groupStats.map(g => (
-                                            <Card key={g.name} className="overflow-hidden rounded-xl border-slate-200 shadow-sm">
-                                                <CardHeader className="p-3 py-2 bg-muted/10 border-b flex flex-row items-center gap-2">
-                                                    <div className={`w-1 h-3 rounded-full ${g.color || 'bg-primary'}`} />
-                                                    <CardTitle className="text-xs font-bold">{g.name}</CardTitle>
+                                            <Card key={g.name} className="overflow-hidden border-slate-200 shadow-sm rounded-2xl">
+                                                <CardHeader className="p-3.5 py-2.5 bg-slate-50/50 border-b flex flex-row items-center gap-2">
+                                                    <div className="w-1.5 h-3.5 rounded-full bg-indigo-400" />
+                                                    <CardTitle className="text-xs font-bold text-slate-700">{g.name}</CardTitle>
                                                 </CardHeader>
-                                                <CardContent className="p-3">
-                                                    <div className="flex flex-wrap gap-2 text-xs">
+                                                <CardContent className="p-4">
+                                                    <div className="flex flex-wrap gap-1.5 text-xs">
                                                         {g.students.map((s, i) => (
-                                                            <span key={i} className="bg-gray-100 px-2 py-1 rounded">
-                                                                {s.name} ({s.class})
+                                                            <span key={i} className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                                                                <User size={12} className="text-slate-400" />
+                                                                {s.name} <span className="opacity-30">|</span> {s.class}
                                                             </span>
                                                         ))}
-                                                        {g.students.length === 0 && <span className="text-muted-foreground">獄경쐢占??占쏙옙</span>}
+                                                        {g.students.length === 0 && <span className="text-muted-foreground opacity-60">소속 학생 없음</span>}
                                                     </div>
                                                 </CardContent>
                                             </Card>
                                         ))}
                                     </div>
-                                    {groupStats.length === 0 && <p className="text-sm text-muted-foreground">??뽳옙??影욆퀓????占쏜졐?占쏜졊?</p>}
+                                    {groupStats.length === 0 && <p className="text-sm text-muted-foreground opacity-60 italic">설정된 분산 배정 그룹이 없습니다.</p>}
                                 </div>
 
-                                {/* 囹모쪛깍옙/?占쏙옙 */}
                                 <div className="space-y-4">
-                                    <h4 className="font-bold text-sm flex items-center gap-2">?占?囹모쪛깍옙 獄??占쏙옙 ?占쏙옙 ?屍귩쪟</h4>
-                                    <div className="space-y-4">
-                                        <Card>
-                                            <CardHeader className="p-3 py-2 bg-muted/10 border-b">
-                                                <CardTitle className="text-xs font-bold">囹모쪛깍옙 獄삣윜占??邕ㅿ옙</CardTitle>
+                                    <h4 className="font-bold text-sm flex items-center gap-2 text-slate-800">
+                                        <CheckCircle size={18} className="text-indigo-500" weight="bold" />
+                                        고정 배정 및 특수 현황
+                                    </h4>
+                                    <div className="space-y-3">
+                                        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+                                            <CardHeader className="p-3.5 py-2.5 bg-slate-50/50 border-b">
+                                                <CardTitle className="text-xs font-bold text-slate-700">고정 배정 학생</CardTitle>
                                             </CardHeader>
-                                            <CardContent className="p-3 space-y-2">
+                                            <CardContent className="p-4 space-y-2.5">
                                                 {specialStats.fixed.map((s, i) => (
                                                     <div key={i} className="flex justify-between items-center text-xs">
-                                                        <span>{s.name} ({s.target} ?獵븝옙)</span>
-                                                        <Badge variant={s.isMet ? 'outline' : 'destructive'} className="text-[10px] h-5">
-                                                            {s.isMet ? `?歟볣솷(${s.class})` : `?占쏙옙(${s.class})`}
+                                                        <div className="flex items-center gap-2">
+                                                            <User size={14} className="text-slate-400" />
+                                                            <span className="font-semibold text-slate-700">{s.name}</span>
+                                                            <span className="text-slate-400">({s.target}반 희망)</span>
+                                                        </div>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`text-[10px] h-5 rounded-full px-2 ${s.isMet
+                                                                ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
+                                                                : 'border-red-200 text-red-700 bg-red-50'
+                                                                }`}
+                                                        >
+                                                            {s.isMet ? '만족' : '미충족'} ({s.class})
                                                         </Badge>
                                                     </div>
                                                 ))}
-                                                {specialStats.fixed.length === 0 && <p className="text-xs text-muted-foreground">囹모쪛깍옙 ?邕ㅿ옙 ?占쏙옙</p>}
+                                                {specialStats.fixed.length === 0 && <p className="text-xs text-muted-foreground opacity-60">고정 배정 학생 없음</p>}
                                             </CardContent>
                                         </Card>
 
-                                        <Card>
-                                            <CardHeader className="p-3 py-2 bg-muted/10 border-b">
-                                                <CardTitle className="text-xs font-bold">?占쏙옙 ?占쏙옙 ?邕ㅿ옙</CardTitle>
+                                        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden">
+                                            <CardHeader className="p-3.5 py-2.5 bg-slate-50/50 border-b">
+                                                <CardTitle className="text-xs font-bold text-slate-700">전출 예정 학생</CardTitle>
                                             </CardHeader>
-                                            <CardContent className="p-3">
-                                                <div className="flex flex-wrap gap-2 text-xs">
+                                            <CardContent className="p-4">
+                                                <div className="flex flex-wrap gap-1.5 text-xs">
                                                     {specialStats.preTransfer.map((s, i) => (
-                                                        <span key={i} className="text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-100">
-                                                            {s.name} ({s.class})
+                                                        <span key={i} className="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 font-medium flex items-center gap-1">
+                                                            <User size={12} className="text-indigo-400" />
+                                                            {s.name} <span className="opacity-30">|</span> {s.class}
                                                         </span>
                                                     ))}
-                                                    {specialStats.preTransfer.length === 0 && <span className="text-muted-foreground">?占쏙옙 ?邕ㅿ옙 ?占쏙옙</span>}
+                                                    {specialStats.preTransfer.length === 0 && <span className="text-muted-foreground opacity-60">전출 예정 학생 없음</span>}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -486,63 +715,143 @@ export function AssignmentReportDialog({
                             </div>
                         </TabsContent>
 
-                        <TabsContent value="history" className="m-0">
-                            {history.length === 0 ? (
-                                <div className="text-center py-20 text-muted-foreground border-2 border-dashed rounded-xl">
-                                    <div className="text-4xl mb-4">?占</div>
-                                    <p className="text-sm">獄삣윜占?縕먲옙囹??歷좑옙???占쏜졐?占쏜졊?</p>
-                                    <p className="text-xs opacity-60 mt-1">獄삣윜占??轝좑옙 ?占쏙옙 수동 ?歷좑옙 ??影ｅ쐣占????곧졐?占쏜졊?</p>
+                        <TabsContent value="movements" className="m-0 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <p className="text-sm text-muted-foreground">최초 배정 결과 대비 <strong>{movementStats.length}명</strong>의 학생이 이동되었습니다.</p>
+                            </div>
+
+                            {movementStats.length === 0 ? (
+                                <div className="text-center py-20 text-muted-foreground border border-dashed rounded-2xl bg-slate-50/50">
+                                    <Info size={32} className="mx-auto mb-3 opacity-20" />
+                                    <p className="text-sm">이동한 학생이 없습니다.</p>
                                 </div>
                             ) : (
-                                <div className="flex flex-col h-full">
-                                    {/* 囹모쪛깍옙 ??덌옙 - ?轝좑옙獄??占쏜　?獄?*/}
-                                    <div className="pb-3 flex justify-between items-center border-b bg-white">
-                                        <p className="text-sm text-muted-foreground">容?<strong>{history.length}</strong>令뉑른占??歷좑옙 ?歷π　</p>
-                                        <p className="text-xs text-muted-foreground">?歷좑옙?占?'?劑퍠占?獄삣윜占? ??容뺧옙??塋언Œ?占쏜졊?</p>
-                                    </div>
-                                    {/* ?轝좑옙獄?令덌옙?鴉뺧옙 玉붺쭛????占쏜　?*/}
-                                    <div className="divide-y divide-gray-100 border rounded-lg mt-3 overflow-y-auto max-h-[400px]">
-                                        {history.map((change, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 px-4 text-sm hover:bg-gray-50 transition-colors">
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`font-bold ${change.type === 'swap' ? 'text-indigo-700' : 'text-primary'}`}>
-                                                            {idx + 1}. {change.type === 'swap' ? '[囹깎쪗э옙] ' : ''}
-                                                            {change.studentName}
-                                                            {change.type === 'swap' && ` ??${change.partnerName}`}
-                                                        </span>
-                                                        <Badge variant="secondary" className={`text-[10px] h-4 px-1 ${change.source === 'auto' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                                                            {change.source === 'auto' ? '자동' : '수동'}
-                                                        </Badge>
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        {new Date(change.timestamp).toLocaleTimeString()}
-                                                    </span>
+                                <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                    {movementStats.map((s, i) => (
+                                        <div key={s.id} className="flex items-center justify-between p-4 px-5 text-sm hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-5">
+                                                <span className="text-xs font-bold text-slate-300 w-5">{i + 1}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <User size={16} className="text-slate-400" />
+                                                    <span className="font-bold text-slate-700">{s.name}</span>
+                                                    <Badge variant="secondary" className="text-[11px] px-1.5 h-5 font-normal text-slate-500 bg-slate-100 hover:bg-slate-200">
+                                                        {s.prev_info.split('-').slice(0, 2).join('-')} 반
+                                                    </Badge>
                                                 </div>
-                                                <div className="flex items-center gap-3">
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[11px] font-medium text-slate-400 uppercase tracking-tighter">최초</span>
+                                                    <Badge variant="outline" className="font-semibold text-slate-500 bg-white border-slate-200 px-2 py-0.5 rounded-lg">
+                                                        {s.initialClass}
+                                                    </Badge>
+                                                </div>
+                                                <ArrowRight size={14} weight="bold" className="text-slate-300" />
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[11px] font-medium text-indigo-400 uppercase tracking-tighter">최종</span>
+                                                    <Badge className="bg-indigo-500 text-white font-bold border-none px-3 py-1 rounded-lg shadow-sm">
+                                                        {s.finalClass}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        <TabsContent value="history" className="m-0">
+                            {history.length === 0 ? (
+                                <div className="text-center py-20 text-muted-foreground border border-dashed rounded-2xl bg-slate-50/50">
+                                    <Clock size={32} className="mx-auto mb-3 opacity-20" />
+                                    <p className="text-sm font-medium">배정 변경 이력이 없습니다.</p>
+                                    <p className="text-xs opacity-60 mt-1">자동 배정 이후의 수동 변경 사항이 여기에 표시됩니다.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center px-1">
+                                        <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                                            <Info size={16} className="text-indigo-500" />
+                                            총 {history.length}건의 변경 이력
+                                        </p>
+                                    </div>
+                                    <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm max-h-[450px] overflow-y-auto">
+                                        {history.map((change, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-4 px-5 text-sm hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-center gap-5">
+                                                    <span className="text-xs font-bold text-slate-300 w-5">{idx + 1}</span>
+                                                    <div className="space-y-0.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`font-bold text-[14px] ${change.type === 'swap' ? 'text-indigo-700' : 'text-slate-700'}`}>
+                                                                {change.type === 'swap' ? (
+                                                                    <span className="flex items-center gap-2">
+                                                                        <User size={16} className="text-slate-400" /> {change.studentName}
+                                                                        <ArrowsLeftRight size={14} className="text-slate-300" />
+                                                                        <User size={16} className="text-slate-400" /> {change.partnerName}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="flex items-center gap-2">
+                                                                        <User size={16} className="text-slate-400" /> {change.studentName}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`text-[9px] h-4 rounded-full px-1.5 ${change.source === 'auto'
+                                                                    ? 'bg-purple-50 text-purple-600 border-purple-100'
+                                                                    : 'bg-amber-50 text-amber-600 border-amber-100'
+                                                                    }`}
+                                                            >
+                                                                {change.source === 'auto' ? '자동' : '수동'}
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                                                            <Clock size={12} />
+                                                            {new Date(change.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
                                                     {change.type === 'swap' ? (
-                                                        <div className="flex flex-col items-end gap-1">
-                                                            <div className="flex items-center gap-2 text-[11px]">
-                                                                <span className="text-muted-foreground">{change.studentName}:</span>
-                                                                <span className="line-through opacity-50">{change.oldClass}</span>
-                                                                <span className="font-bold text-indigo-600">→ {change.newClass}</span>
+                                                        <div className="flex flex-col items-end gap-1.5 font-mono text-[11px]">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-slate-500 font-medium w-14 truncate text-right">{change.studentName}</span>
+                                                                <Badge variant="outline" className="text-slate-400 border-slate-200 bg-white font-normal px-1.5 h-5 text-[10px] min-w-[30px] justify-center">
+                                                                    {change.oldClass}
+                                                                </Badge>
+                                                                <ArrowRight size={12} className="text-slate-300" />
+                                                                <Badge className="bg-indigo-500 text-white border-none px-1.5 h-5 text-[10px] min-w-[30px] justify-center shadow-sm">
+                                                                    {change.newClass}
+                                                                </Badge>
                                                             </div>
-                                                            <div className="flex items-center gap-2 text-[11px]">
-                                                                <span className="text-muted-foreground">{change.partnerName}:</span>
-                                                                <span className="line-through opacity-50">{change.newClass}</span>
-                                                                <span className="font-bold text-indigo-600">→ {change.oldClass}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-slate-500 font-medium w-14 truncate text-right">{change.partnerName}</span>
+                                                                <Badge variant="outline" className="text-slate-400 border-slate-200 bg-white font-normal px-1.5 h-5 text-[10px] min-w-[30px] justify-center">
+                                                                    {change.newClass}
+                                                                </Badge>
+                                                                <ArrowRight size={12} className="text-slate-300" />
+                                                                <Badge className="bg-indigo-500 text-white border-none px-1.5 h-5 text-[10px] min-w-[30px] justify-center shadow-sm">
+                                                                    {change.oldClass}
+                                                                </Badge>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <>
-                                                            <Badge variant="outline" className="text-muted-foreground font-normal line-through opacity-50 h-6 px-1.5">
-                                                                {change.oldClass || '미배정'}
-                                                            </Badge>
-                                                            <span className="text-muted-foreground">→</span>
-                                                            <Badge className="bg-indigo-600 font-bold h-6 px-1.5">
-                                                                {change.newClass || '미배정'}
-                                                            </Badge>
-                                                        </>
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-tighter">이전</span>
+                                                                <Badge variant="outline" className="font-semibold text-slate-500 bg-white border-slate-200 px-2 py-0.5 rounded-lg">
+                                                                    {change.oldClass || 'N/A'}
+                                                                </Badge>
+                                                            </div>
+                                                            <ArrowRight size={14} weight="bold" className="text-slate-300" />
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] font-medium text-indigo-400 uppercase tracking-tighter">변경</span>
+                                                                <Badge className="bg-indigo-500 text-white font-bold border-none px-3 py-1 rounded-lg shadow-sm">
+                                                                    {change.newClass || 'N/A'}
+                                                                </Badge>
+                                                            </div>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

@@ -40,7 +40,7 @@ interface Step1SetupProps {
 export default function Step1Setup({ onNext }: Step1SetupProps) {
     const {
         students, setStudents, settings, setClassCount, resetAll,
-        updateStudent, addStudent, deleteStudent, clearMovements
+        updateStudent, addStudent, deleteStudent, clearMovements, setGroups
     } = useClasszleStore();
     const [isDragging, setIsDragging] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -127,6 +127,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         try {
             const parsedStudents = await parseExcelFile(file);
             setStudents(parsedStudents);
+            setGroups([]); // 새 파일 로드 시 그룹 초기화
             clearMovements(); // 새 파일 로드 시 히스토리 초기화
 
             // 학급 수 자동 감지
