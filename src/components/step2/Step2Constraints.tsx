@@ -22,7 +22,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PencilSimple, Trash, WarningCircle } from '@phosphor-icons/react';
+import { PencilSimple, Trash, WarningCircle, Handshake, ArrowsLeftRight } from '@phosphor-icons/react';
 
 
 interface Step2ConstraintsProps {
@@ -73,7 +73,16 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
     const [relationMemo, setRelationMemo] = useState('');
     const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
     const [tempMemberIds, setTempMemberIds] = useState<string[]>([]);
-    const [relationClassFilter, setRelationClassFilter] = useState<string>('all');
+    // 분산배정 그룹 학생 검색
+    const [groupStudentSearch, setGroupStudentSearch] = useState<string>('');
+    // 고정 배정 학생 검색
+    const [fixedStudentSearch, setFixedStudentSearch] = useState<string>('');
+    // 기준 학생용 필터/검색 (피해야 할 관계, 같은 반 희망)
+    const [baseStudentClassFilter, setBaseStudentClassFilter] = useState<string>('all');
+    const [baseStudentSearch, setBaseStudentSearch] = useState<string>('');
+    // 대상 학생용 필터/검색 (피해야 할 관계, 같은 반 희망)
+    const [targetStudentClassFilter, setTargetStudentClassFilter] = useState<string>('all');
+    const [targetStudentSearch, setTargetStudentSearch] = useState<string>('');
     const [tempRelationTargetIds, setTempRelationTargetIds] = useState<string[]>([]);
     const [tempRelationMemos, setTempRelationMemos] = useState<Record<string, string>>({});
     const [selectedRelationsForDelete, setSelectedRelationsForDelete] = useState<Set<string>>(new Set());
@@ -99,7 +108,9 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
             const memos = relationMode === 'avoid' ? selectedStudent.avoid_memos : selectedStudent.keep_memos;
             setTempRelationTargetIds([...ids]);
             setTempRelationMemos(memos ? { ...memos } : {});
-            setRelationClassFilter('all');
+            // 대상 학생 필터/검색만 초기화 (기준 학생 필터는 유지)
+            setTargetStudentClassFilter('all');
+            setTargetStudentSearch('');
         } else {
             setTempRelationTargetIds([]);
             setTempRelationMemos({});
@@ -152,6 +163,20 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                 }
             });
         });
+
+        // 각 반별로 기준 학생 번호순 정렬 (오름차순)
+        Object.keys(relationsByClass).forEach(cls => {
+            relationsByClass[cls].sort((a, b) => {
+                const numA = parseInt(a.studentA.prev_info.split('-')[2] || '0');
+                const numB = parseInt(b.studentA.prev_info.split('-')[2] || '0');
+                if (numA !== numB) return numA - numB;
+                // 같은 번호면 대상 학생 번호순
+                const targetNumA = parseInt(a.studentB.prev_info.split('-')[2] || '0');
+                const targetNumB = parseInt(b.studentB.prev_info.split('-')[2] || '0');
+                return targetNumA - targetNumB;
+            });
+        });
+
         return relationsByClass;
     };
 
@@ -595,10 +620,17 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
+                                                <Input
+                                                    placeholder="이름 검색..."
+                                                    value={groupStudentSearch}
+                                                    onChange={(e) => setGroupStudentSearch(e.target.value)}
+                                                    className="h-8 text-sm mb-2"
+                                                />
                                                 <div className="flex-1 overflow-y-auto p-1">
                                                     {Object.entries(students
                                                         .filter(s => !tempMemberIds.includes(s.id))
                                                         .filter(s => selectedClassFilter === 'all' || s.prev_info.split('-')[1] === selectedClassFilter)
+                                                        .filter(s => !groupStudentSearch || s.name.toLowerCase().includes(groupStudentSearch.toLowerCase()))
                                                         .reduce((acc, s) => {
                                                             const cls = s.prev_info.split('-')[1] || '기타';
                                                             if (!acc[cls]) acc[cls] = [];
@@ -655,6 +687,15 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                                 <div className="flex-1 overflow-y-auto space-y-1 bg-gray-50 rounded-lg p-2 border">
                                                     {students
                                                         .filter(s => tempMemberIds.includes(s.id))
+                                                        .sort((a, b) => {
+                                                            // 반별, 번호순 정렬
+                                                            const classA = parseInt(a.prev_info.split('-')[1] || '0');
+                                                            const classB = parseInt(b.prev_info.split('-')[1] || '0');
+                                                            if (classA !== classB) return classA - classB;
+                                                            const numA = parseInt(a.prev_info.split('-')[2] || '0');
+                                                            const numB = parseInt(b.prev_info.split('-')[2] || '0');
+                                                            return numA - numB;
+                                                        })
                                                         .map(s => (
                                                             <div
                                                                 key={s.id}
@@ -708,11 +749,11 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                             <div className="flex gap-4">
                                 {/* 기준 학생 선택 */}
                                 <div className="w-1/3 border rounded-lg p-4">
-                                    <div className="flex justify-between items-center mb-3">
+                                    <div className="flex justify-between items-center mb-2">
                                         <h3 className="font-bold text-lg">기준 학생 선택</h3>
                                         <Select
-                                            value={relationClassFilter}
-                                            onValueChange={setRelationClassFilter}
+                                            value={baseStudentClassFilter}
+                                            onValueChange={setBaseStudentClassFilter}
                                         >
                                             <SelectTrigger className="w-[100px] h-7 text-xs">
                                                 <SelectValue placeholder="이전반 선택" />
@@ -725,9 +766,16 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="h-[450px] overflow-y-auto">
+                                    <Input
+                                        placeholder="이름 검색..."
+                                        value={baseStudentSearch}
+                                        onChange={(e) => setBaseStudentSearch(e.target.value)}
+                                        className="h-8 text-sm mb-2"
+                                    />
+                                    <div className="h-[420px] overflow-y-auto">
                                         {Object.entries(students
-                                            .filter(s => relationClassFilter === 'all' || s.prev_info.split('-')[1] === relationClassFilter)
+                                            .filter(s => baseStudentClassFilter === 'all' || s.prev_info.split('-')[1] === baseStudentClassFilter)
+                                            .filter(s => !baseStudentSearch || s.name.toLowerCase().includes(baseStudentSearch.toLowerCase()))
                                             .reduce((acc, s) => {
                                                 const cls = s.prev_info.split('-')[1] || '기타';
                                                 if (!acc[cls]) acc[cls] = [];
@@ -799,10 +847,10 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                             {/* 전체 학생 목록 */}
                                             <div className="border rounded-md p-2 flex flex-col h-full overflow-hidden">
                                                 <div className="mb-2 flex justify-between items-center">
-                                                    <span className="font-bold text-sm">전체 학생</span>
+                                                    <span className="font-bold text-sm">대상 학생</span>
                                                     <Select
-                                                        value={relationClassFilter}
-                                                        onValueChange={setRelationClassFilter}
+                                                        value={targetStudentClassFilter}
+                                                        onValueChange={setTargetStudentClassFilter}
                                                     >
                                                         <SelectTrigger className="w-[100px] h-8 text-xs">
                                                             <SelectValue placeholder="이전반 선택" />
@@ -815,10 +863,17 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
+                                                <Input
+                                                    placeholder="이름 검색..."
+                                                    value={targetStudentSearch}
+                                                    onChange={(e) => setTargetStudentSearch(e.target.value)}
+                                                    className="h-8 text-sm mb-2"
+                                                />
                                                 <div className="flex-1 overflow-y-auto p-1">
                                                     {Object.entries(students
                                                         .filter(s => s.id !== selectedStudent.id && !tempRelationTargetIds.includes(s.id))
-                                                        .filter(s => relationClassFilter === 'all' || s.prev_info.split('-')[1] === relationClassFilter)
+                                                        .filter(s => targetStudentClassFilter === 'all' || s.prev_info.split('-')[1] === targetStudentClassFilter)
+                                                        .filter(s => !targetStudentSearch || s.name.toLowerCase().includes(targetStudentSearch.toLowerCase()))
                                                         .reduce((acc, s) => {
                                                             const cls = s.prev_info.split('-')[1] || '기타';
                                                             if (!acc[cls]) acc[cls] = [];
@@ -992,7 +1047,19 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                                                                         />
                                                                                         <div className="flex-1 min-w-0">
                                                                                             <span className="text-xs">
-                                                                                                {studentA.name}({studentA.prev_info}) ↔ {studentB.name}({studentB.prev_info})
+                                                                                                {relationMode === 'keep' ? (
+                                                                                                    <div className="flex items-center gap-1">
+                                                                                                        <span>{studentA.name}({studentA.prev_info})</span>
+                                                                                                        <Handshake size={14} className="text-indigo-400" weight="fill" />
+                                                                                                        <span>{studentB.name}({studentB.prev_info})</span>
+                                                                                                    </div>
+                                                                                                ) : (
+                                                                                                    <div className="flex items-center gap-1">
+                                                                                                        <span>{studentA.name}({studentA.prev_info})</span>
+                                                                                                        <ArrowsLeftRight size={14} className="text-red-400" />
+                                                                                                        <span>{studentB.name}({studentB.prev_info})</span>
+                                                                                                    </div>
+                                                                                                )}
                                                                                             </span>
                                                                                             {memo && (
                                                                                                 <span className="text-[10px] text-gray-400 ml-1">| {memo}</span>
@@ -1059,7 +1126,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                             <div className="flex gap-4">
                                 {/* 기준 학생 선택 */}
                                 <div className="w-1/3 border rounded-lg p-4">
-                                    <div className="flex justify-between items-center mb-3">
+                                    <div className="flex justify-between items-center mb-2">
                                         <h3 className="font-bold text-lg">기준 학생 선택</h3>
                                         <Select
                                             value={selectedClassFilter}
@@ -1076,9 +1143,16 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="h-[450px] overflow-y-auto">
+                                    <Input
+                                        placeholder="이름 검색..."
+                                        value={fixedStudentSearch}
+                                        onChange={(e) => setFixedStudentSearch(e.target.value)}
+                                        className="h-8 text-sm mb-2"
+                                    />
+                                    <div className="h-[420px] overflow-y-auto">
                                         {Object.entries(students
                                             .filter(s => selectedClassFilter === 'all' || s.prev_info.split('-')[1] === selectedClassFilter)
+                                            .filter(s => !fixedStudentSearch || s.name.toLowerCase().includes(fixedStudentSearch.toLowerCase()))
                                             .reduce((acc, s) => {
                                                 const cls = s.prev_info.split('-')[1] || '기타';
                                                 if (!acc[cls]) acc[cls] = [];
@@ -1197,37 +1271,47 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                                                     <span className="font-normal">{classStudents.length}명</span>
                                                                 </div>
                                                                 <div className="grid grid-cols-2 gap-2">
-                                                                    {classStudents.map(s => (
-                                                                        <div
-                                                                            key={s.id}
-                                                                            className="py-1 px-2 rounded border bg-white hover:bg-accent text-sm flex justify-between items-center"
-                                                                        >
-                                                                            <div className="flex items-center gap-2 min-w-0">
-                                                                                <span className="text-xs">{s.name}({s.prev_info})</span>
-                                                                                {s.fixed_class_memo && (
-                                                                                    <span className="text-[10px] text-gray-400 truncate">| {s.fixed_class_memo}</span>
-                                                                                )}
+                                                                    {classStudents
+                                                                        .sort((a, b) => {
+                                                                            // 원래 반별, 번호순 정렬
+                                                                            const classA = parseInt(a.prev_info.split('-')[1] || '0');
+                                                                            const classB = parseInt(b.prev_info.split('-')[1] || '0');
+                                                                            if (classA !== classB) return classA - classB;
+                                                                            const numA = parseInt(a.prev_info.split('-')[2] || '0');
+                                                                            const numB = parseInt(b.prev_info.split('-')[2] || '0');
+                                                                            return numA - numB;
+                                                                        })
+                                                                        .map(s => (
+                                                                            <div
+                                                                                key={s.id}
+                                                                                className="py-1 px-2 rounded border bg-white hover:bg-accent text-sm flex justify-between items-center"
+                                                                            >
+                                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                                    <span className="text-xs">{s.name}({s.prev_info})</span>
+                                                                                    {s.fixed_class_memo && (
+                                                                                        <span className="text-[10px] text-gray-400 truncate">| {s.fixed_class_memo}</span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="flex gap-1 shrink-0">
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        className="h-6 px-2 text-xs text-primary hover:text-primary/80 hover:bg-transparent"
+                                                                                        onClick={() => handleSelectBaseStudent(s)}
+                                                                                    >
+                                                                                        수정
+                                                                                    </Button>
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        size="sm"
+                                                                                        className="h-6 px-2 text-xs text-destructive hover:text-destructive/80 hover:bg-transparent"
+                                                                                        onClick={() => setFixedClass(s.id, undefined, '')}
+                                                                                    >
+                                                                                        해제
+                                                                                    </Button>
+                                                                                </div>
                                                                             </div>
-                                                                            <div className="flex gap-1 shrink-0">
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="sm"
-                                                                                    className="h-6 px-2 text-xs text-primary hover:text-primary/80 hover:bg-transparent"
-                                                                                    onClick={() => handleSelectBaseStudent(s)}
-                                                                                >
-                                                                                    수정
-                                                                                </Button>
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="sm"
-                                                                                    className="h-6 px-2 text-xs text-destructive hover:text-destructive/80 hover:bg-transparent"
-                                                                                    onClick={() => setFixedClass(s.id, undefined, '')}
-                                                                                >
-                                                                                    해제
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
+                                                                        ))}
                                                                 </div>
                                                             </div>
                                                         ))
@@ -1265,6 +1349,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                     students={students}
                                     tempPreTransferIds={tempPreTransferIds}
                                     onToggleTempPreTransfer={onToggleTempPreTransfer}
+                                    hasUnsavedChanges={hasUnsavedPreTransferChanges()}
                                 />
                             </CardContent>
                         </Card>

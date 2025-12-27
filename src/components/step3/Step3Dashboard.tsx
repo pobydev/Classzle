@@ -20,6 +20,7 @@ import {
     DialogDescription
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { AssignmentReportDialog } from './AssignmentReportDialog';
 import {
     Select,
     SelectContent,
@@ -206,568 +207,12 @@ function StudentCard({
 }
 
 
-// 배정 결과 리포트 다이얼로그
-function AssignmentReportDialog({
-    open,
-    onOpenChange,
-    students,
-    groups,
-    history,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    students: Student[];
-    groups: any[];
-    history: AssignmentChange[];
-}) {
-    // 1. 관계 성취 현황 계산
-    const relationStats = useMemo(() => {
-        const stats = {
-            keepTotal: 0,
-            keepMet: 0,
-            avoidTotal: 0,
-            avoidMet: 0,
-            details: [] as any[]
-        };
-
-        students.forEach(s => {
-            // 같은 반 희망 학생들
-            s.keep_ids.forEach(kid => {
-                const partner = students.find(p => p.id === kid);
-                if (partner && s.id < partner.id) { // 중복 방지
-                    stats.keepTotal++;
-                    const isSame = s.assigned_class === partner.assigned_class && s.assigned_class !== null;
-                    if (isSame) stats.keepMet++;
-                    stats.details.push({
-                        type: 'keep',
-                        names: [s.name, partner.name],
-                        status: isSame ? '성공' : '미성취',
-                        classes: [s.assigned_class || '미배정', partner.assigned_class || '미배정']
-                    });
-                }
-            });
-
-            // 피해야 할 학생들
-            s.avoid_ids.forEach(aid => {
-                const partner = students.find(p => p.id === aid);
-                if (partner && s.id < partner.id) {
-                    stats.avoidTotal++;
-                    const isSame = s.assigned_class === partner.assigned_class && s.assigned_class !== null;
-                    if (!isSame) stats.avoidMet++; // 같은 반이 아니면 성공
-                    stats.details.push({
-                        type: 'avoid',
-                        names: [s.name, partner.name],
-                        status: !isSame ? '성공' : '위반',
-                        classes: [s.assigned_class || '미배정', partner.assigned_class || '미배정']
-                    });
-                }
-            });
-        });
-
-        return stats;
-    }, [students]);
-
-    // 2. 그룹별 배정 현황
-    const groupStats = useMemo(() => {
-        return groups.map(g => ({
-            name: g.name,
-            color: g.color,
-            students: students.filter(s => g.member_ids.includes(s.id)).map(s => ({
-                name: s.name,
-                class: s.assigned_class || '미배정'
-            }))
-        }));
-    }, [students, groups]);
-
-    // 3. 특수 배정 (고정, 전출)
-    const specialStats = useMemo(() => ({
-        fixed: students.filter(s => s.fixed_class).map(s => ({
-            name: s.name,
-            class: s.assigned_class || '미배정',
-            target: s.fixed_class,
-            isMet: s.assigned_class === s.fixed_class
-        })),
-        preTransfer: students.filter(s => s.is_pre_transfer).map(s => ({
-            name: s.name,
-            class: s.assigned_class || '미배정'
-        }))
-    }), [students]);
-
-    const handlePrint = () => {
-        // 기존 프레임이 있으면 제거
-        const oldFrame = document.getElementById('print-frame');
-        if (oldFrame) document.body.removeChild(oldFrame);
-
-        // 새 비가시적 프레임 생성
-        const iframe = document.createElement('iframe');
-        iframe.id = 'print-frame';
-        iframe.style.position = 'fixed';
-        iframe.style.right = '0';
-        iframe.style.bottom = '0';
-        iframe.style.width = '0';
-        iframe.style.height = '0';
-        iframe.style.border = '0';
-        document.body.appendChild(iframe);
-
-        const printWindow = iframe.contentWindow;
-        if (!printWindow) return;
-
-        const historyHtml = history.length === 0
-            ? '<tr><td colspan="5" style="text-align:center; padding: 40px; color: #999;">변경 이력이 없습니다.</td></tr>'
-            : history.map((c, i) => `
-                <tr>
-                    <td style="text-align:center;">${i + 1}</td>
-                    <td style="text-align:center;">${c.source === 'auto' ? '자동' : '수동'}</td>
-                    <td style="text-align:center; font-size: 11px;">${new Date(c.timestamp).toLocaleTimeString()}</td>
-                    <td style="font-weight: bold;">
-                        ${c.type === 'swap' ? `${c.studentName}<br>↔ ${c.partnerName}` : c.studentName}
-                    </td>
-                    <td>
-                        ${c.type === 'swap'
-                    ? `${c.studentName}: ${c.oldClass} → ${c.newClass}<br>${c.partnerName}: ${c.newClass} → ${c.oldClass}`
-                    : `${c.oldClass || '미배정'} → ${c.newClass || '미배정'}`
-                }
-                    </td>
-                </tr>
-            `).join('');
-
-        const groupHtml = groupStats.length === 0
-            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 분산 배정 그룹이 없습니다.</p>'
-            : groupStats.map(g => `
-                <div style="margin-bottom: 12px;">
-                    <strong style="font-size: 11pt; color: #333;">• ${g.name}</strong>
-                    <div style="margin-top: 5px; padding-left: 15px; font-size: 10pt; line-height: 1.6;">
-                        ${g.students.length === 0
-                    ? '<span style="color: #999;">멤버 없음</span>'
-                    : g.students.map(s => `${s.name} (${s.class})`).join(', ')
-                }
-                    </div>
-                </div>
-            `).join('');
-
-        const relationHtml = relationStats.details.length === 0
-            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 관계 조건이 없습니다.</p>'
-            : `
-            <table style="width: 100%; border-collapse: collapse; margin-top: 5px;">
-                <thead>
-                    <tr style="background-color: #f5f5f5;">
-                        <th style="width: 60px;">구분</th>
-                        <th>대상 학생</th>
-                        <th>배정 결과 (반)</th>
-                        <th style="width: 60px;">상태</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${relationStats.details.map(d => `
-                        <tr>
-                            <td style="text-align:center;">${d.type === 'keep' ? '희망' : '회피'}</td>
-                            <td>${d.names.join(', ')}</td>
-                            <td style="text-align:center;">${d.classes.join(', ')}</td>
-                            <td style="text-align:center; font-weight: bold; color: ${d.status === '성공' ? '#2e7d32' : '#d32f2f'}">${d.status}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-
-        const specialHtml = `
-            <div style="padding: 10px; border: 1px solid #333; border-radius: 4px;">
-                <div style="margin-bottom: 12px;">
-                    <strong style="font-size: 11pt; color: #333;">• 고정 배정 학생</strong>
-                    <div style="margin-top: 5px; padding-left: 15px;">
-                        ${specialStats.fixed.length === 0
-                ? '<span style="color: #999; font-size: 10pt;">고정 학생 없음</span>'
-                : specialStats.fixed.map(s => `
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
-                                    <span>${s.name} (${s.target} 희망)</span>
-                                    <span style="color: ${s.isMet ? '#2e7d32' : '#d32f2f'}; font-weight: bold; font-size: 9pt;">
-                                        ${s.isMet ? `성공(${s.class})` : `위반(${s.class})`}
-                                    </span>
-                                </div>
-                            `).join('')}
-                    </div>
-                </div>
-                <div style="margin-top: 15px; border-top: 1px dashed #eee; padding-top: 15px;">
-                    <strong style="font-size: 11pt; color: #333;">• 전출 예정 학생</strong>
-                    <div style="margin-top: 5px; padding-left: 15px; font-size: 10pt; line-height: 1.6;">
-                        ${specialStats.preTransfer.length === 0
-                ? '<span style="color: #999;">전출 학생 없음</span>'
-                : specialStats.preTransfer.map(s => `${s.name} (${s.class})`).join(', ')
-            }
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const html = `
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <title>반 배정 결과 보고서</title>
-                    <style>
-                    @page { size: A4; margin: 20mm; }
-                    body { font-family: sans-serif; margin: 0; padding: 0; line-height: 1.5; color: #333; }
-                    .header { text-align: center; margin-bottom: 30px; }
-                    .header h1 { font-size: 24pt; margin: 0; }
-                    .header p { text-align: right; font-size: 10pt; color: #666; }
-                    h2 { font-size: 16pt; border-bottom: 2px solid #333; padding-bottom: 5px; margin-top: 30px; page-break-after: avoid; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; }
-                    th, td { border: 1px solid #333; padding: 8px; font-size: 11pt; word-break: break-all; vertical-align: middle; }
-                    th { background-color: #f5f5f5; font-weight: bold; }
-                    tr { page-break-inside: avoid; }
-                        .summary-table th {width: 40%; }
-                    .summary-table td { text-align: center; }
-                        .history-table th:nth-child(1) {width: 40px; }
-                        .history-table th:nth-child(2) {width: 60px; }
-                        .history-table th:nth-child(3) {width: 100px; }
-                        .history-table th:nth-child(4) {width: 150px; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <p>출력일시: ${new Date().toLocaleString()}</p>
-                        <h1>반 배정 결과 보고서</h1>
-                    </div>
-
-                    <h2>1. 조건 성취 요약</h2>
-                    <table class="summary-table">
-                        <thead>
-                            <tr>
-                                <th>평가 항목</th>
-                                <th>성취 / 전체</th>
-                                <th>성취율 (%)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>같은 반 희망</td>
-                                <td>${relationStats.keepMet} / ${relationStats.keepTotal}</td>
-                                <td>${relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</td>
-                            </tr>
-                            <tr>
-                                <td>피해야 할 관계</td>
-                                <td>${relationStats.avoidMet} / ${relationStats.avoidTotal}</td>
-                                <td>${relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</td>
-                            </tr>
-                            <tr>
-                                <td>고정 배정 준수</td>
-                                <td>${specialStats.fixed.filter(s => s.isMet).length} / ${specialStats.fixed.length}</td>
-                                <td>${specialStats.fixed.length > 0 ? Math.round((specialStats.fixed.filter(s => s.isMet).length / specialStats.fixed.length) * 100) : 100}%</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                    <h3 style="margin-top: 15px; font-size: 13pt;">🔗 관계별 상세 배정 정보</h3>
-                    ${relationHtml}
-
-                    <h2>2. 분산 배정 그룹 및 특수 배정 현황</h2>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div style="padding: 10px; border: 1px solid #333; border-radius: 4px;">
-                            ${groupHtml}
-                        </div>
-                        ${specialHtml}
-                    </div>
-
-                    <h2>3. 누적 변경 이력 (총 ${history.length}건)</h2>
-                    <table class="history-table">
-
-                        <thead>
-                            <tr>
-                                <th>No</th>
-                                <th>구분</th>
-                                <th>시간</th>
-                                <th>대상 학생</th>
-                                <th>상세 변경 내용</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${historyHtml}
-                        </tbody>
-                    </table>
-
-                    <div style="margin-top: 50px; text-align: center; font-size: 9pt; color: #999;">
-                        Classzle - 완벽한 반 편성을 위한 마지막 조각
-                    </div>
-                </body>
-            </html>
-        `;
-
-        if (window.electronAPI) {
-            window.electronAPI.printPreview(html);
-        } else {
-            // 기존 방식: iframe 사용 (웹 환경)
-            const oldFrame = document.getElementById('print-frame');
-            if (oldFrame) document.body.removeChild(oldFrame);
-
-            const iframe = document.createElement('iframe');
-            iframe.id = 'print-frame';
-            iframe.style.position = 'fixed';
-            iframe.style.right = '0';
-            iframe.style.bottom = '0';
-            iframe.style.width = '0';
-            iframe.style.height = '0';
-            iframe.style.border = '0';
-            document.body.appendChild(iframe);
-
-            const printWindow = iframe.contentWindow;
-            if (printWindow) {
-                // 웹 프린트용 스크립트 추가
-                const webHtml = html.replace('</body>', `
-                    <script>
-                        window.onload = function() {
-                            window.print();
-                        };
-                    </script>
-                    </body>
-                `);
-                printWindow.document.write(webHtml);
-                printWindow.document.close();
-            }
-        }
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent id="report-dialog-content" className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0">
-                <DialogHeader className="p-6 pb-2">
-                    <DialogTitle className="text-2xl flex items-center gap-2">
-                        📊 배정 결과 상세 리포트
-                    </DialogTitle>
-                    <DialogDescription>학급 배정 결과를 상세히 확인하세요.</DialogDescription>
-                </DialogHeader>
-
-
-                <Tabs defaultValue="fulfillment" className="flex-1 overflow-hidden flex flex-col">
-                    <div className="px-6 border-b">
-                        <TabsList className="w-full justify-start h-12 bg-transparent gap-6 p-0">
-                            <TabsTrigger
-                                value="fulfillment"
-                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2"
-                            >
-                                조건 성취 현황
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="history"
-                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2"
-                            >
-                                누적 변경 이력 ({history.length})
-                            </TabsTrigger>
-                        </TabsList>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-6">
-                        <TabsContent value="fulfillment" className="m-0 space-y-6">
-                            {/* 관계 성취 요약 */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <Card className="bg-pink-50/30 border-pink-100 flex flex-col items-center justify-center text-center py-4 rounded-xl shadow-sm">
-                                    <div className="text-sm font-medium text-pink-700 mb-1">💕 같은 반 희망</div>
-                                    <div className="text-2xl font-bold text-pink-600">
-                                        {relationStats.keepMet} / {relationStats.keepTotal}
-                                    </div>
-                                    <p className="text-xs text-pink-600/70">커플 성취율: {relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</p>
-                                </Card>
-                                <Card className="bg-red-50/30 border-red-100 flex flex-col items-center justify-center text-center py-4 rounded-xl shadow-sm">
-                                    <div className="text-sm font-medium text-red-700 mb-1">🚫 피해야 할 관계</div>
-                                    <div className="text-2xl font-bold text-red-600">
-                                        {relationStats.avoidMet} / {relationStats.avoidTotal}
-                                    </div>
-                                    <p className="text-xs text-red-600/70">분리 성공률: {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
-                                </Card>
-                            </div>
-
-                            {/* 관계 상세 내역 */}
-                            <Card className="rounded-xl border-indigo-100 shadow-md shadow-indigo-500/5 bg-white">
-                                <CardHeader className="py-3 border-b bg-muted/20">
-                                    <CardTitle className="text-sm font-bold flex items-center gap-2">🔗 관계별 상세 배정 정보</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <div className="divide-y divide-gray-100">
-                                        {relationStats.details.length === 0 ? (
-                                            <div className="p-8 text-center text-muted-foreground text-sm">설정된 관계 조건이 없습니다.</div>
-                                        ) : relationStats.details.map((detail, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 text-sm">
-                                                <div className="flex items-center gap-3">
-                                                    <Badge variant="outline" className={detail.type === 'keep' ? 'border-pink-200 text-pink-700 bg-pink-50' : 'border-red-200 text-red-700 bg-red-50'}>
-                                                        {detail.type === 'keep' ? '💕 희망' : '🚫 회피'}
-                                                    </Badge>
-                                                    <span className="font-medium">
-                                                        {detail.names.map((name: string, i: number) => (
-                                                            <span key={i}>
-                                                                {name} <span className="text-muted-foreground font-normal text-xs">({detail.classes[i]})</span>
-                                                                {i < detail.names.length - 1 ? ', ' : ''}
-                                                            </span>
-                                                        ))}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                    <Badge variant={detail.status === '성공' ? 'default' : 'destructive'} className="w-16 justify-center">
-                                                        {detail.status}
-                                                    </Badge>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            {/* 커스텀 그룹 및 특수 배정 */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* 커스텀 그룹 */}
-                                <div className="space-y-4">
-                                    <h4 className="font-bold text-sm flex items-center gap-2">👥 그룹 학생 배정 정보</h4>
-                                    <div className="space-y-3">
-                                        {groupStats.map(g => (
-                                            <Card key={g.name} className="overflow-hidden rounded-xl border-slate-200 shadow-sm">
-                                                <CardHeader className="p-3 py-2 bg-muted/10 border-b flex flex-row items-center gap-2">
-                                                    <div className={`w-1 h-3 rounded-full ${g.color || 'bg-primary'}`} />
-                                                    <CardTitle className="text-xs font-bold">{g.name}</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-3">
-                                                    <div className="flex flex-wrap gap-2 text-xs">
-                                                        {g.students.map((s, i) => (
-                                                            <span key={i} className="bg-gray-100 px-2 py-1 rounded">
-                                                                {s.name} ({s.class})
-                                                            </span>
-                                                        ))}
-                                                        {g.students.length === 0 && <span className="text-muted-foreground">멤버 없음</span>}
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
-                                    {groupStats.length === 0 && <p className="text-sm text-muted-foreground">생성된 그룹이 없습니다.</p>}
-                                </div>
-
-                                {/* 고정/전출 */}
-                                <div className="space-y-4">
-                                    <h4 className="font-bold text-sm flex items-center gap-2">📌 고정 및 전출 예정 확인</h4>
-                                    <div className="space-y-4">
-                                        <Card>
-                                            <CardHeader className="p-3 py-2 bg-muted/10 border-b">
-                                                <CardTitle className="text-xs font-bold">고정 배정 학생</CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="p-3 space-y-2">
-                                                {specialStats.fixed.map((s, i) => (
-                                                    <div key={i} className="flex justify-between items-center text-xs">
-                                                        <span>{s.name} ({s.target} 희망)</span>
-                                                        <Badge variant={s.isMet ? 'outline' : 'destructive'} className="text-[10px] h-5">
-                                                            {s.isMet ? `성공(${s.class})` : `위반(${s.class})`}
-                                                        </Badge>
-                                                    </div>
-                                                ))}
-                                                {specialStats.fixed.length === 0 && <p className="text-xs text-muted-foreground">고정 학생 없음</p>}
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader className="p-3 py-2 bg-muted/10 border-b">
-                                                <CardTitle className="text-xs font-bold">전출 예정 학생</CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="p-3">
-                                                <div className="flex flex-wrap gap-2 text-xs">
-                                                    {specialStats.preTransfer.map((s, i) => (
-                                                        <span key={i} className="text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-100">
-                                                            {s.name} ({s.class})
-                                                        </span>
-                                                    ))}
-                                                    {specialStats.preTransfer.length === 0 && <span className="text-muted-foreground">전출 학생 없음</span>}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                </div>
-                            </div>
-                        </TabsContent>
-
-                        <TabsContent value="history" className="m-0">
-                            {history.length === 0 ? (
-                                <div className="text-center py-20 text-muted-foreground border-2 border-dashed rounded-xl">
-                                    <div className="text-4xl mb-4">📜</div>
-                                    <p className="text-sm">배정 변경 이력이 없습니다.</p>
-                                    <p className="text-xs opacity-60 mt-1">배정 실행 후나 수동 이동 시 기록이 남습니다.</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col h-full">
-                                    {/* 고정 헤더 - 스크롤 영역 밖 */}
-                                    <div className="pb-3 flex justify-between items-center border-b bg-white">
-                                        <p className="text-sm text-muted-foreground">총 <strong>{history.length}</strong>건의 이동 내역</p>
-                                        <p className="text-xs text-muted-foreground">이력은 '신규 배정' 시 초기화됩니다.</p>
-                                    </div>
-                                    {/* 스크롤 가능한 리스트 영역 */}
-                                    <div className="divide-y divide-gray-100 border rounded-lg mt-3 overflow-y-auto max-h-[400px]">
-                                        {history.map((change, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 px-4 text-sm hover:bg-gray-50 transition-colors">
-                                                <div className="flex flex-col">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`font-bold ${change.type === 'swap' ? 'text-indigo-700' : 'text-primary'}`}>
-                                                            {idx + 1}. {change.type === 'swap' ? '[교환] ' : ''}
-                                                            {change.studentName}
-                                                            {change.type === 'swap' && ` ↔ ${change.partnerName}`}
-                                                        </span>
-                                                        <Badge variant="secondary" className={`text-[10px] h-4 px-1 ${change.source === 'auto' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                                                            {change.source === 'auto' ? '자동' : '수동'}
-                                                        </Badge>
-                                                    </div>
-                                                    <span className="text-[10px] text-muted-foreground">
-                                                        {new Date(change.timestamp).toLocaleTimeString()}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    {change.type === 'swap' ? (
-                                                        <div className="flex flex-col items-end gap-1">
-                                                            <div className="flex items-center gap-2 text-[11px]">
-                                                                <span className="text-muted-foreground">{change.studentName}:</span>
-                                                                <span className="line-through opacity-50">{change.oldClass}</span>
-                                                                <span className="font-bold text-indigo-600">→ {change.newClass}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-[11px]">
-                                                                <span className="text-muted-foreground">{change.partnerName}:</span>
-                                                                <span className="line-through opacity-50">{change.newClass}</span>
-                                                                <span className="font-bold text-indigo-600">→ {change.oldClass}</span>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <Badge variant="outline" className="text-muted-foreground font-normal line-through opacity-50 h-6 px-1.5">
-                                                                {change.oldClass || '미배정'}
-                                                            </Badge>
-                                                            <span className="text-muted-foreground">→</span>
-                                                            <Badge className="bg-indigo-600 font-bold h-6 px-1.5">
-                                                                {change.newClass || '미배정'}
-                                                            </Badge>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </TabsContent>
-                    </div>
-
-                    <div className="p-4 border-t px-6 flex justify-between bg-gray-50">
-                        <Button
-                            variant="outline"
-                            onClick={handlePrint}
-                            className="gap-2"
-                        >
-                            🖨️ 리포트 인쇄
-                        </Button>
-                        <Button onClick={() => onOpenChange(false)}>확인 및 닫기</Button>
-                    </div>
-                </Tabs>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     const {
         students, groups, settings, setStudents,
         assignStudentToClass, swapStudents,
         movementHistory, addMovements, clearMovements,
-        setNumberingMethod
+        setNumberingMethod, resetAssignments
     } = useClasszleStore();
     const [violations, setViolations] = useState<Violation[]>([]);
     const [isAssigning, setIsAssigning] = useState(false);
@@ -779,6 +224,9 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
 
     // 리포트 다이얼로그 상태
     const [isReportOpen, setIsReportOpen] = useState(false);
+
+    // 배정 초기화 확인 다이얼로그 상태
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
     // 배정 모드 상태 ('new' | 'optimize')
     const [assignmentMode, setAssignmentMode] = useState<'new' | 'optimize'>('new');
@@ -1062,7 +510,11 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                         <TabsTrigger value="new" className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
                                             🚀 신규 배정
                                         </TabsTrigger>
-                                        <TabsTrigger value="optimize" className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
+                                        <TabsTrigger
+                                            value="optimize"
+                                            disabled={!hasAssignments}
+                                            className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
                                             🛠️ 현재 배정 수정
                                         </TabsTrigger>
                                     </TabsList>
@@ -1082,6 +534,14 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                     : hasAssignments
                                         ? '🔄 배정 실행'
                                         : '🚀 반편성 시작'}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsResetConfirmOpen(true)}
+                                disabled={!hasAssignments}
+                                className="h-10 px-4 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                            >
+                                <span className="mr-2 text-base">🗑️</span> 배정 초기화
                             </Button>
 
                             <div className="h-11 w-px bg-slate-200 mx-1" /> {/* 구분선 */}
@@ -1489,6 +949,43 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                     </div>
                     <div className="flex justify-end pt-2">
                         <Button variant="ghost" onClick={() => setIsExportDialogOpen(false)}>취소</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* 배정 초기화 확인 다이얼로그 */}
+            <Dialog open={isResetConfirmOpen} onOpenChange={setIsResetConfirmOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl flex items-center gap-2 text-orange-600">
+                            🗑️ 반편성 초기화
+                        </DialogTitle>
+                        <DialogDescription>
+                            현재 반편성 결과를 초기화합니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-3">
+                        <p className="text-sm text-slate-700">
+                            모든 학생의 <strong>배정된 반</strong>이 초기화되어 <strong>미배정</strong> 상태가 됩니다.
+                        </p>
+                        <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200 border-dashed">
+                            💡 Step 2에서 설정한 모든 조건(관계, 그룹, 전출 등)은 그대로 유지됩니다.
+                        </p>
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2 border-t">
+                        <Button variant="outline" onClick={() => setIsResetConfirmOpen(false)}>취소</Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                resetAssignments();
+                                clearMovements();
+                                setViolations([]);
+                                setIsResetConfirmOpen(false);
+                                toast.success('반편성이 초기화되었습니다.');
+                            }}
+                        >
+                            초기화 실행
+                        </Button>
                     </div>
                 </DialogContent>
             </Dialog>
