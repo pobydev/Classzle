@@ -1,0 +1,20 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "backendAuthType": "public",
+  "executionArgs": {
+    "projectName": "Classzle",
+    "projectPath": "c:\\antigravity workspace\\Classzle",
+    "testIds": [
+      "TC001",
+      "TC002"
+    ],
+    "additionalInstruction": "Focus on debugging and edge case testing for items #2 and #3:\n\nFor TC001 (parseExcelFile):\n- Test with NaN values in academic_score field (e.g., \"abc\", \"\", undefined)\n- Test with invalid behavior type strings (e.g., \"행동(3)\" without minus sign)\n- Test with missing required fields (name, gender)\n- Test with special characters in student names\n- Verify that NaN scores are converted to default value 500\n\nFor TC002 (loadProject):\n- Test loading with missing required fields in students array\n- Test loading with invalid student IDs in avoid_ids/keep_ids (referential integrity)\n- Test loading with group_ids that don't exist in groups array\n- Test loading with corrupted/malformed JSON structure\n- Test loading empty arrays for students/groups\n\nThese tests should verify defensive coding and graceful error handling.",
+    "envs": {
+      "API_KEY": "sk-user-WCjh5afzV4yHuq3RK_2GdMudKEt57xN4g5qd3cAPZNZsKhwz87PSnL7sG1QW8qbIrhL4Xpb0-yV7Gn7DUV_Vq-JttENyK2lBcG7LsivSHzF-BfhJPCJdMtgAfVD8tso9vMo"
+    }
+  },
+  "proxy": "http://8da207b7-e2c2-4a6f-9066-259ec5a8735b:lTLAANWSrXb9ks4sRPmQeapwfRtwc0TM@tun.testsprite.com:8080"
+}

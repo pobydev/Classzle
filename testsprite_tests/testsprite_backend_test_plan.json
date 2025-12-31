@@ -1,0 +1,27 @@
+[
+  {
+    "id": "TC001",
+    "title": "parseexcelfile_valid_and_invalid_files",
+    "description": "Test the parseExcelFile function with valid Excel files containing student data in multiple supported formats to ensure correct parsing. Also test with invalid or corrupted Excel files to verify that the function throws appropriate errors."
+  },
+  {
+    "id": "TC002",
+    "title": "loadproject_state_restoration",
+    "description": "Test the loadProject function by loading saved project JSON data including students, groups, and settings. Verify that the Zustand store state is correctly updated and all data is restored accurately."
+  },
+  {
+    "id": "TC003",
+    "title": "assignstudents_balanced_distribution_and_constraints",
+    "description": "Test the assignStudents function with various student datasets and class counts to verify that the assignment algorithm balances academic scores, gender, and behavior types across classes. Also test that constraints like fixed assignments, avoid and keep relationships are respected and violations are reported correctly."
+  },
+  {
+    "id": "TC004",
+    "title": "exporttoexcel_file_generation_and_formatting",
+    "description": "Test the exportToExcel function to ensure it generates and downloads an Excel file with two sheets formatted correctly: one by assigned class and one by previous class. Verify that headers, summaries, groupings, and pagination match specifications."
+  },
+  {
+    "id": "TC005",
+    "title": "validateswap_constraint_violation_detection",
+    "description": "Test the validateSwap function by attempting to swap pairs of students with various constraints (fixed class, avoid relations, keep relations). Verify that the function accurately detects and returns any violations preventing the swap."
+  }
+]

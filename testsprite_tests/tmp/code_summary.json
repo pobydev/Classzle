@@ -1,0 +1,77 @@
+{
+    "tech_stack": [
+        "TypeScript",
+        "Next.js 16",
+        "React 19",
+        "Electron 33",
+        "Zustand 5",
+        "Tailwind CSS 4",
+        "ExcelJS",
+        "xlsx"
+    ],
+    "features": [
+        {
+            "name": "parseExcelFile",
+            "description": "Parse student data from Excel file, extracting name, gender, academic score, behavior type/score, and class assignment info",
+            "files": [
+                "src/lib/excel.ts"
+            ],
+            "api_doc": {
+                "function": "parseExcelFile",
+                "input": "File (Excel .xlsx)",
+                "output": "Promise<Student[]>",
+                "throws": "Error on parsing failure"
+            }
+        },
+        {
+            "name": "loadProject",
+            "description": "Load saved project data (students, groups, settings) from JSON into Zustand store",
+            "files": [
+                "src/lib/store.ts"
+            ],
+            "api_doc": {
+                "function": "loadProject",
+                "input": "{ students: Student[], groups: CustomGroup[], settings: AppSettings }",
+                "output": "void",
+                "sideEffects": "Updates Zustand store state"
+            }
+        },
+        {
+            "name": "assignStudents",
+            "description": "Main algorithm to assign students to classes with balanced distribution considering academic scores, behavior types, gender, and constraints (avoid/keep/fixed)",
+            "files": [
+                "src/lib/algorithm.ts"
+            ],
+            "api_doc": {
+                "function": "assignStudents",
+                "input": "students: Student[], classCount: number, groups: CustomGroup[], scoreTolerance: number, mode: 'new' | 'optimize', useAdvancedConstraints: boolean",
+                "output": "{ students: Student[], violations: Violation[] }"
+            }
+        },
+        {
+            "name": "exportToExcel",
+            "description": "Export assigned students to formatted Excel file with two sheets (by assigned class, by previous class)",
+            "files": [
+                "src/lib/excel.ts"
+            ],
+            "api_doc": {
+                "function": "exportToExcel",
+                "input": "students: Student[], classCount: number, filename: string, options: { includeDetails?, groups?, numberingMethod? }",
+                "output": "Promise<void>",
+                "sideEffects": "Downloads Excel file"
+            }
+        },
+        {
+            "name": "validateSwap",
+            "description": "Validate if swapping two students would violate any constraints (fixed class, avoid relations, keep relations)",
+            "files": [
+                "src/lib/validation.ts"
+            ],
+            "api_doc": {
+                "function": "validateSwap",
+                "input": "studentId1: string, studentId2: string, allStudents: Student[]",
+                "output": "Violation[]"
+            }
+        }
+    ]
+}
