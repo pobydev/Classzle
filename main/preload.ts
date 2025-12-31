@@ -16,4 +16,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getProjectList: () => ipcRenderer.invoke('get-project-list'),
     deleteProject: (name: string) => ipcRenderer.invoke('delete-project', name),
     printPreview: (html: string) => ipcRenderer.invoke('print-preview', html),
+    confirmDialog: (message: string) => ipcRenderer.invoke('confirm-dialog', message),
 });

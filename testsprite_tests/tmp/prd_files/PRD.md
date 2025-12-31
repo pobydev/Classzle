@@ -1,8 +1,9 @@
+
 # PRD: Classzle (Smart Classroom Assigner)
 
 **프로젝트 코드명:** Project Anti-Gravity  
 **제품명:** Classzle (클래스즐)  
-**문서 버전:** 3.1 (Classzle v1.2.4 기반)  
+**문서 버전:** 3.0 (Updated to match v1.2.3 Implementation)  
 **작성일:** 2025. 12. 28.  
 **플랫폼:** Windows Desktop Application (Electron)  
 **개발 스택:** Electron, Next.js (React 19), TypeScript, Tailwind CSS v4, shadcn/ui, Phosphor Icons  

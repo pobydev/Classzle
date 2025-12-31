@@ -117,7 +117,16 @@ export default function Home() {
     if (!name) return;
 
     if (students.length > 0) {
-      if (!confirm('현재 작업 중인 내용이 있습니다. 저장하지 않은 내용은 사라집니다. 계속하시겠습니까?')) {
+      // Select 컴포넌트가 완전히 닫힐 시간을 주기 위해 약간의 지연을 둡니다.
+      // 일렉트론에서 네이티브 confirm이 바로 뜨면 포커스 제어가 꼬일 수 있습니다.
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const message = '현재 작업 중인 내용이 있습니다. 저장하지 않은 내용은 사라집니다. 계속하시겠습니까?';
+      const confirmed = window.electronAPI
+        ? await window.electronAPI.confirmDialog(message)
+        : confirm(message);
+
+      if (!confirmed) {
         setSelectKey(""); // 선택 취소 시에도 초기화
         return;
       }
@@ -140,6 +149,11 @@ export default function Home() {
           toast.success(`'${name}' 프로젝트를 불러왔습니다.`);
           setActiveProjectName(name);
           setActiveTab('step1');
+
+          // 프로젝트를 불러온 후 윈도우에 포커스를 명시적으로 줍니다.
+          if (window.electronAPI) {
+            window.focus();
+          }
         } else {
           toast.error('올바르지 않은 프로젝트 데이터입니다.');
         }
@@ -157,7 +171,13 @@ export default function Home() {
 
   const handleDeleteProject = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`'${name}' 프로젝트를 삭제하시겠습니까?`)) return;
+
+    const message = `'${name}' 프로젝트를 삭제하시겠습니까?`;
+    const confirmed = window.electronAPI
+      ? await window.electronAPI.confirmDialog(message)
+      : confirm(message);
+
+    if (!confirmed) return;
 
     if (window.electronAPI) {
       const success = await window.electronAPI.deleteProject(name);

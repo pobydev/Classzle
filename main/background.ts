@@ -110,6 +110,19 @@ ipcMain.handle('delete-project', async (event, name: string) => {
     }
 });
 
+ipcMain.handle('confirm-dialog', async (event, message: string) => {
+    if (!mainWindow) return false;
+    const { response } = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        buttons: ['취소', '확인'],
+        defaultId: 1,
+        cancelId: 0,
+        title: '확인',
+        message: message,
+    });
+    return response === 1;
+});
+
 // 인쇄 미리보기 핸들러
 ipcMain.handle('print-preview', async (event, htmlContent: string) => {
     try {

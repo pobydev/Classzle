@@ -108,8 +108,13 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         setLocalClassCount(settings.classCount.toString());
     }, [settings.classCount]);
 
-    const handleResetAll = () => {
-        if (window.confirm('정말 모든 데이터를 삭제하고 초기화하시겠습니까?\n저장하지 않은 진행 상황은 모두 사라집니다.')) {
+    const handleResetAll = async () => {
+        const message = '정말 모든 데이터를 삭제하고 초기화하시겠습니까?\n저장하지 않은 진행 상황은 모두 사라집니다.';
+        const confirmed = window.electronAPI
+            ? await window.electronAPI.confirmDialog(message)
+            : confirm(message);
+
+        if (confirmed) {
             resetAll();
             setUploadStatus('idle');
             setErrorMessage('');
