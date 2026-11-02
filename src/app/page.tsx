@@ -43,9 +43,6 @@ export default function Home() {
     setIsCollapsed(showsBoard);
   }, [showsBoard]);
 
-  // onBoardActiveChange는 보드 담당 브랜치의 Step3Dashboard에 생깁니다. 합치기 전에도 타입 오류가 없도록 펼쳐서 넘깁니다.
-  const boardProps = { onBoardActiveChange: setBoardActive };
-
   const saveProject = async () => {
     if (await projects.save(projectName)) {
       setSaveDialogOpen(false);
@@ -92,8 +89,9 @@ export default function Home() {
             />
           </TabsContent>
 
-          <TabsContent value="step3" className="p-5">
-            <Step3Dashboard onBack={() => setActiveTab('step2')} {...boardProps} />
+          {/* 3단계는 도구 줄을 위에 붙이고 보드 높이를 창에 맞추므로 여백을 스스로 둡니다. */}
+          <TabsContent value="step3">
+            <Step3Dashboard onBack={() => setActiveTab('step2')} onBoardActiveChange={setBoardActive} />
           </TabsContent>
         </main>
       </Tabs>

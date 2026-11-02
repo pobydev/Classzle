@@ -24,7 +24,7 @@ describe('교환 추천', () => {
         expect(recommendSwaps('a', two({}, { fixed_class: '2반' }), 2)).toEqual([]);
     });
 
-    it('떼어 놓을 학생과 같은 반이 되는 교환은 뺍니다', () => {
+    it('분리 배정 상대와 같은 반이 되는 교환은 뺍니다', () => {
         const students = [
             makeStudent({ id: 'a', assigned_class: '1반', avoid_ids: ['c'] }),
             makeStudent({ id: 'b', assigned_class: '2반' }),

@@ -19,7 +19,7 @@ describe('학생 교환 검사', () => {
         expect(validateSwap('a', 'b', students).map((v) => v.type)).toContain('FIXED_CLASS');
     });
 
-    it('떼어 놓을 학생과 같은 반이 되면 알립니다', () => {
+    it('분리 배정 상대와 같은 반이 되면 알립니다', () => {
         const students = [
             makeStudent({ id: 'a', assigned_class: '1반', avoid_ids: ['c'] }),
             makeStudent({ id: 'b', assigned_class: '2반' }),

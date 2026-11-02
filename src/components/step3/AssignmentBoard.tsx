@@ -14,7 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import type { CustomGroup, NumberingMethod, Student, Violation } from '@/types';
-import { BoardPanel, THIN_SCROLLBAR } from './BoardPanel';
+import { BoardPanel } from './BoardPanel';
 import { buildRelations, groupStudentsByClass, matchesQuery, UNASSIGNED } from './boardModel';
 import { StudentChip, type ChipRelation } from './StudentChip';
 
@@ -267,7 +267,7 @@ export function AssignmentBoard({
                         <h3 className="mb-1 text-small font-bold text-ink">
                             {UNASSIGNED} <span className="font-normal text-soft">{unassigned.length}명</span>
                         </h3>
-                        <div className={`grid max-h-[80px] grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-px overflow-y-auto ${THIN_SCROLLBAR}`}>
+                        <div className="grid max-h-[80px] grid-cols-[repeat(auto-fill,minmax(112px,1fr))] gap-px overflow-y-auto">
                             {unassigned.map((s) => renderChip(s, false))}
                         </div>
                     </section>
@@ -279,7 +279,7 @@ export function AssignmentBoard({
                     onScroll={(e) => {
                         if (shownView === 'compact') compactScroll.current = { top: e.currentTarget.scrollTop, left: e.currentTarget.scrollLeft };
                     }}
-                    className={`min-h-0 flex-1 overflow-auto px-1 pb-1 ${THIN_SCROLLBAR}`}
+                    className="min-h-0 flex-1 overflow-auto px-1 pb-1"
                 >
                     {shownView === 'compact' ? (
                         <div

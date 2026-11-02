@@ -16,18 +16,18 @@ export interface Student {
     birth?: string;                // 생년월일 (YYYY.MM.DD.)
 
     // 생활지도
-    behavior_score: number;        // -2 ~ +3
+    behavior_score: number;        // 리더 +1, +2 / 행동과 정서 -1 ~ -3 / 없으면 0
     behavior_type: BehaviorType;   // 유형
     behavior_note?: string;        // 비고 (툴팁)
     is_pre_transfer?: boolean;     // 전출 예정 여부
 
     // 그룹 및 관계
     group_ids: string[];           // 소속된 CustomGroup ID 목록
-    avoid_ids: string[];           // 피해야 할 학생 ID (저격)
+    avoid_ids: string[];           // 분리 배정 학생 ID
     avoid_memos?: Record<string, string>; // 분리 배정 사유 (Key: 상대ID, Value: 사유)
-    keep_ids: string[];            // 함께해야 할 학생 ID (단짝)
-    keep_memos?: Record<string, string>;  // 동반 배정 사유
-    fixed_class?: string;          // 고정 반 (예: "1반")
+    keep_ids: string[];            // 함께 배정 학생 ID
+    keep_memos?: Record<string, string>;  // 함께 배정 사유
+    fixed_class?: string;          // 고정 배정 (예: "1반")
     fixed_class_memo?: string;     // 고정 배정 사유
 
     // 배정 결과
@@ -95,7 +95,7 @@ export interface ClassStats {
     preTransferFemaleCount: number;  // 전출 예정 여학생 수
 }
 
-// 제약 조건 위반 정보
+// 조건 위반 정보
 export interface Violation {
     type:
         | 'UNASSIGNED'

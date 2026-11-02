@@ -109,8 +109,8 @@ export function GuideDialog({
 
                 <Step number="05" title="결과 다듬기">
                     <p>
-                        <strong className={STRONG}>상세 배치 조정</strong>에서 학생을 누르면 바꿀 만한 학생을 추천합니다. 그 학생을 눌러
-                        교환하거나 반을 눌러 옮깁니다. 잘못 바꾸었으면 <strong className={STRONG}>되돌리기</strong>를 누릅니다.
+                        <strong className={STRONG}>상세 배치 조정</strong>에서 학생을 누르면 바꿀 만한 학생을 오른쪽에 추천합니다. 추천 줄을 누르면
+                        바꾸기 전에 두 반을 비교해 볼 수 있습니다. 학생을 눌러 바로 교환하거나 반 이름을 눌러 옮겨도 됩니다. 잘못 바꾸었으면 <strong className={STRONG}>되돌리기</strong>를 누릅니다.
                     </p>
                 </Step>
 

@@ -182,7 +182,7 @@ export interface Measure {
     typeLevel: Record<TypeLevelKey, number>;
     behaviorTotal: number;
     emotionalTotal: number;
-    // 반별 생활지도 점수 합계(리더 포함)의 차이, 음수 점수만 더한 합계의 차이입니다.
+    // 반별 생활지도 합계(리더 포함)의 차이, 음수 점수만 더한 합계의 차이입니다.
     guidanceTotal: number;
     negativeSum: number;
     leader: number;

@@ -11,7 +11,6 @@ import { behaviorMark, groupsOf, relationMemo, UNASSIGNED, type RelationIndex } 
 import { Mark, RankBadge, StudentMarks } from './StudentChip';
 
 // 공통 디자인의 스크롤바: 평소에는 보이지 않고 마우스를 올린 곳에서만 5px로 나타납니다.
-export const THIN_SCROLLBAR = '[&::-webkit-scrollbar]:size-[5px] [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-hairline';
 
 function Heading({ children }: { children: ReactNode }) {
     return <h3 className="mt-4 mb-1.5 flex items-center gap-1 text-small font-bold text-ink">{children}</h3>;
@@ -395,7 +394,7 @@ export function BoardPanel({
             ref={ref}
             aria-label="학생 정보와 추천"
             data-board-panel
-            className={`min-h-0 w-[280px] shrink-0 overflow-y-auto border-l border-line bg-card p-3 ${THIN_SCROLLBAR}`}
+            className="min-h-0 w-[280px] shrink-0 overflow-y-auto border-l border-line bg-card p-3"
         >
             {student && comparePartner && preview && (
                 <ComparisonCard

@@ -52,7 +52,7 @@ export function calculateClassStats(students: Student[], classCountOrNames: numb
             className: cn,
             studentCount: cs.length,
             stayCount: staying.length,
-            // 생활지도 점수가 0인 학생 수 (일반 학생)
+            // 생활지도가 없는 학생 수 (일반 학생)
             normalCount: cs.filter((s) => s.behavior_score === 0).length,
             maleCount: cs.filter((s) => s.gender === 'M').length,
             femaleCount: cs.filter((s) => s.gender === 'F').length,
