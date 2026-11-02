@@ -63,7 +63,7 @@ const FIGURE_ROWS: { label: string; title?: string; format: (f: ClassFigures) =>
     { label: '정서 -2', format: (f) => `${f.emotional2}명` },
     { label: '정서 -1', format: (f) => `${f.emotional1}명` },
     { label: '리더', format: (f) => `${f.leader}명` },
-    { label: '합계', title: '리더를 포함한 생활지도 점수의 합입니다. 대략 보는 참고 값입니다.', format: (f) => String(f.guidanceTotal) },
+    { label: '합계', title: '어려운 학생의 점수만 더한 값입니다. 리더는 더하지 않습니다.', format: (f) => String(f.difficultyTotal) },
 ];
 
 // 달라지지 않는 값은 한 번만 흐리게 적고, 달라지는 값만 화살표와 함께 굵게 적습니다.

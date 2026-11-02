@@ -1,4 +1,5 @@
 import type { CustomGroup, Student } from '@/types';
+import { difficultyOf } from '../difficulty';
 
 export function makeClassNames(classCount: number): string[] {
     return Array.from({ length: classCount }, (_, i) => `${i + 1}반`);
@@ -69,7 +70,7 @@ export interface Problem {
     score: Float64Array;
     meanScore: number;
     scoreWeight: number;
-    // 전출 뒤 남는 학생의 음수 생활지도 점수와, 그 합을 반 수로 나눈 값입니다. 리더는 상쇄에 쓰지 않으므로 넣지 않습니다.
+    // 전출 뒤 남는 학생의 어려움 점수(difficulty.ts)와, 그 합을 반 수로 나눈 값입니다.
     difficultyPoints: Int32Array;
     meanDifficulty: number;
     avoidAdj: number[][];
@@ -244,7 +245,7 @@ export function compileProblem(
     const meanScore = stayScores.length ? stayScores.reduce((a, b) => a + b, 0) / stayScores.length : 0;
     const scoreWeight = (weights.score * 1000) / Math.max(1, max - min);
 
-    const difficultyPoints = Int32Array.from(students, (s, i) => (stay[i] ? Math.min(s.behavior_score, 0) : 0));
+    const difficultyPoints = Int32Array.from(students, (s, i) => (stay[i] ? difficultyOf(s) : 0));
     const meanDifficulty = difficultyPoints.reduce((a, b) => a + b, 0) / Math.max(1, c);
 
     return {

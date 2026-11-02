@@ -98,12 +98,53 @@ describe('학급별 균형 표', () => {
         expect(first.cells.average.flagged).toBe(false);
     });
 
-    it('합계는 리더를 포함한 전출 뒤 생활지도 점수 합이고 차이는 있지만 표시하지 않습니다', () => {
+    it('합계는 전출 뒤 어려움 합계이고 리더를 더하지 않으며 어려움이 큰 반을 표시합니다', () => {
         // 1반 -3 -3 -3, 2반 리더 +2. 2반의 전출 예정 -3은 뺍니다.
-        expect(first.cells.guidanceTotal).toEqual({ value: -9, flagged: false });
-        expect(second.cells.guidanceTotal).toEqual({ value: 2, flagged: false });
-        expect(table.difference.guidanceTotal).toEqual({ value: 11, flagged: false });
-        expect(table.columns.find((c) => c.key === 'guidanceTotal')?.title).toContain('참고');
+        expect(first.cells.difficultyTotal).toEqual({ value: -9, flagged: true });
+        expect(second.cells.difficultyTotal).toEqual({ value: 0, flagged: false });
+        expect(table.difference.difficultyTotal).toEqual({ value: 9, flagged: true });
+        expect(table.columns.find((c) => c.key === 'difficultyTotal')?.title).toBe('어려운 학생의 점수만 더한 값입니다. 리더는 더하지 않습니다.');
+    });
+
+    describe('합계의 표시 기준', () => {
+        const withTotals = (totals: number[]) =>
+            calculateBalanceTable(
+                totals.map((total, i) =>
+                    makeStudent({ id: `s${i}`, assigned_class: `${i + 1}반`, behavior_type: total ? 'BEHAVIOR' : 'NONE', behavior_score: total }),
+                ),
+                totals.length,
+            );
+        const flags = (totals: number[]) => withTotals(totals).rows.map((row) => row.cells.difficultyTotal.flagged);
+
+        it('차이 2까지는 표시하지 않습니다', () => {
+            expect(withTotals([-3, -2, -1]).difference.difficultyTotal).toEqual({ value: 2, flagged: false });
+            expect(flags([-3, -2, -1])).toEqual([false, false, false]);
+        });
+
+        it('차이 3부터 대부분의 반에서 벗어난 큰 쪽만 표시합니다', () => {
+            // -3 한 반만 무겁습니다. 값이 음수여도 어려움이 큰 쪽입니다.
+            expect(flags([-3, 0, 0, 0])).toEqual([true, false, false, false]);
+        });
+
+        it('어려움이 작은 반은 표시하지 않습니다', () => {
+            expect(flags([-3, -3, -3, 0])).toEqual([false, false, false, false]);
+            expect(withTotals([-3, -3, -3, 0]).difference.difficultyTotal.flagged).toBe(true);
+        });
+
+        it('표시해도 칸의 값은 음수 그대로입니다', () => {
+            expect(withTotals([-3, 0]).rows[0].cells.difficultyTotal.value).toBe(-3);
+        });
+    });
+
+    it('행동 -1과 정서 -1은 차이가 커도 표시하지 않고 숫자만 보여 줍니다', () => {
+        const list = [
+            ...['a', 'b', 'c', 'd'].map((id) => makeStudent({ id, assigned_class: '1반', behavior_type: 'BEHAVIOR', behavior_score: -1 })),
+            ...['e', 'f', 'g', 'h'].map((id) => makeStudent({ id, assigned_class: '2반', behavior_type: 'EMOTIONAL', behavior_score: -1 })),
+        ];
+        const mild = calculateBalanceTable(list, 2);
+        expect(mild.difference.behavior1).toEqual({ value: 4, flagged: false });
+        expect(mild.difference.emotional1).toEqual({ value: 4, flagged: false });
+        expect(mild.rows.every((row) => !row.cells.behavior1.flagged && !row.cells.emotional1.flagged)).toBe(true);
     });
 
     it('인원, 남, 그룹, 행동 -3의 차이 줄과 벗어난 칸을 표시합니다', () => {

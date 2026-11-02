@@ -16,8 +16,8 @@ export interface ClassFigures {
     emotional2: number;
     emotional1: number;
     leader: number;
-    // 리더를 포함한 생활지도 점수 합입니다. 참고 값입니다.
-    guidanceTotal: number;
+    // 어려움 합계입니다. 맞추는 목표입니다.
+    difficultyTotal: number;
 }
 
 export interface SwapPreviewClass {
@@ -46,7 +46,7 @@ function figuresOf(stat: ReturnType<typeof calculateClassStats>[number]): ClassF
         emotional2: stat.emotionalPlus2,
         emotional1: stat.emotionalPlus1,
         leader: stat.leaderCount,
-        guidanceTotal: stat.behaviorTotal,
+        difficultyTotal: stat.difficultyTotal,
     };
 }
 

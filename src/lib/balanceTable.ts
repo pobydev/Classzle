@@ -74,7 +74,7 @@ export function flagColumn(values: number[], limit: number | null, flag: FlagMod
 
 const COUNT_LIMIT = 1;
 const LEVEL_LIMIT = 1;
-const MILD_LEVEL_LIMIT = 2;
+const DIFFICULTY_LIMIT = 2;
 
 export function calculateBalanceTable(students: Student[], classCount: number, groups: CustomGroup[] = []): BalanceTable {
     const classNames = makeClassNames(classCount);
@@ -84,25 +84,28 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
     const withTransfer = calculateClassStats(students, classNames, groups);
 
     type Stat = (typeof stats)[number];
-    const specs: (BalanceColumn & { read: (stat: Stat) => number })[] = [
+    const specs: (BalanceColumn & { read: (stat: Stat) => number; flagBy?: (stat: Stat) => number })[] = [
         { key: 'count', label: '인원', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.studentCount },
         { key: 'male', label: '남', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.maleCount },
         { key: 'female', label: '여', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.femaleCount },
         { key: 'average', label: '평균', limit: null, flag: 'none', read: (s) => s.averageScore },
         { key: 'behavior3', label: '-3', section: '행동', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.behaviorPlus3 },
         { key: 'behavior2', label: '-2', section: '행동', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.behaviorPlus2 },
-        { key: 'behavior1', label: '-1', section: '행동', limit: MILD_LEVEL_LIMIT, flag: 'above', read: (s) => s.behaviorPlus1 },
+        // -1은 합계를 맞추느라 차이가 벌어질 수 있어 숫자만 보여 줍니다.
+        { key: 'behavior1', label: '-1', section: '행동', limit: null, flag: 'none', read: (s) => s.behaviorPlus1 },
         { key: 'emotional3', label: '-3', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus3 },
         { key: 'emotional2', label: '-2', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus2 },
-        { key: 'emotional1', label: '-1', section: '정서', limit: MILD_LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus1 },
+        { key: 'emotional1', label: '-1', section: '정서', limit: null, flag: 'none', read: (s) => s.emotionalPlus1 },
         { key: 'leader', label: '리더', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.leaderCount },
         {
-            key: 'guidanceTotal',
+            key: 'difficultyTotal',
             label: '합계',
-            title: '리더를 포함한 생활지도 점수의 합입니다. 반의 분위기를 대략 보는 참고 값입니다. -3 학생의 어려움이 리더로 상쇄되는 것은 아닙니다.',
-            limit: null,
-            flag: 'none',
-            read: (s) => s.behaviorTotal,
+            title: '어려운 학생의 점수만 더한 값입니다. 리더는 더하지 않습니다.',
+            limit: DIFFICULTY_LIMIT,
+            flag: 'above',
+            read: (s) => s.difficultyTotal,
+            // 값이 음수이므로 부호를 바꿔 어려움이 큰 반을 표시합니다.
+            flagBy: (s) => -s.difficultyTotal,
         },
         ...groups.map((g) => ({
             key: `group:${g.id}`,
@@ -122,10 +125,10 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
     }));
     const difference: Record<string, BalanceCell> = {};
     for (const spec of specs) {
-        const { difference: diff, cells } = flagColumn(stats.map(spec.read), spec.limit, spec.flag);
+        const { difference: diff, cells } = flagColumn(stats.map(spec.flagBy ?? spec.read), spec.limit, spec.flag);
         difference[spec.key] = diff;
         cells.forEach((cell, i) => {
-            rows[i].cells[spec.key] = cell;
+            rows[i].cells[spec.key] = { ...cell, value: spec.read(stats[i]) };
         });
     }
 
@@ -210,7 +213,7 @@ export interface PreviousClassMatrix {
     totals: Record<string, number>;
 }
 
-// 새 반과 전학년도 반의 인원표입니다. 전출 뒤 기준이고, 참고용이라 목표나 표시는 없습니다.
+// 새 반과 전학년도 반의 인원표입니다. 전출 뒤 기준입니다. 비슷하면 되는 약한 조건이라 표에 표시는 하지 않습니다.
 export function calculatePreviousClassMatrix(students: Student[], classCount: number): PreviousClassMatrix {
     const classNames = makeClassNames(classCount);
     const previousSet = new Set<string>();

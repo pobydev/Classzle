@@ -43,7 +43,7 @@ const WEIGHTS: Weights = {
 
 /**
  * 고른 학생과 바꿔도 조건을 새로 어기지 않는 상대를 균형이 좋아지는 순서로 찾습니다.
- * 고정 반, 떼어 놓기, 함께 두기, 그룹, 인원, 남녀, 전출 예정을 모두 검사합니다.
+ * 고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀, 전출 예정을 모두 검사합니다.
  */
 export function recommendSwaps(
     studentId: string,

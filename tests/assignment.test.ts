@@ -214,7 +214,7 @@ describe('어려움 합계', () => {
     const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const risky = (id: string, type: 'BEHAVIOR' | 'EMOTIONAL', level: number, extra: Partial<Student> = {}) =>
         makeStudent({ id, gender: 'M', behavior_type: type, behavior_score: level, ...extra });
-    // 생활지도 점수가 없고 성적이 같은 학생으로 반을 채웁니다.
+    // 생활지도가 없고 성적이 같은 학생으로 반을 채웁니다.
     const fill = (count: number) =>
         Array.from({ length: count }, (_, i) => makeStudent({ id: `f${i}`, gender: i % 2 ? 'M' : 'F' }));
     const totals = (students: Student[], classCount: number) =>

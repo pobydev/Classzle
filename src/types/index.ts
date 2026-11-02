@@ -58,7 +58,8 @@ export interface ClassStats {
     className: string;             // 반 이름
     studentCount: number;          // 학생 수
     averageScore: number;          // 평균 성적
-    behaviorTotal: number;         // 생활지도 총점
+    behaviorTotal: number;         // 리더까지 더한 생활지도 총점
+    difficultyTotal: number;       // 어려움 합계 (src/lib/difficulty.ts)
     maleCount: number;             // 남학생 수
     femaleCount: number;           // 여학생 수
     leaderCount: number;           // 리더십 학생 수
