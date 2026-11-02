@@ -36,12 +36,15 @@ export interface Weights {
     level3: number;
     level2: number;
     level1: number;
+    typeLevel3: number;
+    typeLevel2: number;
+    typeLevel1: number;
     leader: number;
     leaderStrong: number;
     type: number;
     band: number;
     score: number;
-    previous: number;
+    guidance: number;
     moved: number;
 }
 
@@ -65,6 +68,9 @@ export interface Problem {
     score: Float64Array;
     meanScore: number;
     scoreWeight: number;
+    // 전출 뒤 남는 학생의 생활지도 점수(리더 포함)와 반마다 나눈 합계입니다. 대략의 수준을 보는 약한 항목입니다.
+    guidancePoints: Int32Array;
+    meanGuidance: number;
     avoidAdj: number[][];
     keepAdj: number[][];
     avoidEdges: [number, number][];
@@ -191,6 +197,13 @@ export function compileProblem(
     addDim(stayers.filter(scoreIs(-3)), weights.level3);
     addDim(stayers.filter(scoreIs(-2)), weights.level2);
     addDim(stayers.filter(scoreIs(-1)), weights.level1);
+    // 행동과 정서는 다른 어려움입니다. 등급별 합이 맞아도 한 반에 한 유형만 몰리지 않게 따로 맞춥니다.
+    for (const type of ['BEHAVIOR', 'EMOTIONAL'] as const) {
+        const ofType = stayers.filter((i) => students[i].behavior_type === type);
+        addDim(ofType.filter(scoreIs(-3)), weights.typeLevel3);
+        addDim(ofType.filter(scoreIs(-2)), weights.typeLevel2);
+        addDim(ofType.filter(scoreIs(-1)), weights.typeLevel1);
+    }
     addDim(stayers.filter((i) => students[i].behavior_type === 'LEADER'), weights.leader);
     addDim(stayers.filter((i) => students[i].behavior_type === 'LEADER' && students[i].behavior_score >= 2), weights.leaderStrong);
     addDim(stayers.filter((i) => students[i].behavior_type === 'BEHAVIOR'), weights.type);
@@ -210,25 +223,15 @@ export function compileProblem(
         }
     }
 
-    // 전학년도 반이 새 반에 몰리지 않게 합니다.
-    const byPrevious = new Map<string, number[]>();
-    for (const i of stayers) {
-        const previous = previousClassOf(students[i]);
-        if (previous === null) continue;
-        const list = byPrevious.get(previous);
-        if (list) list.push(i);
-        else byPrevious.set(previous, [i]);
-    }
-    if (byPrevious.size > 1) {
-        for (const members of byPrevious.values()) addDim(members, weights.previous);
-    }
-
     // 성적 단위가 달라도(100점, 1000점) 같은 무게가 되게 맞춥니다.
     const stayScores = stayers.map((i) => score[i]);
     const min = stayScores.length ? Math.min(...stayScores) : 0;
     const max = stayScores.length ? Math.max(...stayScores) : 0;
     const meanScore = stayScores.length ? stayScores.reduce((a, b) => a + b, 0) / stayScores.length : 0;
     const scoreWeight = (weights.score * 1000) / Math.max(1, max - min);
+
+    const guidancePoints = Int32Array.from(students, (s, i) => (stay[i] ? s.behavior_score : 0));
+    const meanGuidance = guidancePoints.reduce((a, b) => a + b, 0) / Math.max(1, c);
 
     return {
         n,
@@ -240,6 +243,8 @@ export function compileProblem(
         score,
         meanScore,
         scoreWeight,
+        guidancePoints,
+        meanGuidance,
         avoidAdj: avoid.adj,
         keepAdj: keep.adj,
         avoidEdges: avoid.edges,
