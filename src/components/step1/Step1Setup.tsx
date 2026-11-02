@@ -45,6 +45,7 @@ import { BehaviorPickerHeader, KEY_HINT } from './BehaviorPicker';
 import { ClassSheetPanel } from './ClassSheetPanel';
 import { StudentTableRow } from './StudentTableRow';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
+import { removalConsequences } from '@/lib/studentRemoval';
 import {
     Dialog,
     DialogContent,
@@ -126,6 +127,20 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         (id: string, type: BehaviorType, score: number) => updateStudent(id, { behavior_type: type, behavior_score: score }),
         [updateStudent],
     );
+
+    const handleDeleteStudent = useCallback(async (id: string) => {
+        const state = useClasszleStore.getState();
+        const student = state.students.find((s) => s.id === id);
+        if (!student) return;
+        const consequences = removalConsequences(student, state.students, state.groups);
+        const confirmed = await confirm({
+            title: `${student.name} 학생을 지울까요?`,
+            description: `${consequences.length > 0 ? `함께 지워지는 것: ${consequences.join(', ')}. ` : ''}지운 학생은 되돌릴 수 없습니다.`,
+            confirmLabel: '삭제',
+            danger: true,
+        });
+        if (confirmed) deleteStudent(id);
+    }, [confirm, deleteStudent]);
 
     // 전학년도 반별 인원과 생활지도 입력 인원. 빠뜨린 반을 알아채는 데 씁니다.
     const prevClassSummary = useMemo(() => {
@@ -816,7 +831,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                     onEditingChange={setEditingId}
                                                     onUpdate={updateStudent}
                                                     onBehaviorChange={handleBehaviorChange}
-                                                    onDelete={deleteStudent}
+                                                    onDelete={handleDeleteStudent}
                                                 />
                                             ))}
                                         </TableBody>
