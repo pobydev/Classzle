@@ -41,14 +41,14 @@ describe('신규 배정', () => {
         expect(m.minus2).toBeLessThanOrEqual(1);
     });
 
-    it('행동과 정서를 등급마다 반별 차이 1명 안으로 맞추고 합계도 크게 벌어지지 않습니다', () => {
+    it('-3, -2는 유형별로 반별 차이 1명 안으로 맞추고 어려움 합계도 맞춥니다', () => {
         const cfg = SCENARIOS['작음 5반 140명'];
         for (let i = 0; i < 3; i++) {
             const p = makeScenario(cfg, 1000 + i * 7);
             const result = assignStudents(p.students, cfg.classes, p.groups, { seed: 5000 + i, ...FAST });
             const m = measure(result.students, p.groups, p.names);
-            expect(Math.max(...Object.values(m.typeLevel))).toBeLessThanOrEqual(1);
-            expect(m.guidanceTotal).toBeLessThanOrEqual(3);
+            expect(Math.max(m.typeLevel.b3, m.typeLevel.e3, m.typeLevel.b2, m.typeLevel.e2)).toBeLessThanOrEqual(1);
+            expect(m.negativeSum).toBeLessThanOrEqual(2);
             expect(result.violations).toEqual([]);
         }
     });
@@ -190,6 +190,133 @@ describe('전출 예정 학생', () => {
     });
 });
 
+describe('전학년도 반 섞기', () => {
+    it('같은 전학년도 반 학생이 한 반에 몰리지 않습니다', () => {
+        const students = Array.from({ length: 80 }, (_, i) =>
+            makeStudent({ id: `s${i}`, gender: i % 2 ? 'M' : 'F', academic_score: 1 + i * 11, prev_info: `2-${(i % 4) + 1}-${i}` }),
+        );
+        const result = assignStudents(students, 4, [], { seed: 3, ...FAST });
+        const m = measure(result.students, [], ['1반', '2반', '3반', '4반']);
+        expect(m.previousMax).toBeLessThanOrEqual(3);
+    });
+
+    it('조건이 있는 문제에서도 전학년도 반을 고르게 나눕니다', () => {
+        const cfg = SCENARIOS['작음 5반 140명'];
+        for (let i = 0; i < 3; i++) {
+            const p = makeScenario(cfg, 1000 + i * 7);
+            const result = assignStudents(p.students, cfg.classes, p.groups, { seed: 5000 + i, ...FAST });
+            expect(measure(result.students, p.groups, p.names).previousMax).toBeLessThanOrEqual(3);
+        }
+    });
+});
+
+describe('어려움 합계', () => {
+    const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const risky = (id: string, type: 'BEHAVIOR' | 'EMOTIONAL', level: number, extra: Partial<Student> = {}) =>
+        makeStudent({ id, gender: 'M', behavior_type: type, behavior_score: level, ...extra });
+    // 생활지도 점수가 없고 성적이 같은 학생으로 반을 채웁니다.
+    const fill = (count: number) =>
+        Array.from({ length: count }, (_, i) => makeStudent({ id: `f${i}`, gender: i % 2 ? 'M' : 'F' }));
+    const totals = (students: Student[], classCount: number) =>
+        Array.from({ length: classCount }, (_, c) =>
+            students.filter((s) => s.assigned_class === `${c + 1}반`).reduce((sum, s) => sum + Math.min(s.behavior_score, 0), 0),
+        );
+    const levelsIn = (students: Student[], level: number, classCount: number) =>
+        Array.from({ length: classCount }, (_, c) =>
+            students.filter((s) => s.assigned_class === `${c + 1}반` && s.behavior_score === level).length,
+        );
+
+    it.each([
+        ['행동 -2, 행동 -1 2명', 'BEHAVIOR', 'BEHAVIOR', 'BEHAVIOR'],
+        ['행동 -2, 정서 -1 2명', 'BEHAVIOR', 'EMOTIONAL', 'EMOTIONAL'],
+        ['정서 -2, 행동 -1, 정서 -1', 'EMOTIONAL', 'BEHAVIOR', 'EMOTIONAL'],
+    ] as const)('두 반에 -2 한 명과 -1 두 명이면 -2와 -1 둘로 나눕니다: %s', (_, a, b, c) => {
+        const students = [risky('x', a, -2), risky('y', b, -1), risky('z', c, -1), ...fill(40)];
+        for (const seed of SEEDS) {
+            const result = assignStudents(students, 2, [], { seed, ...FAST });
+            expect(totals(result.students, 2)).toEqual([-2, -2]);
+            expect(result.violations).toEqual([]);
+        }
+    });
+
+    it('두 반에 -3 한 명과 -1 세 명이면 -3과 -1 셋으로 나눕니다', () => {
+        const students = [
+            risky('x', 'BEHAVIOR', -3),
+            risky('y', 'BEHAVIOR', -1),
+            risky('z', 'EMOTIONAL', -1),
+            risky('w', 'BEHAVIOR', -1),
+            ...fill(40),
+        ];
+        for (const seed of SEEDS) {
+            const result = assignStudents(students, 2, [], { seed, ...FAST });
+            expect(totals(result.students, 2)).toEqual([-3, -3]);
+            expect(levelsIn(result.students, -1, 2).sort()).toEqual([0, 3]);
+        }
+    });
+
+    it('네 반이어도 -1 인원이 달라져야 합계가 같으면 합계를 맞춥니다', () => {
+        // 반마다 -3이 되는 나눔은 (-3), (-3), (-2, -1), (-1, -1, -1) 하나뿐입니다.
+        const students = [
+            risky('a', 'BEHAVIOR', -3),
+            risky('b', 'EMOTIONAL', -3),
+            risky('c', 'BEHAVIOR', -2),
+            risky('d', 'BEHAVIOR', -1),
+            risky('e', 'EMOTIONAL', -1),
+            risky('g', 'BEHAVIOR', -1),
+            risky('h', 'EMOTIONAL', -1),
+            ...fill(80),
+        ];
+        for (const seed of SEEDS) {
+            const result = assignStudents(students, 4, [], { seed, ...FAST });
+            expect(totals(result.students, 4)).toEqual([-3, -3, -3, -3]);
+            expect(levelsIn(result.students, -1, 4).sort()).toEqual([0, 0, 1, 3]);
+        }
+    });
+
+    it('-1이 많아도 -3 두 명을 한 반에 넣지 않습니다', () => {
+        const students = [
+            risky('a', 'BEHAVIOR', -3),
+            risky('b', 'BEHAVIOR', -3),
+            ...['p', 'q', 'r', 's', 't', 'u'].map((id) => risky(id, 'EMOTIONAL', -1)),
+            ...fill(40),
+        ];
+        for (const seed of SEEDS) {
+            const result = assignStudents(students, 2, [], { seed, ...FAST });
+            expect(levelsIn(result.students, -3, 2)).toEqual([1, 1]);
+        }
+    });
+
+    it('-3을 모아야만 합계가 같아져도 -3 두 명을 한 반에 넣지 않습니다', () => {
+        // 2반과 3반에 -1이 6명씩 고정이라 두 -3을 1반에 모으면 합계가 모두 -6이 됩니다. 유형이 달라 유형별 벌점도 없습니다.
+        const fixedOnes = (cn: string, prefix: string) =>
+            ['1', '2', '3', '4', '5', '6'].map((n) => risky(prefix + n, 'EMOTIONAL', -1, { fixed_class: cn }));
+        const students = [
+            risky('a', 'BEHAVIOR', -3),
+            risky('b', 'EMOTIONAL', -3),
+            ...fixedOnes('2반', 'p'),
+            ...fixedOnes('3반', 'q'),
+            ...Array.from({ length: 60 }, (_, i) => makeStudent({ id: `f${i}`, gender: i % 4 === 0 ? 'M' : 'F' })),
+        ];
+        for (const seed of SEEDS) {
+            const result = assignStudents(students, 3, [], { seed, ...FAST });
+            expect(Math.max(...levelsIn(result.students, -3, 3))).toBe(1);
+        }
+    });
+
+    it('합계를 고를 때 리더로 상쇄하지 않습니다', () => {
+        // 리더를 합계에 넣으면 1반 -3, 리더 없음과 2반 -3, +2가 다르게 보입니다. 음수만 보므로 두 반의 합계는 같습니다.
+        const students = [
+            risky('a', 'BEHAVIOR', -3),
+            risky('b', 'BEHAVIOR', -3),
+            makeStudent({ id: 'l', gender: 'F', behavior_type: 'LEADER', behavior_score: 2 }),
+            ...fill(20),
+        ];
+        for (const seed of SEEDS) {
+            expect(totals(assignStudents(students, 2, [], { seed, ...FAST }).students, 2)).toEqual([-3, -3]);
+        }
+    });
+});
+
 describe('행동과 정서를 등급마다 따로 맞추기', () => {
     const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const CLASSES = ['1반', '2반'];
@@ -276,7 +403,7 @@ describe('행동과 정서를 등급마다 따로 맞추기', () => {
     });
 
     // 행동 2명은 유형 합 때문에 갈라집니다. 정서 -1이 어느 쪽에 가도 다른 항목의 벌점은 같습니다.
-    it('등급이 같으면 생활지도 합계가 비슷한 쪽을 고릅니다', () => {
+    it('등급이 같으면 어려움 합계가 비슷한 쪽을 고릅니다', () => {
         const students = [
             risky('b3', 'BEHAVIOR', -3),
             risky('b2', 'BEHAVIOR', -2),
@@ -292,8 +419,8 @@ describe('행동과 정서를 등급마다 따로 맞추기', () => {
         }
     });
 
-    it('합계를 맞추려고 -3을 한 반에 모으지 않습니다', () => {
-        // -3 두 명을 한 반에 모으고 리더를 몰아주면 합계는 0으로 같아지지만 그렇게 하지 않습니다.
+    it('리더가 많아도 -3을 한 반에 모으지 않습니다', () => {
+        // -3 두 명을 한 반에 모으고 리더를 몰아주면 점수를 다 더한 값은 0으로 같아지지만 그렇게 하지 않습니다.
         const students = [
             risky('b3a', 'BEHAVIOR', -3),
             risky('b3b', 'BEHAVIOR', -3),
@@ -306,7 +433,7 @@ describe('행동과 정서를 등급마다 따로 맞추기', () => {
         }
     });
 
-    it('교환 추천도 생활지도 합계를 봅니다', () => {
+    it('교환 추천도 어려움 합계를 봅니다', () => {
         // 1반 합계 -6, 2반 합계 0입니다. -1과 0을 바꾸면 등급은 그대로 고르고 합계만 가까워집니다.
         const students = [
             risky('b3', 'BEHAVIOR', -3, { assigned_class: '1반' }),
