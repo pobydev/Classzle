@@ -44,7 +44,8 @@ export interface Weights {
     type: number;
     band: number;
     score: number;
-    guidance: number;
+    difficulty: number;
+    previous: number;
     moved: number;
 }
 
@@ -68,9 +69,9 @@ export interface Problem {
     score: Float64Array;
     meanScore: number;
     scoreWeight: number;
-    // 전출 뒤 남는 학생의 생활지도 점수(리더 포함)와 반마다 나눈 합계입니다. 대략의 수준을 보는 약한 항목입니다.
-    guidancePoints: Int32Array;
-    meanGuidance: number;
+    // 전출 뒤 남는 학생의 음수 생활지도 점수와, 그 합을 반 수로 나눈 값입니다. 리더는 상쇄에 쓰지 않으므로 넣지 않습니다.
+    difficultyPoints: Int32Array;
+    meanDifficulty: number;
     avoidAdj: number[][];
     keepAdj: number[][];
     avoidEdges: [number, number][];
@@ -223,6 +224,19 @@ export function compileProblem(
         }
     }
 
+    // 전학년도 반이 새 반에 몰리지 않게 합니다.
+    const byPrevious = new Map<string, number[]>();
+    for (const i of stayers) {
+        const previous = previousClassOf(students[i]);
+        if (previous === null) continue;
+        const list = byPrevious.get(previous);
+        if (list) list.push(i);
+        else byPrevious.set(previous, [i]);
+    }
+    if (byPrevious.size > 1) {
+        for (const members of byPrevious.values()) addDim(members, weights.previous);
+    }
+
     // 성적 단위가 달라도(100점, 1000점) 같은 무게가 되게 맞춥니다.
     const stayScores = stayers.map((i) => score[i]);
     const min = stayScores.length ? Math.min(...stayScores) : 0;
@@ -230,8 +244,8 @@ export function compileProblem(
     const meanScore = stayScores.length ? stayScores.reduce((a, b) => a + b, 0) / stayScores.length : 0;
     const scoreWeight = (weights.score * 1000) / Math.max(1, max - min);
 
-    const guidancePoints = Int32Array.from(students, (s, i) => (stay[i] ? s.behavior_score : 0));
-    const meanGuidance = guidancePoints.reduce((a, b) => a + b, 0) / Math.max(1, c);
+    const difficultyPoints = Int32Array.from(students, (s, i) => (stay[i] ? Math.min(s.behavior_score, 0) : 0));
+    const meanDifficulty = difficultyPoints.reduce((a, b) => a + b, 0) / Math.max(1, c);
 
     return {
         n,
@@ -243,8 +257,8 @@ export function compileProblem(
         score,
         meanScore,
         scoreWeight,
-        guidancePoints,
-        meanGuidance,
+        difficultyPoints,
+        meanDifficulty,
         avoidAdj: avoid.adj,
         keepAdj: keep.adj,
         avoidEdges: avoid.edges,

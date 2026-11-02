@@ -28,25 +28,29 @@ export interface AssignResult {
 
 // 어길 때의 벌점입니다. 충돌하면 고정 배정, 분리 배정, 함께 배정, 그룹 분산, 전체 인원, 남녀 순으로 지킵니다.
 // 고정 배정은 학생을 옮기지 않는 것으로 지킵니다.
-const HARD = { avoid: 3000, keep: 1500, group: 600, count: 300, gender: 150 };
+const HARD = { avoid: 9000, keep: 4500, group: 1800, count: 900, gender: 450 };
 
-// 비슷하면 되는 항목입니다. 학생 한 명을 옮겨 얻는 이득이 남녀 벌점 한 칸(150)을 넘지 않아야 조건이 먼저입니다.
-// 가장 무거운 -3 행동 학생 기준: 2 x (level3 40 + typeLevel3 15 + type 5 + band 10) + 6 x guidance 1 = 146.
+// 비슷하면 되는 항목입니다. 순서: -3과 -2가 몰리지 않게 하기, 어려움 합계, 그다음 -1 인원.
+// 학생 한 명을 옮겨 얻는 이득이 남녀 벌점 한 칸(450)을 넘지 않아야 조건이 먼저입니다.
+// 가장 무거운 -3 학생 기준: 2 x (level3 65 + typeLevel3 65 + type 2 + band 10 + previous 1.5) + 6 x difficulty 6 = 323.
+// 합계 때문에 -3, -2가 몰리지 않으려면 한 명을 옮겨 얻는 다른 이득을 다 더해도(-3: 36 + 4 + 20 + 3 = 63, -2: 24 + 4 + 20 + 3 = 51)
+// 벌점 한 칸보다 작아야 합니다. 그래서 level3과 typeLevel3은 65, level2와 typeLevel2는 55입니다.
 const FULL_WEIGHTS: Weights = {
     ...HARD,
     transfer: 60,
-    level3: 40,
-    level2: 30,
-    level1: 8,
-    typeLevel3: 15,
-    typeLevel2: 12,
-    typeLevel1: 4,
+    level3: 65,
+    level2: 55,
+    level1: 2,
+    typeLevel3: 65,
+    typeLevel2: 55,
+    typeLevel1: 1,
     leader: 14,
     leaderStrong: 6,
-    type: 5,
+    type: 2,
     band: 10,
     score: 0.5,
-    guidance: 1,
+    difficulty: 6,
+    previous: 1.5,
     moved: 0,
 };
 
@@ -64,7 +68,8 @@ const REPAIR_WEIGHTS: Weights = {
     type: 1,
     band: 4,
     score: 0.25,
-    guidance: 0.2,
+    difficulty: 0.2,
+    previous: 0.2,
     moved: 25,
 };
 
