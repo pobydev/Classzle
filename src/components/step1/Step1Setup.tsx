@@ -201,7 +201,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
         try {
             // 읽을 수 없는 파일이면 묻지 않고 알립니다. 지금 작업은 그대로 둡니다.
-            const { students: parsedStudents, warnings } = await parseExcelFile(file);
+            const { students: parsedStudents, warnings, formLine } = await parseExcelFile(file);
 
             // 지금 작업을 새 명단으로 덮어쓰기 전에 묻습니다.
             if (useClasszleStore.getState().students.length > 0) {
@@ -215,7 +215,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             }
 
             setStudents(parsedStudents);
-            warnings.forEach((warning) => toast.warning(warning, { duration: 12000 }));
+            setNotices([formLine, ...warnings]);
             setGroups([]); // 새 파일 로드 시 그룹 초기화
             clearMovements(); // 새 파일 로드 시 히스토리 초기화
 
@@ -259,7 +259,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             setUploadStatus('error');
             setErrorMessage((error as Error).message);
         }
-    }, [setStudents, setClassCount, clearMovements, setGroups, confirm]);
+    }, [setStudents, setClassCount, clearMovements, setGroups, setNotices, confirm]);
 
 
     const handleDrop = useCallback(

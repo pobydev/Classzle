@@ -8,6 +8,8 @@ export interface ParsedRoster {
     students: Student[];
     // 짐작해서 넣은 값이 있으면 교사에게 알립니다.
     warnings: string[];
+    // 어느 양식으로 읽었는지 한 줄로 알립니다.
+    formLine: string;
 }
 
 // 엑셀 파일에서 학생 데이터 파싱
@@ -22,7 +24,9 @@ export function parseExcelFile(file: File): Promise<ParsedRoster> {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                roster = parseRosterRows(XLSX.utils.sheet_to_json(worksheet));
+                // 값이 모두 빈 열은 행에 나오지 않으므로 머리글은 따로 읽습니다.
+                const [headers] = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
+                roster = parseRosterRows(XLSX.utils.sheet_to_json(worksheet), (headers ?? []).map(String));
             } catch (error) {
                 reject(new Error('엑셀 파일 파싱 오류: ' + (error as Error).message));
                 return;
@@ -86,7 +90,7 @@ function isTotalRow(row: any): boolean {
 }
 
 // 엑셀 행을 학생으로 바꿉니다.
-export function parseRosterRows(allRows: any[]): ParsedRoster {
+export function parseRosterRows(allRows: any[], headers: string[] = []): ParsedRoster {
     // 이 앱이 내보낸 결과 파일은 반마다 머리글 줄과 계 줄이 끼어 있습니다.
     const isResultFile = allRows.some((row) => row['반(배정)'] !== undefined && row['반(이전)'] !== undefined);
     const rows = allRows.filter((row) => !isRepeatedHeaderRow(row) && !isTotalRow(row));
@@ -96,9 +100,12 @@ export function parseRosterRows(allRows: any[]): ParsedRoster {
     const unreadableBehavior: string[] = [];
     let blankNameRows = 0;
 
-    // 빈 칸은 행에 들어오지 않으므로 양식은 파일 전체를 보고 정합니다. 전입생은 이전 반이 빈 칸입니다.
+    // 양식은 대다수 줄을 보고 정합니다. 양식 B의 전입생은 이전 반이 빈 칸이고, 양식 A에 잘못 들어간 칸 하나로 시트 전체가 바뀌면 안 됩니다.
     const prevClassOf = (row: any) => row['반_1'] || row['class_1'] || row['이전반'] || row['prev_class'] || row['반(이전)'];
-    const isFormB = rows.some((row) => prevClassOf(row) !== undefined);
+    const nameOfRow = (row: any) => String(firstValue(row, ['이름', 'name', '성명']) ?? '').trim();
+    const namedRows = rows.filter((row) => nameOfRow(row) !== '');
+    const rowsWithPrev = namedRows.filter((row) => prevClassOf(row) !== undefined);
+    const isFormB = rowsWithPrev.length > 0 && rowsWithPrev.length * 2 >= namedRows.length;
 
     const students: Student[] = rows.map((row: any) => {
                     const rowName = String(firstValue(row, ['이름', 'name', '성명']) ?? '');
@@ -188,7 +195,25 @@ export function parseRosterRows(allRows: any[]): ParsedRoster {
         warnings.push(`생활지도 값을 읽지 못해 해당없음으로 넣었습니다: ${listNames(unreadableBehavior)}. 행동(-2)처럼 적어 주세요.`);
     }
 
-    return { students: students.filter((s) => s.name.trim() !== ''), warnings };
+    if (isFormB && rowsWithPrev.length < namedRows.length) {
+        const blank = namedRows.filter((row) => prevClassOf(row) === undefined).map(nameOfRow);
+        warnings.push(`양식 B로 읽었는데 이전 반이 비어 있는 학생이 있습니다: ${listNames(blank)}. 전입생이면 그대로 두어도 됩니다.`);
+    }
+    if (!isFormB && rowsWithPrev.length > 0) {
+        warnings.push(`양식 A로 읽었습니다. 이전 반 칸이 채워진 줄은 이 양식과 맞지 않아 그 칸을 쓰지 않았습니다: ${listNames(rowsWithPrev.map(nameOfRow))}`);
+    }
+    const hasPrevHeader = headers.some((h) => ['이전반', 'prev_class', '반_1', 'class_1', '반(이전)'].includes(h.trim()))
+        || headers.filter((h) => h.trim() === '반').length > 1;
+    if (!isFormB && rowsWithPrev.length === 0 && hasPrevHeader) {
+        warnings.push('이전 반 칸이 모두 비어 있어 양식 A로 읽었습니다. 앞쪽 반을 이전 반으로 넣었습니다. 양식 B라면 이전 학년, 반, 번호를 채워 주세요.');
+    }
+
+    const named = students.filter((s) => s.name.trim() !== '');
+    const placed = named.filter((s) => s.assigned_class).length;
+    const formName = isResultFile ? '배정 결과 파일' : isFormB ? '양식 B(기배정안)' : '양식 A(이전 학년 명단)';
+    const formLine = `${formName}로 읽었습니다. 학생 ${named.length}명${placed > 0 ? `, 반이 정해진 학생 ${placed}명` : ''}.`;
+
+    return { students: named, warnings, formLine };
 }
 
 // 성별 파싱. 읽을 수 없으면 null입니다.
