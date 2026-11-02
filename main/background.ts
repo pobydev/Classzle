@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, protocol, net, Menu, ipcMain, dialog } from 
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { pathToFileURL } from 'url';
+import { isSafeExternalUrl } from './externalUrl';
 import { isPrintSource } from './printFiles';
 import { setupUpdates } from './updater';
 import { projectFilePath, writeFileSafely } from './projectFiles';
@@ -240,6 +241,12 @@ ipcMain.handle('print-preview', async (event, htmlContent: string) => {
     }
 });
 
+// 새 창을 만들지 않고 https 주소만 기본 브라우저로 넘깁니다.
+function openLinkOutside({ url }: { url: string }): { action: 'deny' } {
+    if (isSafeExternalUrl(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
@@ -266,10 +273,7 @@ function createWindow() {
     });
 
     // 외부 링크는 기본 브라우저로 열기
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
-        return { action: 'deny' };
-    });
+    mainWindow.webContents.setWindowOpenHandler(openLinkOutside);
 
     if (isDev) {
         // 개발 모드: Next.js 개발 서버에 연결
