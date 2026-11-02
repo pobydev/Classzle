@@ -265,6 +265,38 @@ export async function exportToExcel(
     window.URL.revokeObjectURL(url);
 }
 
+// 계 줄에 넣을 값입니다. 전출 뒤 기준으로 세고, 전출 예정 학생은 따로 셉니다.
+interface ClassTally {
+    total: number;
+    male: number;
+    female: number;
+    scoreSum: number;
+    transfer: number;
+}
+
+const emptyTally = (): ClassTally => ({ total: 0, male: 0, female: 0, scoreSum: 0, transfer: 0 });
+
+function addToTally(tally: ClassTally, student: Student) {
+    if (student.is_pre_transfer) {
+        tally.transfer++;
+        return;
+    }
+    tally.total++;
+    if (student.gender === 'M') tally.male++;
+    else tally.female++;
+    tally.scoreSum += student.academic_score;
+}
+
+function tallyCells(tally: ClassTally) {
+    return {
+        count: `${tally.total}명`,
+        note: tally.transfer > 0 ? `전출 ${tally.transfer}명 제외` : '',
+        gender: `남:${tally.male} 여:${tally.female}`,
+        // 전출 예정 학생만 있는 반은 평균이 없습니다.
+        average: tally.total > 0 ? (tally.scoreSum / tally.total).toFixed(1) : '',
+    };
+}
+
 // 결과 파일에 들어가지 않는 학생입니다. 미배정과, 학급 수를 줄여 없어진 반의 학생입니다. 보드도 이들을 미배정으로 보여 줍니다.
 export function studentsLeftOutOfExport(students: Student[], classCount: number): Student[] {
     const classNames = makeClassNames(classCount);
@@ -404,12 +436,7 @@ export function buildResultWorkbook(
     let newNumberCounter = 1;
 
     // 반별 요약 계산을 위한 변수
-    let classStats = {
-        total: 0,
-        male: 0,
-        female: 0,
-        scoreSum: 0
-    };
+    let classStats = emptyTally();
 
     sortedByClass.forEach((s, index) => {
         const assignedClass = s.assigned_class || '';
@@ -423,10 +450,10 @@ export function buildResultWorkbook(
                 const summaryRow = sheet1.addRow({
                     new_grade: '',
                     new_class: '계',
-                    new_number: `${classStats.total}명`,
-                    name: '',
-                    gender: `남:${classStats.male} 여:${classStats.female}`,
-                    score: (classStats.scoreSum / classStats.total).toFixed(1),
+                    new_number: tallyCells(classStats).count,
+                    name: tallyCells(classStats).note,
+                    gender: tallyCells(classStats).gender,
+                    score: tallyCells(classStats).average,
                     prev_grade: '',
                     prev_class: '',
                     prev_number: '',
@@ -463,7 +490,7 @@ export function buildResultWorkbook(
 
             // 초기화
             newNumberCounter = 1;
-            classStats = { total: 0, male: 0, female: 0, scoreSum: 0 };
+            classStats = emptyTally();
         }
 
         currentClass = assignedClass;
@@ -501,20 +528,17 @@ export function buildResultWorkbook(
         });
 
         // 통계 누적
-        classStats.total++;
-        if (s.gender === 'M') classStats.male++;
-        else classStats.female++;
-        classStats.scoreSum += s.academic_score;
+        addToTally(classStats, s);
 
         // 마지막 행 처리
         if (index === sortedByClass.length - 1) {
             const summaryRow = sheet1.addRow({
                 new_grade: '',
                 new_class: '계',
-                new_number: `${classStats.total}명`,
-                name: '',
-                gender: `남:${classStats.male} 여:${classStats.female}`,
-                score: (classStats.scoreSum / classStats.total).toFixed(1),
+                new_number: tallyCells(classStats).count,
+                name: tallyCells(classStats).note,
+                gender: tallyCells(classStats).gender,
+                score: tallyCells(classStats).average,
                 prev_grade: '',
                 prev_class: '',
                 prev_number: '',
@@ -628,7 +652,7 @@ export function buildResultWorkbook(
 
 
     let currentPrevClassFull = ''; // 학년-반 조합
-    classStats = { total: 0, male: 0, female: 0, scoreSum: 0 };
+    classStats = emptyTally();
 
     sortedByPrevClass.forEach((s, index) => {
         const prevParts = s.prev_info.split('-');
@@ -642,10 +666,10 @@ export function buildResultWorkbook(
             const summaryRow = sheet2.addRow({
                 prev_grade: '',
                 prev_class: '계',
-                prev_number: `${classStats.total}명`,
-                name: '',
-                gender: `남:${classStats.male} 여:${classStats.female}`,
-                score: (classStats.scoreSum / classStats.total).toFixed(1),
+                prev_number: tallyCells(classStats).count,
+                name: tallyCells(classStats).note,
+                gender: tallyCells(classStats).gender,
+                score: tallyCells(classStats).average,
                 new_grade: '',
                 new_class: '',
                 new_number: ''
@@ -676,7 +700,7 @@ export function buildResultWorkbook(
                 cell.alignment = alignmentCenter;
             });
 
-            classStats = { total: 0, male: 0, female: 0, scoreSum: 0 };
+            classStats = emptyTally();
         }
 
         currentPrevClassFull = prevClassFull;
@@ -705,19 +729,16 @@ export function buildResultWorkbook(
             cell.alignment = alignmentCenter;
         });
 
-        classStats.total++;
-        if (s.gender === 'M') classStats.male++;
-        else classStats.female++;
-        classStats.scoreSum += s.academic_score;
+        addToTally(classStats, s);
 
         if (index === sortedByPrevClass.length - 1) {
             const summaryRow = sheet2.addRow({
                 prev_grade: '',
                 prev_class: '계',
-                prev_number: `${classStats.total}명`,
-                name: '',
-                gender: `남:${classStats.male} 여:${classStats.female}`,
-                score: (classStats.scoreSum / classStats.total).toFixed(1),
+                prev_number: tallyCells(classStats).count,
+                name: tallyCells(classStats).note,
+                gender: tallyCells(classStats).gender,
+                score: tallyCells(classStats).average,
                 new_grade: '',
                 new_class: '',
                 new_number: ''

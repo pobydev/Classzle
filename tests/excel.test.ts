@@ -122,9 +122,9 @@ describe('결과 엑셀', () => {
         expect(text).toContain('성적');
         expect(text).toContain('734');
         expect(text).toContain('612');
-        // 반 평균 행은 소수점 한 자리입니다.
+        // 반 평균 행은 소수점 한 자리입니다. 2반은 전출 예정 학생뿐이라 평균이 없습니다.
         expect(text).toContain('734.0');
-        expect(text).toContain('612.0');
+        expect(text).not.toContain('612.0');
     });
 
     it('기본 정보에 성적이 들어가도 생활지도, 관계, 고정 반은 나가지 않습니다', () => {

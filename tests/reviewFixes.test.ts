@@ -1,12 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import ExcelJS from 'exceljs';
 import { FULL_WEIGHTS } from '@/lib/assignment';
 import { calculateBalanceTable, flagColumn } from '@/lib/balanceTable';
+import { buildResultWorkbook } from '@/lib/excel';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { RECOMMEND_WEIGHTS, recommendSwaps } from '@/lib/recommend';
 import { groupStudentsByClass } from '@/components/step3/boardModel';
 import { makeStudent } from './helpers/students';
 
 const ids = (list: { studentId: string }[]) => list.map((r) => r.studentId);
+
+async function rowsOf(sheet: ExcelJS.Worksheet) {
+    const rows: string[][] = [];
+    sheet.eachRow((row) => {
+        rows.push((row.values as unknown[]).slice(1).map((v) => String(v ?? '')));
+    });
+    return rows;
+}
 
 describe('12. 교환 추천의 가중치', () => {
     it('배정과 같은 값을 씁니다', () => {
@@ -115,5 +125,32 @@ describe('18. 두 반 보기 순서', () => {
         const numbers = calculateAttendanceNumbers(list, method);
         const order = groupStudentsByClass(list, ['1반'], method)['1반'].map((s) => numbers[s.id]);
         expect(order).toEqual([...order].sort((a, b) => a - b));
+    });
+});
+
+describe('20. 계 줄', () => {
+    const list = [
+        makeStudent({ id: 'a', name: '가상가', gender: 'M', academic_score: 100, assigned_class: '1반', prev_info: '1-1-1' }),
+        makeStudent({ id: 'b', name: '가상나', gender: 'F', academic_score: 200, assigned_class: '1반', prev_info: '1-1-2' }),
+        makeStudent({ id: 't', name: '가상다', gender: 'M', academic_score: 900, assigned_class: '1반', prev_info: '1-1-3', is_pre_transfer: true }),
+    ];
+
+    it.each([0, 1])('전출 뒤 기준이고 전출을 함께 적습니다: 시트 %i', async (sheetIndex) => {
+        const rows = await rowsOf(buildResultWorkbook(list, 2).worksheets[sheetIndex]);
+        const total = rows.find((r) => r.includes('계'))!;
+        expect(total).toContain('2명');
+        expect(total).toContain('남:1 여:1');
+        expect(total).toContain('150.0');
+        expect(total).toContain('전출 1명 제외');
+    });
+
+    it('전출이 없으면 적지 않습니다', async () => {
+        const rows = await rowsOf(buildResultWorkbook(list.slice(0, 2), 2).worksheets[0]);
+        expect(rows.find((r) => r.includes('계'))!.join()).not.toContain('전출');
+    });
+
+    it('전출 학생만 있는 반의 평균이 NaN이 되지 않습니다', async () => {
+        const rows = await rowsOf(buildResultWorkbook([list[2]], 2).worksheets[0]);
+        expect(rows.flat().join()).not.toContain('NaN');
     });
 });
