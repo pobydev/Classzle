@@ -275,6 +275,8 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
     const handleFileSelect = useCallback(
         (e: React.ChangeEvent<HTMLInputElement>) => {
             const file = e.target.files?.[0];
+            // 오류나 취소 뒤에 같은 파일을 다시 고를 수 있게 비웁니다.
+            e.target.value = '';
             if (file) handleFileUpload(file);
         },
         [handleFileUpload]
