@@ -12,6 +12,8 @@ export interface SolveOptions {
     t0: number;
     t1: number;
     maxMs: number;
+    // 켜면 조건을 다 지킬 때까지 판마다 더 크게 흔들고, 다 지키면 바로 멈춥니다. 수정 모드에서 씁니다.
+    escalate?: boolean;
 }
 
 export interface SolveResult {
@@ -326,7 +328,7 @@ export function solve(problem: Problem, options: SolveOptions): SolveResult {
     if (!noMoves) {
         for (let round = 0; round < options.rounds; round++) {
             roundsDone++;
-            const t0 = options.t0 * Math.pow(0.5, round);
+            const t0 = options.escalate ? options.t0 * (round + 1) : options.t0 * Math.pow(0.5, round);
             let temperature = t0;
             const cooling = Math.pow(options.t1 / t0, 1 / Math.max(1, options.iterations));
 
@@ -356,7 +358,7 @@ export function solve(problem: Problem, options: SolveOptions): SolveResult {
             if (Date.now() - startedAt > options.maxMs) break;
             for (let i = 0; i < n; i++) if (cls[i] !== bestClasses[i]) moveStudent(i, bestClasses[i]);
             current = computeCost();
-            if (computeHardCost() === 0 && round >= 1) break;
+            if (computeHardCost() === 0 && (options.escalate || round >= 1)) break;
         }
     }
 

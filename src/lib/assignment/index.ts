@@ -64,7 +64,7 @@ const BALANCE_WEIGHTS: Weights = { ...FULL_WEIGHTS, moved: 2 };
 
 const SCHEDULES: Record<AssignmentMode, { t0: number; t1: number; rounds: number; iterationsPerStudent: number }> = {
     new: { t0: 80, t1: 0.02, rounds: 3, iterationsPerStudent: 2500 },
-    optimize: { t0: 15, t1: 0.05, rounds: 2, iterationsPerStudent: 800 },
+    optimize: { t0: 15, t1: 0.05, rounds: 6, iterationsPerStudent: 800 },
     balance: { t0: 25, t1: 0.02, rounds: 2, iterationsPerStudent: 2000 },
 };
 
@@ -181,6 +181,7 @@ export function assignStudents(
         t0: schedule.t0,
         t1: schedule.t1,
         maxMs: options.maxMs ?? 6000,
+        escalate: mode === 'optimize',
     });
 
     let moved = 0;

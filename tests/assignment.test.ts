@@ -215,6 +215,16 @@ describe('현재 배정 수정', () => {
         expect(repaired.moved).toBeLessThan(fresh.moved / 2);
     });
 
+    it('빡빡한 문제에서도 여러 번 모두 고칩니다', () => {
+        const cfg = SCENARIOS['빡빡 8반 220명'];
+        for (let i = 0; i < 12; i++) {
+            const p = makeScenario(cfg, 1000 + i * 7);
+            const tentative = snakeTentative(p, 7000 + i);
+            const repaired = assignStudents(tentative, cfg.classes, p.groups, { mode: 'optimize', seed: 5000 + i, ...FAST });
+            expect(repaired.violations).toEqual([]);
+        }
+    });
+
     it('뱀 모양을 크게 흐트러뜨리지 않습니다', () => {
         const cfg = SCENARIOS['작음 5반 140명'];
         const p = makeScenario(cfg, 1000);
