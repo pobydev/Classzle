@@ -1,4 +1,5 @@
 import type { CustomGroup, Student, Violation } from '@/types';
+import { isStaying } from './assignment/problem';
 import { calculateClassStats } from './stats';
 import { validateSwap } from './validation';
 
@@ -11,6 +12,8 @@ export interface ClassFigures {
     minus3: number;
     minus2: number;
     leader: number;
+    // 리더를 포함한 생활지도 점수 합입니다. 참고 값입니다.
+    guidanceTotal: number;
 }
 
 export interface SwapPreviewClass {
@@ -27,13 +30,14 @@ export interface SwapPreview {
 
 function figuresOf(stat: ReturnType<typeof calculateClassStats>[number]): ClassFigures {
     return {
-        count: stat.stayCount,
-        male: stat.stayMaleCount,
-        female: stat.stayFemaleCount,
-        average: stat.stayAverageScore,
+        count: stat.studentCount,
+        male: stat.maleCount,
+        female: stat.femaleCount,
+        average: stat.averageScore,
         minus3: stat.minus3Count,
         minus2: stat.minus2Count,
         leader: stat.leaderCount,
+        guidanceTotal: stat.behaviorTotal,
     };
 }
 
@@ -61,8 +65,9 @@ export function previewSwap(
         return s;
     });
     const names = [classA, classB];
-    const before = calculateClassStats(students, names, groups);
-    const after = calculateClassStats(swapped, names, groups);
+    // 전출 예정 학생을 뺀 명단으로 돌려 모든 값을 전출 뒤 기준으로 만듭니다.
+    const before = calculateClassStats(students.filter(isStaying), names, groups);
+    const after = calculateClassStats(swapped.filter(isStaying), names, groups);
 
     return {
         classes: [

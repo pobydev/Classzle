@@ -15,13 +15,13 @@ describe('교환 미리 보기', () => {
         const preview = previewSwap('a', 'b', students, 2)!;
         expect(preview.classes[0]).toEqual({
             className: '1반',
-            before: { count: 2, male: 1, female: 1, average: 700, minus3: 1, minus2: 0, leader: 0 },
-            after: { count: 2, male: 0, female: 2, average: 300, minus3: 0, minus2: 0, leader: 1 },
+            before: { count: 2, male: 1, female: 1, average: 700, minus3: 1, minus2: 0, leader: 0, guidanceTotal: -3 },
+            after: { count: 2, male: 0, female: 2, average: 300, minus3: 0, minus2: 0, leader: 1, guidanceTotal: 1 },
         });
         expect(preview.classes[1]).toEqual({
             className: '2반',
-            before: { count: 2, male: 1, female: 1, average: 400, minus3: 0, minus2: 1, leader: 1 },
-            after: { count: 2, male: 2, female: 0, average: 800, minus3: 1, minus2: 1, leader: 0 },
+            before: { count: 2, male: 1, female: 1, average: 400, minus3: 0, minus2: 1, leader: 1, guidanceTotal: -1 },
+            after: { count: 2, male: 2, female: 0, average: 800, minus3: 1, minus2: 1, leader: 0, guidanceTotal: -5 },
         });
     });
 
@@ -47,10 +47,12 @@ describe('교환 미리 보기', () => {
         const list = [
             makeStudent({ id: 'a', assigned_class: '1반', academic_score: 900 }),
             makeStudent({ id: 'k', assigned_class: '1반', academic_score: 500 }),
-            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100, is_pre_transfer: true }),
+            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100, is_pre_transfer: true, behavior_type: 'BEHAVIOR', behavior_score: -3 }),
             makeStudent({ id: 'm', assigned_class: '2반', academic_score: 700 }),
         ];
         const preview = previewSwap('a', 'b', list, 2)!;
+        expect(preview.classes[1].before).toMatchObject({ minus3: 0, guidanceTotal: 0 });
+        expect(preview.classes[0].after).toMatchObject({ minus3: 0, guidanceTotal: 0 });
         expect(preview.classes[1].before).toMatchObject({ count: 1, average: 700 });
         expect(preview.classes[0].after).toMatchObject({ count: 1, average: 500 });
         expect(preview.classes[1].after).toMatchObject({ count: 2, average: 800 });

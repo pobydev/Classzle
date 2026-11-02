@@ -20,7 +20,7 @@ import {
 import { toast } from 'sonner';
 import { useClasszleStore } from '@/lib/store';
 import { assignStudents, collectViolations, type AssignmentMode } from '@/lib/assignment';
-import { calculateClassStats, calculatePreviousClassLevels } from '@/lib/stats';
+import { calculateClassStats } from '@/lib/stats';
 import { validateMove, validateSwap } from '@/lib/validation';
 import { exportToExcel } from '@/lib/excel';
 import { resolveClassIndex } from '@/lib/assignment/problem';
@@ -45,7 +45,7 @@ import {
 } from '@/components/ui/select';
 import { AssignmentReportDialog } from './AssignmentReportDialog';
 import { AssignmentBoard, type BoardSize, type BoardView } from './AssignmentBoard';
-import { BalanceTables, LegendCriteriaStatus } from './BalanceStats';
+import { BalanceDetailBar, BalanceTable, CriteriaAndStatus } from './BalanceStats';
 
 interface Step3DashboardProps {
     onBack: () => void;
@@ -118,10 +118,6 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
     const classStats = useMemo(
         () => calculateClassStats(students, settings.classCount, groups),
         [students, settings.classCount, groups]
-    );
-    const previousClassLevels = useMemo(
-        () => (tab === 'stats' ? calculatePreviousClassLevels(students) : []),
-        [tab, students]
     );
 
     const boardActive = tab === 'board';
@@ -309,6 +305,11 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
         toast.success(className ? `${name} 학생을 ${className}으로 옮겼습니다.` : `${name} 학생을 미배정으로 뺐습니다.`);
     };
 
+    const openInTwoClassView = (className: string) => {
+        setTwoClasses(([left, right]) => [className, left === className ? right : left]);
+        setView('two');
+    };
+
     const handleHeadClick = useStableCallback((className: string) => {
         const selected = selectedStudentId ? students.find((s) => s.id === selectedStudentId) : null;
         if (selected) {
@@ -316,11 +317,14 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
             if (selected.assigned_class !== className) moveSelectedTo(className);
             return;
         }
-        if (view === 'compact') {
-            setTwoClasses(([left, right]) => [className, left === className ? right : left]);
-            setView('two');
-        }
+        if (view === 'compact') openInTwoClassView(className);
     });
+
+    const handleOpenClassFromStats = (className: string) => {
+        openInTwoClassView(className);
+        setTab('board');
+        clearSelection();
+    };
 
     const handleTwoClassChange = (index: 0 | 1, className: string) => {
         setTwoClasses(([left, right]) => (index === 0 ? [className, right] : [left, className]));
@@ -515,17 +519,18 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                         <div className="mt-3 flex items-start gap-2 rounded-button bg-wash px-3 py-2 text-small text-accent-ink">
                             <Lightbulb size={16} className="mt-0.5 shrink-0" />
                             {assignmentMode === 'new' ? (
-                                <p><strong>신규 배정:</strong> 남녀 각각 성적순(S자)으로 나눈 뒤 모든 조건(고정 반, 학생 관계, 그룹, 인원, 남녀, 생활지도, 성적)을 맞춰 처음부터 새로 편성합니다.</p>
+                                <p><strong>신규 배정:</strong> 남녀 각각 성적순(S자)으로 나눈 뒤 모든 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀, 생활지도, 성적)을 맞춰 처음부터 새로 편성합니다.</p>
                             ) : assignmentMode === 'optimize' ? (
-                                <p><strong>현재 배정 수정:</strong> 지금 배정을 유지하고 어긴 조건(고정 반, 학생 관계, 그룹, 인원, 남녀)만 고칩니다. 옮기는 학생을 가장 적게 합니다.</p>
+                                <p><strong>현재 배정 수정:</strong> 지금 배정을 유지하고 어긴 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀)만 고칩니다. 옮기는 학생을 가장 적게 합니다.</p>
                             ) : (
                                 <p><strong>균형 조정:</strong> 지금 배정에서 시작해 어긴 조건을 고치고 성적과 생활지도 균형까지 맞춥니다. 수정보다 많은 학생을 옮길 수 있습니다.</p>
                             )}
                         </div>
                     </section>
 
-                    <BalanceTables classStats={classStats} groups={groups} previousClassLevels={previousClassLevels} />
-                    <LegendCriteriaStatus hasAssignments={hasAssignments} violations={violations} />
+                    <BalanceDetailBar students={students} groups={groups} classCount={settings.classCount} hasAssignments={hasAssignments} />
+                    <BalanceTable students={students} groups={groups} classCount={settings.classCount} onOpenClass={handleOpenClassFromStats} />
+                    <CriteriaAndStatus hasAssignments={hasAssignments} violations={violations} />
 
                     <div className="border-t border-line pt-4">
                         <Button variant="outline" onClick={onBack}>
@@ -540,7 +545,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-title-sm font-bold text-danger">
-                            <WarningCircle size={22} />배정 제약 조건 위반 알림
+                            <WarningCircle size={22} />조건 위반 알림
                         </DialogTitle>
                         <DialogDescription>옮기면 새로 어기게 되는 조건을 확인하세요.</DialogDescription>
                     </DialogHeader>
@@ -584,7 +589,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                             onClick={() => confirmExport(true)}
                         >
                             <span className="text-body font-bold text-ink">상세 정보 포함</span>
-                            <span className="text-caption font-normal text-soft">배정 결과(학년, 반, 번호), 성적, 기본 인적 사항, 생활지도, 그룹, 관계 조건, 고정 배정</span>
+                            <span className="text-caption font-normal text-soft">배정 결과(학년, 반, 번호), 성적, 기본 인적 사항, 생활지도, 그룹 분산, 분리 배정, 함께 배정, 고정 배정</span>
                         </Button>
                     </div>
                     <div className="flex justify-end pt-2">
@@ -606,7 +611,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                         모든 학생의 <strong>배정된 반</strong>이 초기화되어 <strong>미배정</strong> 상태가 됩니다.
                     </p>
                     <p className="rounded-button bg-wash p-3 text-small text-accent-ink">
-                        조건 설정에서 정한 모든 조건(관계, 그룹, 전출 등)은 그대로 유지됩니다.
+                        조건 설정에서 정한 모든 조건(분리 배정, 함께 배정, 그룹 분산, 전출 예정 등)은 그대로 유지됩니다.
                     </p>
                     <div className="flex justify-end gap-2 border-t border-line pt-4">
                         <Button variant="outline" onClick={() => setIsResetConfirmOpen(false)}>취소</Button>
