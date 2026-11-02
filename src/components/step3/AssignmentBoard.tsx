@@ -279,12 +279,12 @@ export function AssignmentBoard({
                     onScroll={(e) => {
                         if (shownView === 'compact') compactScroll.current = { top: e.currentTarget.scrollTop, left: e.currentTarget.scrollLeft };
                     }}
-                    className={`min-h-0 flex-1 overflow-auto p-1 ${THIN_SCROLLBAR}`}
+                    className={`min-h-0 flex-1 overflow-auto px-1 pb-1 ${THIN_SCROLLBAR}`}
                 >
                     {shownView === 'compact' ? (
                         <div
                             data-view="compact"
-                            className="grid content-start justify-center gap-[3px]"
+                            className="mt-1 grid content-start justify-center gap-[3px]"
                             style={{ gridTemplateColumns: `repeat(${classCount}, minmax(96px, ${COMPACT_COLUMN_MAX}px))` }}
                         >
                             {classNames.map((name) => {
@@ -319,7 +319,7 @@ export function AssignmentBoard({
                     ) : (
                         <div
                             data-view="two"
-                            className="grid content-start justify-center gap-1"
+                            className="mt-1 grid content-start justify-center gap-1"
                             style={{ gridTemplateColumns: `repeat(2, minmax(280px, ${WIDE_COLUMN_MAX}px))` }}
                         >
                             {([0, 1] as const).map((index) => {
