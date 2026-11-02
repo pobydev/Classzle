@@ -209,26 +209,26 @@ const BEHAVIOR_KINDS: { type: BehaviorType; words: string[]; sign: 1 | -1; maxLe
 const NO_BEHAVIOR_VALUES = ['', '해당없음', '없음', '-', 'NONE'];
 
 const BEHAVIOR_WORDS = BEHAVIOR_KINDS.flatMap((kind) => kind.words).join('|');
-// 값의 맨 앞이 유형 낱말이고 그 바로 뒤에 등급 한 자리가 있어야 합니다. '행동 2회'의 2는 등급이 아닙니다.
-const BEHAVIOR_VALUE = new RegExp(`^(${BEHAVIOR_WORDS})\\s*[(\\[:：]?\\s*[+\\-−–]?\\s*(\\d)\\s*[)\\]]?\\s*점?(?=\\s|$|[,.;/])`);
-const OTHER_BEHAVIOR_WORD = new RegExp(BEHAVIOR_WORDS);
+// 유형 낱말 바로 뒤에 등급 한 자리가 있어야 합니다. '행동 2회'의 2는 등급이 아닙니다.
+const BEHAVIOR_VALUE = new RegExp(`(${BEHAVIOR_WORDS})\\s*[(\\[:：]?\\s*[+\\-−–]?\\s*(\\d)\\s*[)\\]]?\\s*점?(?=\\s|$|[,.;/])`);
+const ANY_BEHAVIOR_WORD = new RegExp(BEHAVIOR_WORDS, 'g');
 
 // 생활지도 드롭다운 파싱
 // 옵션: 해당없음, 리더(+2), 리더(+1), 행동(-1), 행동(-2), 행동(-3), 정서(-1), 정서(-2), 정서(-3)
 // 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
-// 뒤에 메모가 있어도 읽되, 메모에 다른 유형 낱말이 있거나 애매하면 짐작하지 않고 읽지 못한 값으로 알립니다.
+// 앞뒤에 메모가 있어도 읽되, 유형 낱말이 둘 이상이거나 애매하면 짐작하지 않고 읽지 못한 값으로 알립니다.
 export function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number; isUnreadable: boolean } {
     const text = String(value).trim().toUpperCase();
     if (NO_BEHAVIOR_VALUES.includes(text.replace(/\s/g, ''))) {
         return { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: false };
     }
 
-    const match = text.match(BEHAVIOR_VALUE);
+    const wordCount = text.match(ANY_BEHAVIOR_WORD)?.length ?? 0;
+    const match = wordCount === 1 ? text.match(BEHAVIOR_VALUE) : null;
     const kind = match && BEHAVIOR_KINDS.find((candidate) => candidate.words.includes(match[1]));
     if (match && kind) {
         const level = Number(match[2]);
-        const note = text.slice(match[0].length);
-        if (level >= 1 && level <= kind.maxLevel && !OTHER_BEHAVIOR_WORD.test(note)) {
+        if (level >= 1 && level <= kind.maxLevel) {
             return { behaviorType: kind.type, behaviorScore: kind.sign * level, isUnreadable: false };
         }
     }

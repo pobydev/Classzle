@@ -211,7 +211,6 @@ describe('23. 생활지도 읽기', () => {
         ['행동 관찰 2회'],
         ['행동 2회'],
         ['리더 2명과 갈등'],
-        ['학교폭력 행동(-3)'],
         ['행동(-2) 정서(-1)'],
         ['행동(-4)'],
         ['리더(+3)'],
@@ -235,6 +234,8 @@ describe('23. 생활지도 읽기', () => {
         ['behavior(-3)', 'BEHAVIOR', -3],
         ['EMOTIONAL 2', 'EMOTIONAL', -2],
         ['행동(-2) 수업 방해가 잦음', 'BEHAVIOR', -2],
+        ['학교폭력 행동(-3)', 'BEHAVIOR', -3],
+        ['2학년 정서(-1)', 'EMOTIONAL', -1],
     ])('유형 낱말 바로 뒤의 등급만 읽습니다: %s', (value, behaviorType, behaviorScore) => {
         expect(parseBehaviorDropdown(value)).toEqual({ behaviorType, behaviorScore, isUnreadable: false });
     });
