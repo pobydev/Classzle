@@ -79,10 +79,12 @@ ipcMain.handle('load-project', async () => {
 // --- Named Save/Load IPC ---
 ipcMain.handle('save-named-project', async (event, name: string, data: string) => {
     try {
-        if (projectNameProblem(name)) return false;
         await ensureProjectsDir();
         const filePath = projectFilePath(getProjectsDir(), name);
         if (!filePath) return false;
+        // 이미 있는 파일은 지금 이름 규칙에 걸려도 다시 저장할 수 있어야 합니다.
+        const exists = await fs.access(filePath).then(() => true, () => false);
+        if (projectNameProblem(name) && !exists) return false;
         await writeFileSafely(filePath, data);
         return true;
     } catch (e) {

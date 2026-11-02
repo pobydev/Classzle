@@ -20,11 +20,19 @@ export function projectNameFromFile(file: string): string {
 }
 
 // 윈도우는 파일 이름의 대소문자를 가리지 않으므로 Test와 test는 같은 파일입니다.
-const sameName = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
+// 저장 창은 앞뒤 공백을 지우므로 옛 파일의 ' 이름 '도 같은 작업으로 봅니다.
+const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase();
 
 /** 목록에서 이 이름과 같은 파일로 저장될 작업을 찾습니다. */
 export function findSameProject(name: string, names: string[]): string | null {
+    if (name.trim() === '') return null;
     return names.find((existing) => sameName(existing, name)) ?? null;
+}
+
+/** 저장할 이름을 정합니다. 이미 있는 작업은 지금 규칙에 걸려도 그 이름 그대로 다시 저장합니다. */
+export function resolveSaveName(typed: string, names: string[]): { name: string; problem: string | null } {
+    const existing = findSameProject(typed, names);
+    return existing !== null ? { name: existing, problem: null } : { name: typed, problem: projectNameProblem(typed) };
 }
 
 /** 다른 작업을 덮어쓰게 되면 true입니다. 지금 연 작업을 다시 저장할 때는 묻지 않습니다. */

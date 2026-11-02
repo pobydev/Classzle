@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { findSameProject, overwritesOtherProject, projectNameProblem } from '../../../main/projectName';
+import { overwritesOtherProject, resolveSaveName } from '../../../main/projectName';
 import { parseProjectFile } from '@/lib/projectFile';
 import { useClasszleStore } from '@/lib/store';
 import { useConfirm } from './ConfirmProvider';
@@ -70,13 +70,12 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
     /** 저장에 성공하면 true입니다. */
     const save = async (rawName: string): Promise<boolean> => {
         const typed = rawName.trim();
-        const problem = projectNameProblem(typed);
+        // 윈도우에서 Test와 test는 같은 파일이므로 목록에 있는 이름으로 저장합니다.
+        const { name, problem } = resolveSaveName(typed, names);
         if (problem) {
             toast.error(problem);
             return false;
         }
-        // 윈도우에서 Test와 test는 같은 파일이므로 목록에 있는 이름으로 저장합니다.
-        const name = findSameProject(typed, names) ?? typed;
         if (overwritesOtherProject(typed, names, activeName)) {
             const answer = await confirm({
                 title: `'${name}' 작업이 이미 있습니다.`,

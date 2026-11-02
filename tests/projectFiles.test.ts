@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { projectFilePath, writeFileSafely } from '../main/projectFiles';
-import { findSameProject, overwritesOtherProject, projectNameFromFile, projectNameProblem } from '../main/projectName';
+import { findSameProject, overwritesOtherProject, projectNameFromFile, projectNameProblem, resolveSaveName } from '../main/projectName';
 
 describe('저장 이름', () => {
     it.each(['14:30 저장', '../밖으로', '..\\밖으로', 'a/b', 'a*b', 'a?b', 'a"b', 'a<b', 'a>b', 'a|b', 'a\tb'])('쓸 수 없는 글자를 알립니다: %s', (name) => {
@@ -104,5 +104,23 @@ describe('파일 안전하게 쓰기', () => {
         await expect(writeFileSafely(file, 123 as unknown as string)).rejects.toThrow();
         expect(await fs.readFile(file, 'utf-8')).toBe('원래 내용');
         expect(await fs.readdir(dir)).toEqual(['작업.json']);
+    });
+});
+
+describe('옛 이름 다시 저장', () => {
+    it('앞뒤 공백이 있는 옛 파일을 새 파일로 만들지 않습니다', () => {
+        expect(resolveSaveName('앞뒤 공백', [' 앞뒤 공백 '])).toEqual({ name: ' 앞뒤 공백 ', problem: null });
+        expect(overwritesOtherProject('앞뒤 공백', [' 앞뒤 공백 '], ' 앞뒤 공백 ')).toBe(false);
+    });
+
+    it('100자 넘는 옛 이름을 다시 저장할 수 있습니다', () => {
+        const long = '가'.repeat(120);
+        expect(resolveSaveName(long, [long])).toEqual({ name: long, problem: null });
+    });
+
+    it('새 이름은 그대로 규칙을 따릅니다', () => {
+        expect(resolveSaveName('가'.repeat(120), []).problem).toContain('100자');
+        expect(resolveSaveName('', ['가상']).problem).toContain('입력');
+        expect(resolveSaveName('새 작업', ['가상'])).toEqual({ name: '새 작업', problem: null });
     });
 });
