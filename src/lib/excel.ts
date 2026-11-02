@@ -256,6 +256,17 @@ export function buildResultWorkbook(
     const { includeDetails = false, groups = [], numberingMethod = 'mixed' } = options;
     const workbook = new ExcelJS.Workbook();
 
+    // 기본 정보에는 성적을 넣지 않습니다. 전출 예정은 명단을 쓰는 데 필요해서 있을 때만 비고로 넣습니다.
+    const hasTransfer = students.some((s) => s.is_pre_transfer);
+    const lastColumnHeader = includeDetails ? '특이사항/조건' : hasTransfer ? '비고' : null;
+    const lastColumnFor = (s: Student) =>
+        includeDetails ? formatStudentDetails(s, groups, students) : s.is_pre_transfer ? '전출 예정' : '';
+    const withoutHiddenColumns = (sheet: ExcelJS.Worksheet) => {
+        if (!includeDetails) {
+            sheet.columns = sheet.columns.filter((column) => column.key !== 'score') as ExcelJS.Column[];
+        }
+    };
+
     // 공통 스타일 정의
     const baseFont = { name: 'Pretendard', size: 11 };
     const headerFont = { name: 'Pretendard', size: 11, bold: true };
@@ -313,13 +324,14 @@ export function buildResultWorkbook(
         { header: '번호(이전)', key: 'prev_number', width: 9 },
     ];
 
-    if (includeDetails) {
+    withoutHiddenColumns(sheet1);
+    if (lastColumnHeader) {
         sheet1.columns = [
             ...sheet1.columns,
-            { header: '특이사항/조건', key: 'details', width: 40 }
+            { header: lastColumnHeader, key: 'details', width: includeDetails ? 40 : 14 }
         ];
         // 중간 헤더에도 details 컬럼 포함
-        (sheet1HeaderValues as any).details = '특이사항/조건';
+        (sheet1HeaderValues as any).details = lastColumnHeader;
     }
 
     // 헤더 스타일 적용 (첫 번째 행)
@@ -450,7 +462,7 @@ export function buildResultWorkbook(
             prev_grade: prevGrade,
             prev_class: prevClass,
             prev_number: prevNumber,
-            details: includeDetails ? formatStudentDetails(s, groups, students) : ''
+            details: lastColumnFor(s)
         });
 
         row.height = 25; // 데이터 행 높이 명시
@@ -534,13 +546,14 @@ export function buildResultWorkbook(
         { header: '번호(배정)', key: 'new_number', width: 9 },
     ];
 
-    if (includeDetails) {
+    withoutHiddenColumns(sheet2);
+    if (lastColumnHeader) {
         sheet2.columns = [
             ...sheet2.columns,
-            { header: '특이사항/조건', key: 'details', width: 40 }
+            { header: lastColumnHeader, key: 'details', width: includeDetails ? 40 : 14 }
         ];
         // 중간 헤더에도 details 컬럼 포함
-        (sheet2HeaderValues as any).details = '특이사항/조건';
+        (sheet2HeaderValues as any).details = lastColumnHeader;
     }
 
     const firstHeaderRow2 = sheet2.getRow(1);
@@ -656,7 +669,7 @@ export function buildResultWorkbook(
             new_grade: newGrade,
             new_class: assignedClassNum,
             new_number: classAttendanceMaps[s.assigned_class!]?.[s.id] || '',
-            details: includeDetails ? formatStudentDetails(s, groups, students) : ''
+            details: lastColumnFor(s)
         });
 
         row.height = 25; // 데이터 행 높이 명시
@@ -701,6 +714,10 @@ export function buildResultWorkbook(
 function formatStudentDetails(student: Student, groups: CustomGroup[], allStudents: Student[]): string {
     const details: string[] = [];
 
+    if (student.is_pre_transfer) {
+        details.push('전출 예정');
+    }
+
     // 1. 생활지도
     if (student.behavior_type !== 'NONE') {
         const typeMap: Record<string, string> = {
@@ -739,6 +756,10 @@ function formatStudentDetails(student: Student, groups: CustomGroup[], allStuden
     // 5. 고정 배정
     if (student.fixed_class) {
         details.push(`${student.fixed_class}고정`);
+    }
+
+    if (student.behavior_note) {
+        details.push(`비고: ${student.behavior_note}`);
     }
 
     return details.join(', ');

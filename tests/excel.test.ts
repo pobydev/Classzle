@@ -104,4 +104,44 @@ describe('결과 엑셀', () => {
         expect(text).toContain('행동(-3)');
         expect(text).toContain('가상나(피함)');
     });
+
+    const scoreList = [
+        makeStudent({ id: 'c', name: '가상다', assigned_class: '1반', prev_info: '1-1-3', academic_score: 734, behavior_note: '가상 비고' }),
+        makeStudent({ id: 'd', name: '가상라', assigned_class: '2반', prev_info: '1-1-4', academic_score: 612, is_pre_transfer: true }),
+    ];
+    const textOf = (students: typeof scoreList, includeDetails: boolean) => {
+        const cells: string[] = [];
+        buildResultWorkbook(students, 2, { includeDetails }).eachSheet((sheet) => {
+            sheet.eachRow((row) => row.eachCell((cell) => cells.push(String(cell.value ?? ''))));
+        });
+        return cells.join('|');
+    };
+
+    it('기본 정보에는 성적과 반 평균이 없습니다', () => {
+        const text = textOf(scoreList, false);
+        expect(text).not.toContain('성적');
+        expect(text).not.toContain('734');
+        expect(text).not.toContain('612');
+        // 평균 행의 소수점 값도 나가지 않습니다.
+        expect(text).not.toMatch(/\d+\.\d/);
+    });
+
+    it('기본 정보에도 전출 예정은 비고로 표시합니다', () => {
+        const text = textOf(scoreList, false);
+        expect(text).toContain('비고');
+        expect(text).toContain('전출 예정');
+        expect(text).not.toContain('가상 비고');
+    });
+
+    it('전출 학생이 없으면 기본 정보에 비고 열을 만들지 않습니다', () => {
+        expect(textOf([scoreList[0]], false)).not.toContain('비고');
+    });
+
+    it('상세 정보에는 성적, 전출 예정, 비고가 들어갑니다', () => {
+        const text = textOf(scoreList, true);
+        expect(text).toContain('성적');
+        expect(text).toContain('734');
+        expect(text).toContain('전출 예정');
+        expect(text).toContain('비고: 가상 비고');
+    });
 });

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { HistoryPanel } from './HistoryPanel';
+import { groupHistory } from '@/lib/history';
 import {
     Users,
     ArrowsLeftRight,
@@ -254,24 +255,29 @@ export function AssignmentReportDialog({
         const printWindow = iframe.contentWindow;
         if (!printWindow) return;
 
+        const historyEntries = groupHistory(history);
+
         const historyHtml = history.length === 0
             ? '<tr><td colspan="5" style="text-align:center; padding: 40px; color: #999;">배정 변경 이력이 없습니다.</td></tr>'
-            : history.map((c, i) => `
+            : historyEntries.map((entry, i) => {
+                const describe = (c: AssignmentChange) => c.type === 'swap'
+                    ? `${c.studentName}: ${c.oldClass} →${c.newClass}<br>${c.partnerName}: ${c.newClass} →${c.oldClass}`
+                    : `${c.studentName}: ${c.oldClass || '미배정'} → ${c.newClass || '미배정'}`;
+                const isRun = entry.source === 'auto' && entry.changes.length > 1;
+                const first = entry.changes[0];
+                return `
                 <tr>
                     <td style="text-align:center;">${i + 1}</td>
-                    <td style="text-align:center;">${c.source === 'auto' ? '자동' : '수동'}</td>
-                    <td style="text-align:center; font-size: 11px;">${new Date(c.timestamp).toLocaleTimeString()}</td>
+                    <td style="text-align:center;">${entry.source === 'auto' ? '자동' : '수동'}</td>
+                    <td style="text-align:center; font-size: 11px;">${new Date(entry.timestamp).toLocaleTimeString()}</td>
                     <td style="font-weight: bold;">
-                        ${c.type === 'swap' ? `${c.studentName}<br>↔${c.partnerName}` : c.studentName}
+                        ${isRun
+                    ? `자동 수정 ${entry.changes.length}건`
+                    : first.type === 'swap' ? `${first.studentName}<br>↔${first.partnerName}` : first.studentName}
                     </td>
-                    <td>
-                        ${c.type === 'swap'
-                    ? `${c.studentName}: ${c.oldClass} →${c.newClass}<br>${c.partnerName}: ${c.newClass} →${c.oldClass}`
-                    : `${c.oldClass || '미배정'} → ${c.newClass || '미배정'}`
-                }
-                    </td>
-                </tr>
-            `).join('');
+                    <td>${entry.changes.map(describe).join('<br>')}</td>
+                </tr>`;
+            }).join('');
 
         const groupHtml = groupStats.length === 0
             ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 분산 배정 그룹이 없습니다.</p>'
@@ -458,7 +464,7 @@ export function AssignmentReportDialog({
                     <h2>3. 이동 학생 명단 (총 ${movementStats.length}명)</h2>
                     ${movementHtml}
 
-                    <h2>4. 변경 누적 이력 (총 ${history.length}건)</h2>
+                    <h2>4. 변경 누적 이력 (총 ${historyEntries.length}건)</h2>
                     <table class="history-table">
 
                         <thead>
