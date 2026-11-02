@@ -173,8 +173,8 @@ export function parseRosterRows(allRows: any[]): ParsedRoster {
     if (isResultFile) {
         warnings.push('배정 결과 파일을 읽었습니다. 이름, 성별, 성적, 반만 들어왔고 생활지도와 조건은 들어오지 않았습니다. 이어서 작업하려면 저장한 작업을 불러와 주세요.');
     }
-    const listNames = (names: string[]) =>
-        names.length > 3 ? `${names.slice(0, 3).join(', ')} 외 ${names.length - 3}명` : names.join(', ');
+    // 값이 빠진 채 배정되는 일이라 이름을 모두 적습니다. 안내 칸은 스크롤됩니다.
+    const listNames = (names: string[]) => names.join(', ');
     if (blankNameRows > 0) {
         warnings.push(`이름이 비어 있는 행 ${blankNameRows}개를 건너뛰었습니다.`);
     }
@@ -201,34 +201,46 @@ function parseGender(value: any): Gender | null {
 
 // 생활지도 값의 유형과 등급 범위
 const BEHAVIOR_KINDS: { type: BehaviorType; words: string[]; sign: 1 | -1; maxLevel: number }[] = [
-    { type: 'LEADER', words: ['리더십', '리더형', '리더', 'LEADER'], sign: 1, maxLevel: 2 },
+    { type: 'LEADER', words: ['리더십', '리더쉽', '리더형', '리더', 'LEADER'], sign: 1, maxLevel: 2 },
     { type: 'BEHAVIOR', words: ['행동형', '행동', 'BEHAVIOR'], sign: -1, maxLevel: 3 },
     { type: 'EMOTIONAL', words: ['정서형', '정서', 'EMOTIONAL'], sign: -1, maxLevel: 3 },
 ];
 
 const NO_BEHAVIOR_VALUES = ['', '해당없음', '없음', '-', 'NONE'];
 
-const BEHAVIOR_WORDS = BEHAVIOR_KINDS.flatMap((kind) => kind.words).join('|');
-// 유형 낱말 바로 뒤에 등급 한 자리가 있어야 합니다. '행동 2회'의 2는 등급이 아닙니다.
-const BEHAVIOR_VALUE = new RegExp(`(${BEHAVIOR_WORDS})\\s*[(\\[:：]?\\s*[+\\-−–]?\\s*(\\d)\\s*[)\\]]?\\s*점?(?=\\s|$|[,.;/])`);
+// 한글 낱말은 글자 사이가 띄어져 있어도 봅니다. '행 동(-2)'
+const BEHAVIOR_WORDS = BEHAVIOR_KINDS.flatMap((kind) => kind.words)
+    .map((word) => (/^[가-힣]+$/.test(word) ? [...word].join('\\s*') : word))
+    .join('|');
+const SIGN = '[+\\-−–]';
+// 유형 낱말 바로 뒤의 등급만 읽습니다. 셋 중 하나여야 하고, 그 밖의 숫자는 날짜나 횟수일 수 있어 읽지 않습니다.
+// 괄호: 행동(-2), 행동(-2점), 행동(-2)메모 / 부호: 행동 -2, 행동, -2 메모 / 숫자만: 값이 거기서 끝나는 행동 3, 행동 2점
+const BEHAVIOR_VALUE = new RegExp(
+    `(${BEHAVIOR_WORDS})[\\s,:]*(?:`
+    + `[(\\[]\\s*${SIGN}?\\s*(\\d)\\s*점?\\s*(?:[)\\]]|$)`
+    + `|${SIGN}\\s*(\\d)점?(?=$|\\s|,\\s)`
+    + `|(\\d)\\s*점?$`
+    + `)`,
+);
 const ANY_BEHAVIOR_WORD = new RegExp(BEHAVIOR_WORDS, 'g');
 
 // 생활지도 드롭다운 파싱
 // 옵션: 해당없음, 리더(+2), 리더(+1), 행동(-1), 행동(-2), 행동(-3), 정서(-1), 정서(-2), 정서(-3)
-// 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
+// 전각 문자를 먼저 맞춥니다. 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
 // 앞뒤에 메모가 있어도 읽되, 유형 낱말이 둘 이상이거나 애매하면 짐작하지 않고 읽지 못한 값으로 알립니다.
 export function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number; isUnreadable: boolean } {
-    const text = String(value).trim().toUpperCase();
+    const text = String(value).normalize('NFKC').trim().toUpperCase();
     if (NO_BEHAVIOR_VALUES.includes(text.replace(/\s/g, ''))) {
         return { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: false };
     }
 
     const wordCount = text.match(ANY_BEHAVIOR_WORD)?.length ?? 0;
     const match = wordCount === 1 ? text.match(BEHAVIOR_VALUE) : null;
-    const kind = match && BEHAVIOR_KINDS.find((candidate) => candidate.words.includes(match[1]));
-    if (match && kind) {
-        const level = Number(match[2]);
-        if (level >= 1 && level <= kind.maxLevel) {
+    if (match) {
+        const word = match[1].replace(/\s/g, '');
+        const kind = BEHAVIOR_KINDS.find((candidate) => candidate.words.includes(word));
+        const level = Number(match[2] ?? match[3] ?? match[4]);
+        if (kind && level >= 1 && level <= kind.maxLevel) {
             return { behaviorType: kind.type, behaviorScore: kind.sign * level, isUnreadable: false };
         }
     }

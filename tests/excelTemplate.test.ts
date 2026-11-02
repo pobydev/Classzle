@@ -57,9 +57,9 @@ describe('생활지도 값 읽기', () => {
         expect(warnings.join()).not.toContain('생활지도');
     });
 
-    it('많으면 이름을 다 늘어놓지 않습니다', () => {
+    it('많아도 이름을 모두 적습니다', () => {
         const rows = Array.from({ length: 5 }, (_, i) => ({ 이름: `가상${i}`, 성별: '남', 성적: 1, 생활지도: '주의' }));
-        expect(parseRosterRows(rows).warnings[0]).toContain('외 2명');
+        expect(parseRosterRows(rows).warnings[0]).toContain('가상4');
     });
 });
 
