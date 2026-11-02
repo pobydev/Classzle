@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildResultWorkbook, parseRosterRows } from '@/lib/excel';
+import { buildResultWorkbook, parseRosterRows, requireStudents } from '@/lib/excel';
 import { makeStudent } from './helpers/students';
 
 describe('엑셀 명단 읽기', () => {
@@ -152,5 +152,22 @@ describe('결과 엑셀', () => {
         expect(text).toContain('734');
         expect(text).toContain('전출 예정');
         expect(text).toContain('비고: 가상 비고');
+    });
+});
+
+describe('학생을 읽지 못한 파일', () => {
+    it('이름 열이 없으면 오류이고 지금 작업을 건드리지 않게 합니다', () => {
+        const roster = parseRosterRows([{ 학년: 2, 반: 1, 번호: 1, 학생이름: '가상', 성별: '남', 성적: 500 }]);
+        expect(roster.students).toEqual([]);
+        expect(() => requireStudents(roster)).toThrow('이름 또는 성명');
+    });
+
+    it('빈 파일도 오류입니다', () => {
+        expect(() => requireStudents(parseRosterRows([]))).toThrow('학생을 한 명도');
+    });
+
+    it('한 명이라도 읽으면 그대로 돌려줍니다', () => {
+        const roster = parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 500 }]);
+        expect(requireStudents(roster)).toBe(roster);
     });
 });

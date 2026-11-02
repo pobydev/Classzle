@@ -15,14 +15,21 @@ export function parseExcelFile(file: File): Promise<ParsedRoster> {
         const reader = new FileReader();
 
         reader.onload = (e) => {
+            let roster: ParsedRoster;
             try {
                 const data = e.target?.result;
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                resolve(parseRosterRows(XLSX.utils.sheet_to_json(worksheet)));
+                roster = parseRosterRows(XLSX.utils.sheet_to_json(worksheet));
             } catch (error) {
                 reject(new Error('엑셀 파일 파싱 오류: ' + (error as Error).message));
+                return;
+            }
+            try {
+                resolve(requireStudents(roster));
+            } catch (error) {
+                reject(error);
             }
         };
 
@@ -32,6 +39,14 @@ export function parseExcelFile(file: File): Promise<ParsedRoster> {
 
         reader.readAsBinaryString(file);
     });
+}
+
+// 학생을 한 명도 읽지 못한 파일로 지금 작업을 바꾸지 않도록 오류로 돌립니다.
+export function requireStudents(roster: ParsedRoster): ParsedRoster {
+    if (roster.students.length === 0) {
+        throw new Error('학생을 한 명도 읽지 못했습니다. 첫 줄에 이름 또는 성명 열이 있는지 확인해 주세요. 지금 작업은 바뀌지 않았습니다.');
+    }
+    return roster;
 }
 
 // 비어 있지 않은 첫 값을 고릅니다. 0도 값으로 봅니다.

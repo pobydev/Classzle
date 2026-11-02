@@ -197,20 +197,21 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             return;
         }
 
-        // 지금 작업을 새 명단으로 덮어쓰기 전에 묻습니다.
-        if (useClasszleStore.getState().students.length > 0) {
-            const confirmed = await confirm({
-                title: '새 파일로 바꿀까요?',
-                description: '지금 작업 중인 학생, 그룹, 배정, 변경 이력이 새 파일 내용으로 바뀝니다. 저장하지 않은 내용은 사라집니다.',
-                confirmLabel: '바꾸기',
-                danger: true,
-            });
-            if (!confirmed) return;
-        }
-
-        setUploadStatus('loading');
         try {
+            // 읽을 수 없는 파일이면 묻지 않고 알립니다. 지금 작업은 그대로 둡니다.
             const { students: parsedStudents, warnings } = await parseExcelFile(file);
+
+            // 지금 작업을 새 명단으로 덮어쓰기 전에 묻습니다.
+            if (useClasszleStore.getState().students.length > 0) {
+                const confirmed = await confirm({
+                    title: '새 파일로 바꿀까요?',
+                    description: '지금 작업 중인 학생, 그룹, 배정, 변경 이력이 새 파일 내용으로 바뀝니다. 저장하지 않은 내용은 사라집니다.',
+                    confirmLabel: '바꾸기',
+                    danger: true,
+                });
+                if (!confirmed) return;
+            }
+
             setStudents(parsedStudents);
             warnings.forEach((warning) => toast.warning(warning, { duration: 12000 }));
             setGroups([]); // 새 파일 로드 시 그룹 초기화
