@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TableCell, TableRow } from '@/components/ui/table';
+import { scoreFromInput } from '@/lib/studentInput';
 import type { BehaviorType, Gender, Student } from '@/types';
 import { BehaviorPicker } from './BehaviorPicker';
 
@@ -74,8 +75,9 @@ function StudentTableRowBase({
                 {isEditing ? (
                     <Input
                         type="number"
+                        step="any"
                         value={student.academic_score}
-                        onChange={(e) => onUpdate(student.id, { academic_score: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => onUpdate(student.id, { academic_score: scoreFromInput(e.target.value) ?? 0 })}
                         className="w-16 h-8 mx-auto text-center"
                     />
                 ) : (

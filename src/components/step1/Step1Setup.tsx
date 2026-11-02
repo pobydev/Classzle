@@ -46,6 +46,7 @@ import { ClassSheetPanel } from './ClassSheetPanel';
 import { StudentTableRow } from './StudentTableRow';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
 import { removalConsequences } from '@/lib/studentRemoval';
+import { BEHAVIOR_CHOICES, scoreFromInput } from '@/lib/studentInput';
 import {
     Dialog,
     DialogContent,
@@ -284,9 +285,9 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                 name: newStudent.name,
                 prev_info: newStudent.prev_info || '',
                 gender: (newStudent.gender as Gender) || 'M',
-                academic_score: newStudent.academic_score || 500,
-                behavior_score: newStudent.behavior_score || 0,
-                behavior_type: (newStudent.behavior_type as BehaviorType) || 'NONE',
+                academic_score: newStudent.academic_score ?? 500,
+                behavior_score: newStudent.behavior_score ?? 0,
+                behavior_type: (newStudent.behavior_type as BehaviorType) ?? 'NONE',
                 behavior_note: '',
                 group_ids: [],
                 avoid_ids: [],
@@ -710,52 +711,32 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                     <Input
                                                         className="col-span-3"
                                                         type="number"
-                                                        min={1}
-                                                        max={1000}
-                                                        value={newStudent.academic_score}
+                                                        step="any"
+                                                        value={newStudent.academic_score ?? ''}
                                                         onChange={(e) =>
                                                             setNewStudent({
                                                                 ...newStudent,
-                                                                academic_score: parseInt(e.target.value) || 500,
+                                                                academic_score: scoreFromInput(e.target.value),
                                                             })
                                                         }
                                                     />
                                                 </div>
                                                 <div className="grid grid-cols-4 items-center gap-4">
                                                     <label className="text-right">생활지도</label>
-                                                    <Input
-                                                        className="col-span-3"
-                                                        type="number"
-                                                        min={-2}
-                                                        max={3}
-                                                        value={newStudent.behavior_score}
-                                                        onChange={(e) =>
-                                                            setNewStudent({
-                                                                ...newStudent,
-                                                                behavior_score: parseInt(e.target.value) || 0,
-                                                            })
-                                                        }
-                                                    />
-                                                </div>
-                                                <div className="grid grid-cols-4 items-center gap-4">
-                                                    <label className="text-right">유형</label>
                                                     <Select
-                                                        value={newStudent.behavior_type}
-                                                        onValueChange={(v) =>
-                                                            setNewStudent({
-                                                                ...newStudent,
-                                                                behavior_type: v as BehaviorType,
-                                                            })
-                                                        }
+                                                        value={`${newStudent.behavior_type}:${newStudent.behavior_score}`}
+                                                        onValueChange={(v) => {
+                                                            const choice = BEHAVIOR_CHOICES.find((c) => c.value === v);
+                                                            if (choice) setNewStudent({ ...newStudent, behavior_type: choice.type, behavior_score: choice.score });
+                                                        }}
                                                     >
-                                                        <SelectTrigger className="col-span-3">
+                                                        <SelectTrigger className="col-span-3" aria-label="생활지도">
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="NONE">해당없음</SelectItem>
-                                                            <SelectItem value="LEADER">리더형</SelectItem>
-                                                            <SelectItem value="BEHAVIOR">행동형</SelectItem>
-                                                            <SelectItem value="EMOTIONAL">정서형</SelectItem>
+                                                            {BEHAVIOR_CHOICES.map((c) => (
+                                                                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                                            ))}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
