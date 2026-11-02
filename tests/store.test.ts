@@ -91,3 +91,23 @@ describe('작업 상태', () => {
         expect(store().undoStack).toEqual([]);
     });
 });
+
+describe('다른 작업이 시작됐는지', () => {
+    const roster = [makeStudent({ id: 'a' })];
+
+    it('새 명단과 전체 초기화에서 바뀝니다', () => {
+        const start = useClasszleStore.getState().workId;
+        useClasszleStore.getState().setStudents(roster);
+        expect(useClasszleStore.getState().workId).toBe(start + 1);
+        useClasszleStore.getState().resetAll();
+        expect(useClasszleStore.getState().workId).toBe(start + 2);
+    });
+
+    it('학생을 고치거나 저장한 작업을 불러올 때는 그대로입니다', () => {
+        useClasszleStore.getState().setStudents(roster);
+        const start = useClasszleStore.getState().workId;
+        useClasszleStore.getState().updateStudent('a', { name: '가상' });
+        useClasszleStore.getState().loadProject({ students: roster, groups: [], settings: useClasszleStore.getState().settings });
+        expect(useClasszleStore.getState().workId).toBe(start);
+    });
+});

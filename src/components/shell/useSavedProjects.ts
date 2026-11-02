@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { projectNameProblem } from '../../../main/projectName';
+import { findSameProject, overwritesOtherProject, projectNameProblem } from '../../../main/projectName';
 import { useClasszleStore } from '@/lib/store';
 import { useConfirm } from './ConfirmProvider';
 
@@ -43,7 +43,7 @@ const DISCARD_WARNING = {
 };
 
 export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
-    const { students, groups, settings, movementHistory, loadProject } = useClasszleStore();
+    const { students, groups, settings, movementHistory, loadProject, workId } = useClasszleStore();
     const confirm = useConfirm();
     const [names, setNames] = useState<string[]>([]);
     const [activeName, setActiveName] = useState<string | null>(null);
@@ -61,16 +61,22 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
         void refresh();
     }, [refresh]);
 
+    // 새 명단이나 전체 초기화는 다른 작업입니다. 예전 이름으로 저장해도 묻지 않는 일이 없도록 잊습니다.
+    useEffect(() => {
+        setActiveName(null);
+    }, [workId]);
+
     /** 저장에 성공하면 true입니다. */
     const save = async (rawName: string): Promise<boolean> => {
-        const name = rawName.trim();
-        const problem = projectNameProblem(name);
+        const typed = rawName.trim();
+        const problem = projectNameProblem(typed);
         if (problem) {
             toast.error(problem);
             return false;
         }
-        // 지금 연 작업을 다시 저장할 때는 묻지 않습니다.
-        if (name !== activeName && names.includes(name)) {
+        // 윈도우에서 Test와 test는 같은 파일이므로 목록에 있는 이름으로 저장합니다.
+        const name = findSameProject(typed, names) ?? typed;
+        if (overwritesOtherProject(typed, names, activeName)) {
             const answer = await confirm({
                 title: `'${name}' 작업이 이미 있습니다.`,
                 description: '덮어쓰면 그 작업의 예전 내용은 사라집니다.',
@@ -151,8 +157,10 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
             if (!file) return;
             if (students.length > 0 && !(await confirm(DISCARD_WARNING))) return;
             try {
-                if (apply(await file.text())) toast.success('작업을 불러왔습니다.');
-                else toast.error('올바르지 않은 작업 파일입니다.');
+                if (apply(await file.text())) {
+                    setActiveName(null);
+                    toast.success('작업을 불러왔습니다.');
+                } else toast.error('올바르지 않은 작업 파일입니다.');
             } catch (e) {
                 console.error(e);
                 toast.error('파일을 읽지 못했습니다.');

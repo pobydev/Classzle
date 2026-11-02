@@ -4,6 +4,9 @@ import { Student, CustomGroup, AppSettings, AssignmentChange } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ClasszleStore {
+    // 새 명단이나 전체 초기화로 다른 작업이 시작될 때마다 바뀝니다. 저장하지 않습니다.
+    workId: number;
+
     // 데이터
     students: Student[];
     groups: CustomGroup[];
@@ -100,6 +103,7 @@ export const useClasszleStore = create<ClasszleStore>()(
     persist(
         (set, get) => ({
             // 초기 상태
+            workId: 0,
             students: [],
             groups: [],
             settings: defaultSettings,
@@ -114,7 +118,7 @@ export const useClasszleStore = create<ClasszleStore>()(
 
             // 학생 관련 액션
             // 새 명단을 넣을 때 씁니다. 옛 명단의 되돌리기 기록은 쓸 수 없으므로 비웁니다.
-            setStudents: (students) => set({ students, undoStack: [] }),
+            setStudents: (students) => set((state) => ({ students, undoStack: [], workId: state.workId + 1 })),
 
             addStudent: (student) => set((state) => ({
                 students: [...state.students, { ...student, id: uuidv4() }]
@@ -389,13 +393,14 @@ export const useClasszleStore = create<ClasszleStore>()(
             }),
 
             // 초기화
-            resetAll: () => set({
+            resetAll: () => set((state) => ({
+                workId: state.workId + 1,
                 students: [],
                 groups: [],
                 settings: defaultSettings,
                 movementHistory: [],
                 undoStack: []
-            }),
+            })),
 
             loadProject: (data) => set({
                 students: data.students || [],
