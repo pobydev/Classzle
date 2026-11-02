@@ -1,5 +1,8 @@
 import type { BehaviorType } from '@/types';
 
+// 성적이 비어 있거나 숫자가 아닐 때 넣는 값입니다. 엑셀과 저장 파일이 같은 규칙을 씁니다.
+export const BLANK_SCORE = 500;
+
 // 학생 추가 창에서 고르는 생활지도입니다. 유형과 점수가 어긋나지 않도록 함께 고릅니다. 값은 양식의 드롭다운과 같습니다.
 export const BEHAVIOR_CHOICES: { value: string; label: string; type: BehaviorType; score: number }[] = [
     { value: 'NONE:0', label: '해당없음', type: 'NONE', score: 0 },

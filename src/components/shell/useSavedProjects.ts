@@ -44,7 +44,7 @@ const DISCARD_WARNING = {
 };
 
 export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
-    const { students, groups, settings, movementHistory, loadProject, workId } = useClasszleStore();
+    const { students, groups, settings, movementHistory, loadProject, setNotices, workId } = useClasszleStore();
     const confirm = useConfirm();
     const [names, setNames] = useState<string[]>([]);
     const [activeName, setActiveName] = useState<string | null>(null);
@@ -101,9 +101,10 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
     };
 
     const apply = (content: string): boolean => {
-        const data = parseProjectFile(content);
-        if (!data) return false;
-        loadProject(data);
+        const parsed = parseProjectFile(content);
+        if (!parsed) return false;
+        loadProject(parsed.data);
+        setNotices(parsed.notices);
         onLoaded();
         return true;
     };

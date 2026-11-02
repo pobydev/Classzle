@@ -63,7 +63,8 @@ interface Step1SetupProps {
 export default function Step1Setup({ onNext }: Step1SetupProps) {
     const {
         students, setStudents, settings, setClassCount, resetAll,
-        updateStudent, addStudent, deleteStudent, clearMovements, setGroups
+        updateStudent, addStudent, deleteStudent, clearMovements, setGroups,
+        notices, setNotices
     } = useClasszleStore();
     const confirm = useConfirm();
     const [isDragging, setIsDragging] = useState(false);
@@ -309,6 +310,21 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
     return (
         <div className="space-y-6">
+            {notices.length > 0 && (
+                <section data-import-notices aria-label="불러온 뒤 안내" className="rounded-card border border-line bg-card p-4 shadow-card">
+                    <div className="flex items-center justify-between gap-3">
+                        <h2 className="flex items-center gap-1.5 text-body font-bold text-ink">
+                            <WarningCircle size={18} className="text-accent" aria-hidden="true" />
+                            불러온 뒤 안내
+                        </h2>
+                        <Button variant="ghost" size="sm" onClick={() => setNotices([])}>닫기</Button>
+                    </div>
+                    <ul className="mt-2 max-h-60 space-y-1.5 overflow-y-auto text-small text-ink">
+                        {notices.map((notice) => <li key={notice} className="break-keep">{notice}</li>)}
+                    </ul>
+                </section>
+            )}
+
             {/* 상단: 기초 정보 입력 + 통계 */}
             <Card>
                 <CardHeader>

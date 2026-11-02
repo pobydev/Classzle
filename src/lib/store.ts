@@ -1,11 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { repairStoredState } from '@/lib/projectFile';
 import { Student, CustomGroup, AppSettings, AssignmentChange } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ClasszleStore {
     // 새 명단이나 전체 초기화로 다른 작업이 시작될 때마다 바뀝니다. 저장하지 않습니다.
     workId: number;
+
+    // 불러온 뒤 교사가 봐야 할 안내입니다. 1단계 화면에 보여 줍니다. 저장하지 않습니다.
+    notices: string[];
+    setNotices: (notices: string[]) => void;
 
     // 데이터
     students: Student[];
@@ -126,6 +131,8 @@ export const useClasszleStore = create<ClasszleStore>()(
         (set, get) => ({
             // 초기 상태
             workId: 0,
+            notices: [],
+            setNotices: (notices) => set({ notices }),
             students: [],
             groups: [],
             settings: defaultSettings,
@@ -140,7 +147,7 @@ export const useClasszleStore = create<ClasszleStore>()(
 
             // 학생 관련 액션
             // 새 명단을 넣을 때 씁니다. 옛 명단의 되돌리기 기록은 쓸 수 없으므로 비웁니다.
-            setStudents: (students) => set((state) => ({ students, undoStack: [], workId: state.workId + 1 })),
+            setStudents: (students) => set((state) => ({ students, undoStack: [], notices: [], workId: state.workId + 1 })),
 
             addStudent: (student) => set((state) => ({
                 students: [...state.students, { ...student, id: uuidv4() }]
@@ -416,6 +423,7 @@ export const useClasszleStore = create<ClasszleStore>()(
             // 초기화
             resetAll: () => set((state) => ({
                 workId: state.workId + 1,
+                notices: [],
                 students: [],
                 groups: [],
                 settings: defaultSettings,
@@ -424,6 +432,7 @@ export const useClasszleStore = create<ClasszleStore>()(
             })),
 
             loadProject: (data) => set({
+                notices: [],
                 students: data.students || [],
                 groups: data.groups || [],
                 settings: data.settings || defaultSettings,
@@ -441,6 +450,22 @@ export const useClasszleStore = create<ClasszleStore>()(
                 settings: state.settings,
                 movementHistory: state.movementHistory,
             }) as unknown as ClasszleStore,
+            // 저장소의 값도 파일과 같은 검사를 거칩니다. 나쁜 값이 있어도 앱은 켜지고, 고친 내용을 안내합니다.
+            merge: (persisted, current) => {
+                const repaired = repairStoredState(persisted);
+                if (!repaired) return current;
+                return { ...current, ...repaired.data, notices: repaired.notices, undoStack: [] };
+            },
+            onRehydrateStorage: () => (state, error) => {
+                // 스토어가 다 만들어진 다음에 부르도록 미룹니다. 고친 값은 저장소에도 다시 씁니다.
+                void Promise.resolve().then(() => {
+                    if (error) {
+                        useClasszleStore.setState({ notices: ['저장돼 있던 작업을 읽지 못해 빈 작업으로 시작했습니다. 저장한 작업이 있으면 왼쪽 목록에서 불러와 주세요.'] });
+                    } else if (state && state.notices.length > 0) {
+                        useClasszleStore.setState({});
+                    }
+                });
+            },
         }
     )
 );
