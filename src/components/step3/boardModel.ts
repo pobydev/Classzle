@@ -66,16 +66,16 @@ export function relationMemo(kind: 'avoid' | 'keep', a: Student, b: Student): st
     return a[key]?.[b.id] || b[key]?.[a.id] || undefined;
 }
 
-// 출석번호 순서와 같게 정렬합니다. 전출 예정 학생은 맨 뒤입니다.
+// 출석번호 순서와 같게 정렬합니다. 남녀를 나누면 성별 안에서, 섞으면 반 전체에서 전출 예정 학생이 뒤입니다.
 export function sortForClass(list: Student[], method: NumberingMethod): Student[] {
     return [...list].sort((a, b) => {
-        const preA = a.is_pre_transfer ? 1 : 0;
-        const preB = b.is_pre_transfer ? 1 : 0;
-        if (preA !== preB) return preA - preB;
         if (method !== 'mixed' && a.gender !== b.gender) {
             const first = method === 'maleFirst' ? 'M' : 'F';
             return a.gender === first ? -1 : 1;
         }
+        const preA = a.is_pre_transfer ? 1 : 0;
+        const preB = b.is_pre_transfer ? 1 : 0;
+        if (preA !== preB) return preA - preB;
         return compareNames(a.name, b.name);
     });
 }

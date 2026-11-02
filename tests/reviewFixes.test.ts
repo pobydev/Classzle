@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { FULL_WEIGHTS } from '@/lib/assignment';
 import { calculateBalanceTable, flagColumn } from '@/lib/balanceTable';
+import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { RECOMMEND_WEIGHTS, recommendSwaps } from '@/lib/recommend';
+import { groupStudentsByClass } from '@/components/step3/boardModel';
 import { makeStudent } from './helpers/students';
 
 const ids = (list: { studentId: string }[]) => list.map((r) => r.studentId);
@@ -98,5 +100,20 @@ describe('17. 리더 칸', () => {
 
     it('차이가 기준 안이면 표시하지 않습니다', () => {
         expect(flagColumn([0, 1, 1, 1], 1, 'aboveOrNone').cells.some((c) => c.flagged)).toBe(false);
+    });
+});
+
+describe('18. 두 반 보기 순서', () => {
+    const list = [
+        makeStudent({ id: 'm1', name: '가', gender: 'M', assigned_class: '1반' }),
+        makeStudent({ id: 'm2', name: '다', gender: 'M', assigned_class: '1반', is_pre_transfer: true }),
+        makeStudent({ id: 'f1', name: '나', gender: 'F', assigned_class: '1반' }),
+        makeStudent({ id: 'f2', name: '라', gender: 'F', assigned_class: '1반', is_pre_transfer: true }),
+    ];
+
+    it.each(['mixed', 'maleFirst', 'femaleFirst'] as const)('번호 순서와 같습니다: %s', (method) => {
+        const numbers = calculateAttendanceNumbers(list, method);
+        const order = groupStudentsByClass(list, ['1반'], method)['1반'].map((s) => numbers[s.id]);
+        expect(order).toEqual([...order].sort((a, b) => a - b));
     });
 });
