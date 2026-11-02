@@ -1,0 +1,140 @@
+import type { CustomGroup, Student } from '@/types';
+import { compileProblem, resolveClassIndex, type Weights } from './assignment/problem';
+
+export interface SwapRecommendation {
+    studentId: string;
+    // 음수일수록 균형이 좋아지는 교환입니다.
+    balanceChange: number;
+    scoreDifference: number;
+}
+
+const WEIGHTS: Weights = {
+    avoid: 3000,
+    keep: 1500,
+    group: 600,
+    count: 300,
+    gender: 150,
+    transfer: 60,
+    level3: 40,
+    level2: 30,
+    level1: 8,
+    leader: 14,
+    leaderStrong: 6,
+    type: 5,
+    band: 10,
+    score: 0.5,
+    previous: 1.5,
+    moved: 0,
+};
+
+/**
+ * 고른 학생과 바꿔도 조건을 새로 어기지 않는 상대를 균형이 좋아지는 순서로 찾습니다.
+ * 고정 반, 떼어 놓기, 함께 두기, 그룹, 인원, 남녀, 전출 예정을 모두 검사합니다.
+ */
+export function recommendSwaps(
+    studentId: string,
+    students: Student[],
+    classCount: number,
+    groups: CustomGroup[] = [],
+    limit = 10,
+): SwapRecommendation[] {
+    const self = students.findIndex((s) => s.id === studentId);
+    if (self < 0) return [];
+
+    const problem = compileProblem(students, classCount, groups, WEIGHTS);
+    const { c, classNames, fixedTo, stay, score, meanScore, scoreWeight, dims, dimsOf, avoidAdj, keepAdj } = problem;
+    const classOf = students.map((s) => resolveClassIndex(s.assigned_class, classNames));
+    const home = classOf[self];
+    if (home < 0) return [];
+    if (fixedTo[self] >= 0 && fixedTo[self] !== home) {
+        // 고정 반을 어긴 학생은 고정 반으로 가는 교환만 살펴봅니다.
+    }
+
+    const counts = new Int32Array(dims.length * c);
+    const stayCount = new Int32Array(c);
+    const stayScore = new Float64Array(c);
+    classOf.forEach((cl, i) => {
+        if (cl < 0) return;
+        const ds = dimsOf[i];
+        for (let k = 0; k < ds.length; k++) counts[ds[k] * c + cl]++;
+        if (stay[i]) {
+            stayCount[cl]++;
+            stayScore[cl] += score[i];
+        }
+    });
+
+    const penalty = (value: number, d: number) => {
+        const dim = dims[d];
+        if (value < dim.lo) return dim.lo - value;
+        if (value > dim.hi) return value - dim.hi;
+        return 0;
+    };
+    const scoreTerm = (sum: number, count: number) =>
+        count > 0 ? Math.abs(sum / count - meanScore) * scoreWeight : 0;
+
+    const pairsDelta = (i: number, from: number, to: number, partner: number) => {
+        let delta = 0;
+        for (const other of avoidAdj[i]) {
+            if (other === partner) continue;
+            if (classOf[other] === from) delta -= WEIGHTS.avoid;
+            else if (classOf[other] === to) delta += WEIGHTS.avoid;
+        }
+        for (const other of keepAdj[i]) {
+            if (other === partner) continue;
+            if (classOf[other] === from) delta += WEIGHTS.keep;
+            else if (classOf[other] === to) delta -= WEIGHTS.keep;
+        }
+        return delta;
+    };
+
+    const results: SwapRecommendation[] = [];
+    students.forEach((candidate, j) => {
+        if (j === self) return;
+        const other = classOf[j];
+        if (other < 0 || other === home) return;
+
+        // 고정 반을 새로 어기는 교환은 뺍니다.
+        if (fixedTo[self] >= 0 && fixedTo[self] !== other) return;
+        if (fixedTo[j] >= 0 && fixedTo[j] !== home) return;
+
+        // 항목별 인원 변화를 임시 표에 모읍니다. 둘이 같은 항목에 있으면 서로 상쇄됩니다.
+        let hard = pairsDelta(self, home, other, j) + pairsDelta(j, other, home, self);
+        let soft = 0;
+        const change = new Map<number, number>();
+        for (let k = 0; k < dimsOf[self].length; k++) {
+            const d = dimsOf[self][k];
+            change.set(d, (change.get(d) ?? 0) + 1);
+        }
+        for (let k = 0; k < dimsOf[j].length; k++) {
+            const d = dimsOf[j][k];
+            change.set(d, (change.get(d) ?? 0) - 1);
+        }
+        change.forEach((amount, d) => {
+            if (amount === 0) return;
+            const base = d * c;
+            const va = counts[base + home];
+            const vb = counts[base + other];
+            const delta = dims[d].weight * (penalty(va - amount, d) - penalty(va, d) + penalty(vb + amount, d) - penalty(vb, d));
+            if (dims[d].hard) hard += delta;
+            else soft += delta;
+        });
+        // 조건을 새로 어기면 추천하지 않습니다.
+        if (hard > 0) return;
+
+        const beforeScore = scoreTerm(stayScore[home], stayCount[home]) + scoreTerm(stayScore[other], stayCount[other]);
+        const homeCount = stayCount[home] - stay[self] + stay[j];
+        const otherCount = stayCount[other] - stay[j] + stay[self];
+        const homeSum = stayScore[home] - stay[self] * score[self] + stay[j] * score[j];
+        const otherSum = stayScore[other] - stay[j] * score[j] + stay[self] * score[self];
+        soft += scoreTerm(homeSum, homeCount) + scoreTerm(otherSum, otherCount) - beforeScore;
+
+        results.push({
+            studentId: candidate.id,
+            balanceChange: hard + soft,
+            scoreDifference: Math.abs(score[self] - score[j]),
+        });
+    });
+
+    results.sort((a, b) => a.balanceChange - b.balanceChange || a.scoreDifference - b.scoreDifference);
+    return results.slice(0, limit);
+}

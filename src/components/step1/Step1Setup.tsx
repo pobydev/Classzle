@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState, useMemo, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useClasszleStore } from '@/lib/store';
 import { parseExcelFile, downloadSampleExcel, downloadPreAssignedSampleExcel } from '@/lib/excel';
 import { Student, BehaviorType, Gender } from '@/types';
@@ -128,10 +129,20 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             return;
         }
 
+        // 지금 작업을 새 명단으로 덮어쓰기 전에 묻습니다.
+        if (useClasszleStore.getState().students.length > 0) {
+            const message = '지금 작업 중인 학생, 그룹, 배정, 변경 이력이 새 파일 내용으로 바뀝니다.\n저장하지 않은 내용은 사라집니다. 계속하시겠습니까?';
+            const confirmed = window.electronAPI
+                ? await window.electronAPI.confirmDialog(message)
+                : confirm(message);
+            if (!confirmed) return;
+        }
+
         setUploadStatus('loading');
         try {
-            const parsedStudents = await parseExcelFile(file);
+            const { students: parsedStudents, warnings } = await parseExcelFile(file);
             setStudents(parsedStudents);
+            warnings.forEach((warning) => toast.warning(warning, { duration: 12000 }));
             setGroups([]); // 새 파일 로드 시 그룹 초기화
             clearMovements(); // 새 파일 로드 시 히스토리 초기화
 
@@ -163,6 +174,9 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
             // 최소 2개 반, 최대 20개 반으로 제한
             if (detectedClassCount >= 2 && detectedClassCount <= 20) {
+                if (detectedClassCount !== useClasszleStore.getState().settings.classCount) {
+                    toast.info(`파일에 맞춰 학급 수를 ${detectedClassCount}개로 바꿨습니다. 다르면 학급 수를 고쳐 주세요.`, { duration: 10000 });
+                }
                 setClassCount(detectedClassCount);
             }
 

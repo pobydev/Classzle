@@ -3,8 +3,14 @@ import { Student, BehaviorType, Gender, CustomGroup, NumberingMethod } from '@/t
 import { calculateAttendanceNumbers } from './numbering';
 import { v4 as uuidv4 } from 'uuid';
 
+export interface ParsedRoster {
+    students: Student[];
+    // 짐작해서 넣은 값이 있으면 교사에게 알립니다.
+    warnings: string[];
+}
+
 // 엑셀 파일에서 학생 데이터 파싱
-export function parseExcelFile(file: File): Promise<Student[]> {
+export function parseExcelFile(file: File): Promise<ParsedRoster> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
@@ -14,9 +20,53 @@ export function parseExcelFile(file: File): Promise<Student[]> {
                 const workbook = XLSX.read(data, { type: 'binary' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                resolve(parseRosterRows(XLSX.utils.sheet_to_json(worksheet)));
+            } catch (error) {
+                reject(new Error('엑셀 파일 파싱 오류: ' + (error as Error).message));
+            }
+        };
 
-                const students: Student[] = jsonData.map((row: any) => {
+        reader.onerror = () => {
+            reject(new Error('파일 읽기 오류'));
+        };
+
+        reader.readAsBinaryString(file);
+    });
+}
+
+// 비어 있지 않은 첫 값을 고릅니다. 0도 값으로 봅니다.
+function firstValue(row: any, keys: string[]): any {
+    for (const key of keys) {
+        const value = row[key];
+        if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+    return undefined;
+}
+
+// 엑셀 행을 학생으로 바꿉니다.
+export function parseRosterRows(rows: any[]): ParsedRoster {
+    const blankGender: string[] = [];
+    const blankScore: string[] = [];
+    let blankNameRows = 0;
+
+    const students: Student[] = rows.map((row: any) => {
+                    const rowName = String(firstValue(row, ['이름', 'name', '성명']) ?? '');
+                    const rawGender = firstValue(row, ['성별', 'gender']);
+                    const gender = parseGender(rawGender);
+                    const rawScore = firstValue(row, ['성적', 'academic_score', '점수', '기준성적']);
+                    const parsedScore = Number(rawScore);
+                    const hasScore = rawScore !== undefined && Number.isFinite(parsedScore);
+
+                    if (rowName.trim() === '') {
+                        // 합계 줄 같은 빈 행은 세지 않고, 다른 값이 있는 행만 알립니다.
+                        if (firstValue(row, ['성별', 'gender', '성적', 'academic_score', '점수', '기준성적']) !== undefined) {
+                            blankNameRows++;
+                        }
+                    } else {
+                        if (gender === null) blankGender.push(rowName);
+                        if (!hasScore) blankScore.push(rowName);
+                    }
+
                     // 생활지도 드롭다운 파싱
                     const { behaviorType, behaviorScore } = parseBehaviorDropdown(
                         row['생활지도'] || row['behavior'] || ''
@@ -51,43 +101,44 @@ export function parseExcelFile(file: File): Promise<Student[]> {
 
                     return {
                         id: uuidv4(),
-                        name: String(row['이름'] || row['name'] || row['성명'] || ''),
+                        name: rowName,
                         prev_info: finalPrevInfoForLogic,
-                        gender: parseGender(row['성별'] || row['gender']),
-                        academic_score: Number(row['성적'] || row['academic_score'] || row['점수'] || row['기준성적'] || 500),
+                        gender: gender ?? 'F',
+                        academic_score: hasScore ? parsedScore : 500,
                         behavior_score: behaviorScore,
                         behavior_type: behaviorType,
                         behavior_note: String(row['비고'] || row['behavior_note'] || ''),
                         group_ids: [],
                         avoid_ids: [],
                         keep_ids: [],
-                        fixed_class: row['고정반'] || row['fixed_class'] || undefined,
+                        fixed_class: parseAssignedClass(row['고정반'] || row['fixed_class']) ?? undefined,
                         birth: undefined, // 생년월일은 수집하지 않음
                         assigned_class: finalAssignedClass
                     };
-                });
-
-                resolve(students.filter(s => s.name.trim() !== ''));
-            } catch (error) {
-                reject(new Error('엑셀 파일 파싱 오류: ' + (error as Error).message));
-            }
-        };
-
-        reader.onerror = () => {
-            reject(new Error('파일 읽기 오류'));
-        };
-
-        reader.readAsBinaryString(file);
     });
+
+    const warnings: string[] = [];
+    const listNames = (names: string[]) =>
+        names.length > 3 ? `${names.slice(0, 3).join(', ')} 외 ${names.length - 3}명` : names.join(', ');
+    if (blankNameRows > 0) {
+        warnings.push(`이름이 비어 있는 행 ${blankNameRows}개를 건너뛰었습니다.`);
+    }
+    if (blankGender.length > 0) {
+        warnings.push(`성별이 비어 있거나 읽을 수 없어 여학생으로 넣었습니다: ${listNames(blankGender)}`);
+    }
+    if (blankScore.length > 0) {
+        warnings.push(`성적이 비어 있거나 숫자가 아니어서 500점으로 넣었습니다: ${listNames(blankScore)}`);
+    }
+
+    return { students: students.filter((s) => s.name.trim() !== ''), warnings };
 }
 
-// 성별 파싱
-function parseGender(value: any): Gender {
-    const str = String(value).toUpperCase().trim();
-    if (str === 'M' || str === '남' || str === '남자' || str === 'MALE') {
-        return 'M';
-    }
-    return 'F';
+// 성별 파싱. 읽을 수 없으면 null입니다.
+function parseGender(value: any): Gender | null {
+    const str = String(value ?? '').toUpperCase().trim();
+    if (str === 'M' || str === '남' || str === '남자' || str === 'MALE') return 'M';
+    if (str === 'F' || str === '여' || str === '여자' || str === 'FEMALE') return 'F';
+    return null;
 }
 
 // 생활지도 드롭다운 파싱
@@ -170,17 +221,38 @@ function parseBirthDate(value: any): string | undefined {
     return str;
 }
 
+interface ExportOptions {
+    includeDetails?: boolean;
+    groups?: CustomGroup[];
+    numberingMethod?: NumberingMethod;
+}
+
 // 학생 데이터를 엑셀로 내보내기 (ExcelJS 사용)
 export async function exportToExcel(
     students: Student[],
     classCount: number,
     filename: string = 'classzle-result.xlsx',
-    options: {
-        includeDetails?: boolean;
-        groups?: CustomGroup[];
-        numberingMethod?: NumberingMethod;
-    } = {}
+    options: ExportOptions = {}
 ) {
+    const workbook = buildResultWorkbook(students, classCount, options);
+
+    // 파일 다운로드
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// 결과 통합 문서를 만듭니다. 기본 정보만 고르면 생활지도와 관계 정보가 들어가지 않아야 합니다.
+export function buildResultWorkbook(
+    students: Student[],
+    classCount: number,
+    options: ExportOptions = {}
+): ExcelJS.Workbook {
     const { includeDetails = false, groups = [], numberingMethod = 'mixed' } = options;
     const workbook = new ExcelJS.Workbook();
 
@@ -622,15 +694,7 @@ export async function exportToExcel(
         }
     });
 
-    // 파일 다운로드
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+    return workbook;
 }
 
 // 상세 정보 포맷팅

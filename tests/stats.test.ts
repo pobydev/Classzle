@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateClassStats } from '@/lib/algorithm';
+import { calculateClassStats } from '@/lib/stats';
 import { makeStudent } from './helpers/students';
 
 describe('학급 통계', () => {
@@ -32,6 +32,20 @@ describe('학급 통계', () => {
             preTransferFemaleCount: 1,
         });
         expect(first.groupCounts).toEqual({ g: 1 });
+    });
+
+    it('전출 뒤 기준 값을 따로 줍니다', () => {
+        const [first] = calculateClassStats(students, 2, groups);
+        expect(first).toMatchObject({
+            stayCount: 2,
+            stayMaleCount: 1,
+            stayFemaleCount: 1,
+            stayAverageScore: 151,
+            minus3Count: 1,
+            minus2Count: 1,
+            minus1Count: 0,
+            leaderCount: 0,
+        });
     });
 
     it('미배정 학생은 어느 반에도 세지 않습니다', () => {

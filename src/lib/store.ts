@@ -32,6 +32,11 @@ interface ClasszleStore {
     // 배정 관련 액션
     assignStudentToClass: (studentId: string, className: string | null) => void;
     resetAssignments: () => void;
+    applyAssignment: (students: Student[], changes: AssignmentChange[], startHistory: boolean) => void;
+
+    // 되돌리기. 배정과 이력만 되돌리고 그 사이에 바꾼 조건은 그대로 둡니다.
+    undoStack: UndoSnapshot[];
+    undoLastChange: () => void;
 
     // 관계 설정 액션
     addAvoidRelation: (studentId: string, avoidId: string, memo?: string) => void;
@@ -43,7 +48,7 @@ interface ClasszleStore {
 
     // 초기화
     resetAll: () => void;
-    loadProject: (data: { students: Student[]; groups: CustomGroup[]; settings: AppSettings }) => void;
+    loadProject: (data: { students: Student[]; groups: CustomGroup[]; settings: AppSettings; movementHistory?: AssignmentChange[] }) => void;
 
     // 이동 이력
     movementHistory: AssignmentChange[];
@@ -58,6 +63,39 @@ const defaultSettings: AppSettings = {
     useAdvancedConstraints: true,
 };
 
+interface UndoSnapshot {
+    assignments: Record<string, string | null>;
+    movementHistory: AssignmentChange[];
+}
+
+const MAX_UNDO = 30;
+
+function withSnapshot(state: { students: Student[]; movementHistory: AssignmentChange[]; undoStack: UndoSnapshot[] }): UndoSnapshot[] {
+    const assignments: Record<string, string | null> = {};
+    state.students.forEach((s) => {
+        assignments[s.id] = s.assigned_class ?? null;
+    });
+    return [...state.undoStack, { assignments, movementHistory: state.movementHistory }].slice(-MAX_UNDO);
+}
+
+// 지운 학생을 다른 학생의 관계와 메모에서도 뺍니다.
+function withoutRelationsTo(student: Student, removedId: string): Student {
+    const hasAvoid = student.avoid_ids.includes(removedId);
+    const hasKeep = student.keep_ids.includes(removedId);
+    if (!hasAvoid && !hasKeep) return student;
+    const avoid_memos = { ...student.avoid_memos };
+    const keep_memos = { ...student.keep_memos };
+    delete avoid_memos[removedId];
+    delete keep_memos[removedId];
+    return {
+        ...student,
+        avoid_ids: student.avoid_ids.filter((id) => id !== removedId),
+        keep_ids: student.keep_ids.filter((id) => id !== removedId),
+        avoid_memos,
+        keep_memos,
+    };
+}
+
 export const useClasszleStore = create<ClasszleStore>()(
     persist(
         (set, get) => ({
@@ -66,6 +104,7 @@ export const useClasszleStore = create<ClasszleStore>()(
             groups: [],
             settings: defaultSettings,
             movementHistory: [],
+            undoStack: [],
 
             // 이동 이력 관련 액션
             addMovements: (changes) => set((state) => ({
@@ -74,7 +113,8 @@ export const useClasszleStore = create<ClasszleStore>()(
             clearMovements: () => set({ movementHistory: [] }),
 
             // 학생 관련 액션
-            setStudents: (students) => set({ students }),
+            // 새 명단을 넣을 때 씁니다. 옛 명단의 되돌리기 기록은 쓸 수 없으므로 비웁니다.
+            setStudents: (students) => set({ students, undoStack: [] }),
 
             addStudent: (student) => set((state) => ({
                 students: [...state.students, { ...student, id: uuidv4() }]
@@ -87,7 +127,9 @@ export const useClasszleStore = create<ClasszleStore>()(
             })),
 
             deleteStudent: (id) => set((state) => ({
-                students: state.students.filter((s) => s.id !== id),
+                students: state.students
+                    .filter((s) => s.id !== id)
+                    .map((s) => withoutRelationsTo(s, id)),
                 groups: state.groups.map((g) => ({
                     ...g,
                     member_ids: g.member_ids.filter((mid) => mid !== id)
@@ -174,6 +216,7 @@ export const useClasszleStore = create<ClasszleStore>()(
                 };
 
                 return {
+                    undoStack: withSnapshot(state),
                     students: state.students.map((s) =>
                         s.id === studentId ? { ...s, assigned_class: className } : s
                     ),
@@ -182,8 +225,27 @@ export const useClasszleStore = create<ClasszleStore>()(
             }),
 
             resetAssignments: () => set((state) => ({
+                undoStack: withSnapshot(state),
                 students: state.students.map((s) => ({ ...s, assigned_class: null }))
             })),
+
+            applyAssignment: (students, changes, startHistory) => set((state) => ({
+                undoStack: withSnapshot(state),
+                students,
+                movementHistory: startHistory ? [] : [...state.movementHistory, ...changes]
+            })),
+
+            undoLastChange: () => set((state) => {
+                const last = state.undoStack[state.undoStack.length - 1];
+                if (!last) return state;
+                return {
+                    undoStack: state.undoStack.slice(0, -1),
+                    movementHistory: last.movementHistory,
+                    students: state.students.map((s) =>
+                        s.id in last.assignments ? { ...s, assigned_class: last.assignments[s.id] } : s
+                    ),
+                };
+            }),
 
             // 관계 설정 액션
             addAvoidRelation: (studentId, avoidId, memo) => set((state) => ({
@@ -316,6 +378,7 @@ export const useClasszleStore = create<ClasszleStore>()(
                 };
 
                 return {
+                    undoStack: withSnapshot(state),
                     students: state.students.map(s => {
                         if (s.id === studentId1) return { ...s, assigned_class: class2 };
                         if (s.id === studentId2) return { ...s, assigned_class: class1 };
@@ -330,17 +393,28 @@ export const useClasszleStore = create<ClasszleStore>()(
                 students: [],
                 groups: [],
                 settings: defaultSettings,
-                movementHistory: []
+                movementHistory: [],
+                undoStack: []
             }),
 
             loadProject: (data) => set({
                 students: data.students || [],
                 groups: data.groups || [],
-                settings: data.settings || defaultSettings
+                settings: data.settings || defaultSettings,
+                // 옛 저장 파일에는 이력이 없습니다. 이전 작업의 이력이 남지 않도록 비웁니다.
+                movementHistory: data.movementHistory || [],
+                undoStack: []
             })
         }),
         {
             name: 'classzle-storage',
+            // 되돌리기 기록은 켜 있는 동안만 씁니다.
+            partialize: (state) => ({
+                students: state.students,
+                groups: state.groups,
+                settings: state.settings,
+                movementHistory: state.movementHistory,
+            }) as unknown as ClasszleStore,
         }
     )
 );

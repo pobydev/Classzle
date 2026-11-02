@@ -8,6 +8,10 @@ const isDev = process.env.NODE_ENV === 'development';
 // 인쇄 미리보기 활성화
 app.commandLine.appendSwitch('enable-print-preview');
 
+// 맞춤법 검사를 쓰지 않는데도 Electron이 처음 켤 때 Google에서 사전을 받습니다.
+// 창의 spellcheck 설정이나 setSpellCheckerEnabled(false)로는 막히지 않아서 세션마다 언어를 비웁니다.
+app.on('session-created', (session) => session.setSpellCheckerLanguages([]));
+
 let mainWindow: BrowserWindow | null = null;
 
 // 커스텀 프로토콜 등록 (앱 시작 시 필수)
@@ -246,8 +250,12 @@ app.whenReady().then(() => {
                 { role: 'reload', label: '새로고침' },
                 { role: 'forceReload', label: '강제 새로고침' },
                 { type: 'separator' },
-                { role: 'toggleDevTools', label: '개발자 도구', accelerator: 'F12' },
-                { type: 'separator' },
+                ...(isDev
+                    ? ([
+                        { role: 'toggleDevTools', label: '개발자 도구', accelerator: 'F12' },
+                        { type: 'separator' },
+                    ] as Electron.MenuItemConstructorOptions[])
+                    : []),
                 { role: 'resetZoom', label: '확대/축소 초기화' },
                 { role: 'zoomIn', label: '확대' },
                 { role: 'zoomOut', label: '축소' },

@@ -2,8 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import { useClasszleStore } from '@/lib/store';
-import { assignStudents, calculateClassStats } from '@/lib/algorithm';
-import { validateSwap } from '@/lib/validation';
+import { assignStudents, collectViolations, type AssignmentMode } from '@/lib/assignment';
+import { calculateClassStats } from '@/lib/stats';
+import { recommendSwaps } from '@/lib/recommend';
+import { validateMove, validateSwap } from '@/lib/validation';
 import { exportToExcel } from '@/lib/excel';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { Student, Violation, BehaviorType, AssignmentChange } from '@/types';
@@ -209,18 +211,20 @@ function StudentCard({
 
 export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     const {
-        students, groups, settings, setStudents,
+        students, groups, settings,
+        applyAssignment, undoLastChange, undoStack,
         assignStudentToClass, swapStudents,
-        movementHistory, addMovements, clearMovements,
+        movementHistory, clearMovements,
         setNumberingMethod, resetAssignments
     } = useClasszleStore();
-    const [violations, setViolations] = useState<Violation[]>([]);
     const [isAssigning, setIsAssigning] = useState(false);
+    const [isNewConfirmOpen, setIsNewConfirmOpen] = useState(false);
 
     const [activeRelationIds, setActiveRelationIds] = useState<string[] | null>(null);
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
-    const [pendingSwap, setPendingSwap] = useState<{ s1Id: string, s2Id: string, violations: Violation[] } | null>(null);
+    // 조건을 어기는 변경을 교사에게 확인받는 동안 들고 있습니다. 교환이면 s2Id, 반으로 옮기기면 className이 있습니다.
+    const [pendingSwap, setPendingSwap] = useState<{ s1Id: string, s2Id?: string, className?: string, violations: Violation[] } | null>(null);
 
     // 리포트 다이얼로그 상태
     const [isReportOpen, setIsReportOpen] = useState(false);
@@ -228,8 +232,16 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     // 배정 초기화 확인 다이얼로그 상태
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
-    // 배정 모드 상태 ('new' | 'optimize')
-    const [assignmentMode, setAssignmentMode] = useState<'new' | 'optimize'>('new');
+    // 배정 모드 상태
+    const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>('new');
+
+    const hasAssignments = students.some((s) => s.assigned_class);
+
+    // 수동으로 바꾼 뒤에도 맞도록 지금 배정에서 바로 계산합니다.
+    const violations = useMemo(
+        () => (hasAssignments ? collectViolations(students, settings.classCount, groups) : []),
+        [hasAssignments, students, settings.classCount, groups]
+    );
 
     const handleClassHeaderClick = (className: string) => {
         handleMoveToClass(className);
@@ -296,25 +308,23 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     }, [students, classNames, settings.numberingMethod]);
 
     const handleAssign = () => {
-        setIsAssigning(true);
-        // 신규 배정일 경우 이력 초기화
-        if (assignmentMode === 'new') {
-            clearMovements();
+        // 신규 배정은 지금 결과와 이력을 지우므로 먼저 묻습니다.
+        if (assignmentMode === 'new' && hasAssignments) {
+            setIsNewConfirmOpen(true);
+            return;
         }
+        runAssign();
+    };
+
+    const runAssign = () => {
+        setIsAssigning(true);
 
         // 현재 상태 캡처 (Deep Copy to avoid reference issues)
         const beforeStudents = JSON.parse(JSON.stringify(students)) as Student[];
 
         setTimeout(() => {
             // 알고리즘 실행
-            const result = assignStudents(
-                students,
-                settings.classCount,
-                groups,
-                settings.scoreTolerance,
-                assignmentMode,
-                settings.useAdvancedConstraints
-            );
+            const result = assignStudents(students, settings.classCount, groups, { mode: assignmentMode });
 
             // 1차 변경 내역 추출 (단순 이동 리스트)
             const rawChanges: AssignmentChange[] = [];
@@ -377,20 +387,19 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                 }
             }
 
-            // 스토어 업데이트
-            setStudents(result.students);
-            if (assignmentMode !== 'new') {
-                addMovements(changes); // '현재 배정 수정'일 때만 이력 추가
-            }
-            setViolations(result.violations);
+            // 신규 배정은 이력을 새로 시작하고, 수정과 균형 조정은 이력에 더합니다.
+            applyAssignment(result.students, assignmentMode === 'new' ? [] : changes, assignmentMode === 'new');
             setIsAssigning(false);
 
             setIsReportOpen(true); // 결과 리포트 열기
 
-            if (changes.length > 0) {
-                toast.success(`${changes.length}명의 학생 배정이 변경되었습니다.`);
+            if (result.moved > 0) {
+                toast.success(`${result.moved}명의 학생 배정이 변경되었습니다.`);
             } else {
-                toast.info('배정 변경 사항이 없습니다 (이미 최적 상태).');
+                toast.info('어긴 조건이 없어 옮긴 학생이 없습니다.');
+            }
+            if (result.violations.length > 0) {
+                toast.warning(`지키지 못한 조건이 ${result.violations.length}건 있습니다. 아래 조건 준수 현황을 확인해 주세요.`);
             }
         }, 100);
     };
@@ -402,7 +411,7 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     const confirmExport = (includeDetails: boolean) => {
         const timestamp = new Date().toISOString().split('T')[0];
         exportToExcel(students, settings.classCount, `반편성_결과_${timestamp}.xlsx`, {
-            includeDetails: true,
+            includeDetails,
             groups,
             numberingMethod: settings.numberingMethod
         });
@@ -411,22 +420,8 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
     // 추천 교환 대상 학생 ID 목록
     const recommendedStudentIds = useMemo(() => {
         if (!selectedStudentId) return [];
-        const s1 = students.find(s => s.id === selectedStudentId);
-        if (!s1 || !s1.assigned_class) return [];
-
-        return students.filter(s2 => {
-            // 다른 반 학생만 대상
-            if (!s2.assigned_class || s2.assigned_class === s1.assigned_class) return false;
-
-            // 1. 성적 유사성 체크 (설정된 Tolerance 이내)
-            const scoreDiff = Math.abs(s1.academic_score - s2.academic_score);
-            if (scoreDiff > settings.scoreTolerance) return false;
-
-            // 2. 제약 조건 위반 여부 체크 (위반 사항이 없어야 추천)
-            const violations = validateSwap(selectedStudentId, s2.id, students);
-            return violations.length === 0;
-        }).map(s => s.id);
-    }, [selectedStudentId, students, settings.scoreTolerance]);
+        return recommendSwaps(selectedStudentId, students, settings.classCount, groups).map((r) => r.studentId);
+    }, [selectedStudentId, students, settings.classCount, groups]);
 
     const handleStudentClick = (id: string) => {
         if (!selectedStudentId) {
@@ -440,11 +435,11 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
 
             if (s1 && s2 && s1.assigned_class && s2.assigned_class && s1.assigned_class !== s2.assigned_class) {
                 // 교환 전 위반 사항 체크
-                const violations = validateSwap(selectedStudentId, id, students);
+                const swapViolations = validateSwap(selectedStudentId, id, students, settings.classCount, groups);
 
-                if (violations.length > 0) {
+                if (swapViolations.length > 0) {
                     // 위반 사항이 있으면 경고 다이얼로그 띄움
-                    setPendingSwap({ s1Id: selectedStudentId, s2Id: id, violations });
+                    setPendingSwap({ s1Id: selectedStudentId, s2Id: id, violations: swapViolations });
                 } else {
                     // 위반 사항 없으면 바로 교환
                     swapStudents(selectedStudentId, id);
@@ -462,26 +457,35 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
 
     const confirmSwap = () => {
         if (pendingSwap) {
-            swapStudents(pendingSwap.s1Id, pendingSwap.s2Id);
+            if (pendingSwap.s2Id) {
+                swapStudents(pendingSwap.s1Id, pendingSwap.s2Id);
+            } else if (pendingSwap.className) {
+                assignStudentToClass(pendingSwap.s1Id, pendingSwap.className);
+            }
             setPendingSwap(null);
             setSelectedStudentId(null);
-            toast.success('제약 조건을 무시하고 학생을 교차 변경했습니다.');
+            toast.success('조건을 어기는 줄 알고 학생을 옮겼습니다. 조건 준수 현황에 표시됩니다.');
         }
     };
 
     const handleMoveToClass = (className: string | null) => {
-        if (selectedStudentId) {
-            assignStudentToClass(selectedStudentId, className);
-            setSelectedStudentId(null);
-            toast.success(`${className || '미배정'} 구역으로 이동했습니다.`);
+        if (!selectedStudentId) return;
+        // 미배정으로 빼는 것은 임시로 두는 일이라 묻지 않습니다.
+        if (className) {
+            const moveViolations = validateMove(selectedStudentId, className, students, settings.classCount, groups);
+            if (moveViolations.length > 0) {
+                setPendingSwap({ s1Id: selectedStudentId, className, violations: moveViolations });
+                return;
+            }
         }
+        assignStudentToClass(selectedStudentId, className);
+        setSelectedStudentId(null);
+        toast.success(`${className || '미배정'} 구역으로 이동했습니다.`);
     };
 
     const selectedStudent = selectedStudentId
         ? students.find((s) => s.id === selectedStudentId)
         : null;
-
-    const hasAssignments = students.some((s) => s.assigned_class);
 
     return (
         <div className="space-y-6">
@@ -503,10 +507,10 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                 <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1 px-1">배정 모드 선택</span>
                                 <Tabs
                                     value={assignmentMode}
-                                    onValueChange={(v) => setAssignmentMode(v as 'new' | 'optimize')}
-                                    className="w-[280px]"
+                                    onValueChange={(v) => setAssignmentMode(v as AssignmentMode)}
+                                    className="w-[420px]"
                                 >
-                                    <TabsList className="grid w-full grid-cols-2 h-11 bg-slate-100/50 p-1">
+                                    <TabsList className="grid w-full grid-cols-3 h-11 bg-slate-100/50 p-1">
                                         <TabsTrigger value="new" className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm">
                                             🚀 신규 배정
                                         </TabsTrigger>
@@ -516,6 +520,13 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                             className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             🛠️ 현재 배정 수정
+                                        </TabsTrigger>
+                                        <TabsTrigger
+                                            value="balance"
+                                            disabled={!hasAssignments}
+                                            className="text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-indigo-600 data-[state=active]:shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            ⚖️ 균형 조정
                                         </TabsTrigger>
                                     </TabsList>
                                 </Tabs>
@@ -542,6 +553,18 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                 className="h-10 px-4 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                             >
                                 <span className="mr-2 text-base">🗑️</span> 배정 초기화
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    undoLastChange();
+                                    setSelectedStudentId(null);
+                                    toast.success('직전 변경을 되돌렸습니다.');
+                                }}
+                                disabled={undoStack.length === 0}
+                                className="h-10 px-4 border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+                            >
+                                <span className="mr-2 text-base">↩️</span> 되돌리기
                             </Button>
 
                             <div className="h-11 w-px bg-slate-200 mx-1" /> {/* 구분선 */}
@@ -570,12 +593,17 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                         {assignmentMode === 'new' ? (
                             <p className="flex items-center gap-2">
                                 <span className="text-primary font-bold">신규 배정:</span>
-                                <span>성적순(S자) 배정을 기초로 모든 조건(성별·생활지도·성적·학생 관계 등)을 고려하여 처음부터 새로 편성합니다.</span>
+                                <span>남녀 각각 성적순(S자)으로 나눈 뒤 모든 조건(고정 반, 학생 관계, 그룹, 인원, 남녀, 생활지도, 성적)을 맞춰 처음부터 새로 편성합니다.</span>
+                            </p>
+                        ) : assignmentMode === 'optimize' ? (
+                            <p className="flex items-center gap-2">
+                                <span className="text-indigo-600 font-bold">현재 배정 수정:</span>
+                                <span>지금 배정을 유지하고 어긴 조건(고정 반, 학생 관계, 그룹, 인원, 남녀)만 고칩니다. 옮기는 학생을 가장 적게 합니다.</span>
                             </p>
                         ) : (
                             <p className="flex items-center gap-2">
-                                <span className="text-indigo-600 font-bold">현재 배정 수정:</span>
-                                <span>현재 배정 정보를 유지하면서, 제약 조건(관계, 균형 등)에 어긋나는 부분만 정교하게 조정합니다.</span>
+                                <span className="text-indigo-600 font-bold">균형 조정:</span>
+                                <span>지금 배정에서 시작해 어긴 조건을 고치고 성적과 생활지도 균형까지 맞춥니다. 수정보다 많은 학생을 옮길 수 있습니다.</span>
                             </p>
                         )}
                     </div>
@@ -705,7 +733,7 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                     <Card className="rounded-xl border-indigo-100 shadow-sm bg-white/50 overflow-hidden">
                         <CardContent className="pt-5">
                             <div className="mb-6 p-4 bg-indigo-50 rounded-lg text-sm text-slate-700 leading-relaxed border border-indigo-100/50">
-                                💡 <strong>생활지도 점수 총점의 의미</strong>: 학급 경영 난이도를 예측하는 참고 지표입니다. 점수가 낮을수록 교사의 세심한 생활지도가 요구되며, 높을수록 비교적 안정적인 학급 운영이 기대됩니다.
+                                💡 <strong>생활지도 균형</strong>: 합계가 아니라 등급별 학생 수로 맞춥니다. -3, -2 학생은 반별 차이 1명을 목표로 하고, 리더는 따로 세어 고르게 나눕니다. 인원, 평균, 남녀, 등급별 인원은 전출 뒤 기준입니다.
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm border-collapse">
@@ -716,7 +744,7 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                             <th className="p-3 text-center font-semibold">평균</th>
                                             <th className="p-3 text-center font-semibold">남/여</th>
                                             <th className="p-3 text-center font-semibold text-slate-700">생활지도 점수별 학생수</th>
-                                            <th className="p-3 text-center font-semibold text-slate-700">생활지도 점수 총점</th>
+                                            <th className="p-3 text-center font-semibold text-slate-700">-3 / -2 / -1 / 리더</th>
                                             {groups.length > 0 && <th className="p-3 text-center font-semibold text-slate-700">분산 배정 그룹</th>}
                                             <th className="p-3 text-center font-semibold">전출(남/여)</th>
                                         </tr>
@@ -725,9 +753,14 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                         {classStats.map((stat) => (
                                             <tr key={stat.className} className="border-b hover:bg-muted/30">
                                                 <td className="p-3 font-bold">{stat.className}</td>
-                                                <td className="p-3 text-center">{stat.studentCount}</td>
-                                                <td className="p-3 text-center">{stat.averageScore}</td>
-                                                <td className="p-3 text-center text-muted-foreground">{stat.maleCount}/{stat.femaleCount}</td>
+                                                <td className="p-3 text-center">
+                                                    {stat.stayCount}
+                                                    {stat.preTransferCount > 0 && (
+                                                        <span className="block text-[10px] text-muted-foreground">전출 전 {stat.studentCount}</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-center">{stat.stayAverageScore}</td>
+                                                <td className="p-3 text-center text-muted-foreground">{stat.stayMaleCount}/{stat.stayFemaleCount}</td>
                                                 <td className="p-3">
                                                     <div className="flex items-center justify-center gap-4">
                                                         {/* 행동/정서 (-3, -2, -1) 2단 구성 */}
@@ -783,8 +816,8 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className={`p-3 text-center font-bold ${stat.behaviorTotal < -5 ? 'text-red-500' : stat.behaviorTotal < 0 ? 'text-orange-500' : 'text-green-600'}`}>
-                                                    {stat.behaviorTotal > 0 ? '+' : ''}{stat.behaviorTotal}
+                                                <td className="p-3 text-center font-semibold text-slate-700">
+                                                    {stat.minus3Count} / {stat.minus2Count} / {stat.minus1Count} / {stat.leaderCount}
                                                 </td>
                                                 {groups.length > 0 && (
                                                     <td className="p-3 text-center text-xs">
@@ -867,18 +900,17 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                         <h4 className="font-bold text-[13px] text-orange-700 mb-2 flex items-center gap-2">
                             <span className="text-base">⚠️</span> 제약 조건 준수 현황
                         </h4>
-                        {violations.length > 0 ? (
+                        {!hasAssignments ? (
+                            <p className="text-xs text-slate-500">아직 배정하지 않았습니다.</p>
+                        ) : violations.length > 0 ? (
                             <div className="space-y-2">
-                                <p className="text-[11px] text-orange-600 font-bold">{violations.length}개의 위반 사항이 기록되었습니다.</p>
-                                <ul className="text-[10px] text-orange-500 space-y-1">
-                                    {violations.slice(0, 2).map((v, i) => <li key={i} className="truncate">• {v.message}</li>)}
-                                    {violations.length > 2 && <li className="opacity-70 italic text-[9px]">• ... 외 {violations.length - 2}개</li>}
+                                <p className="text-[11px] text-orange-600 font-bold">지키지 못한 조건이 {violations.length}건 있습니다.</p>
+                                <ul className="text-[11px] text-orange-700 space-y-1 max-h-40 overflow-y-auto">
+                                    {violations.map((v) => <li key={v.key ?? v.message}>• {v.message}</li>)}
                                 </ul>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2 h-full pb-2">
-                                <span className="text-xs text-green-600 font-semibold italic">모든 제약 조건을 완벽하게 충족하고 있습니다. ✨</span>
-                            </div>
+                            <p className="text-xs text-green-700 font-semibold">고정 반, 떼어 놓기, 함께 두기, 그룹, 인원, 남녀 조건을 모두 지키고 있습니다.</p>
                         )}
                     </div>
                 </div>
@@ -891,10 +923,10 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                         <DialogTitle className="text-xl flex items-center gap-2 text-red-600">
                             ⚠️ 배정 제약 조건 위반 알림
                         </DialogTitle>
-                        <DialogDescription>교환 시 발생하는 제약 조건 위반을 확인하세요.</DialogDescription>
+                        <DialogDescription>옮기면 새로 어기게 되는 조건을 확인하세요.</DialogDescription>
                     </DialogHeader>
                     <p className="text-sm font-medium text-gray-700">
-                        두 학생의 위치를 교환할 경우 다음 제약 조건들이 위반됩니다:
+                        {pendingSwap?.s2Id ? '두 학생을 바꾸면' : '이 반으로 옮기면'} 다음 조건을 어깁니다:
                     </p>
                     <div className="space-y-2 max-h-[200px] overflow-y-auto">
                         {pendingSwap?.violations.map((v, i) => (
@@ -979,12 +1011,37 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                             onClick={() => {
                                 resetAssignments();
                                 clearMovements();
-                                setViolations([]);
                                 setIsResetConfirmOpen(false);
                                 toast.success('반편성이 초기화되었습니다.');
                             }}
                         >
                             초기화 실행
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* 신규 배정 확인 다이얼로그 */}
+            <Dialog open={isNewConfirmOpen} onOpenChange={setIsNewConfirmOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl">처음부터 새로 배정할까요?</DialogTitle>
+                        <DialogDescription>
+                            지금 배정과 변경 이력이 새 결과로 바뀝니다. 직접 바꾼 내용도 함께 사라집니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <p className="text-xs text-slate-500 bg-slate-50 p-3 rounded-lg border border-slate-200 border-dashed">
+                        어긴 조건만 고치려면 취소한 뒤 현재 배정 수정을 고르세요. 새로 배정한 뒤에도 되돌리기로 돌아올 수 있습니다.
+                    </p>
+                    <div className="flex justify-end gap-3 pt-2 border-t">
+                        <Button variant="outline" onClick={() => setIsNewConfirmOpen(false)}>취소</Button>
+                        <Button
+                            onClick={() => {
+                                setIsNewConfirmOpen(false);
+                                runAssign();
+                            }}
+                        >
+                            새로 배정
                         </Button>
                     </div>
                 </DialogContent>

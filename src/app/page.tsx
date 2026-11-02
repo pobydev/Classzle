@@ -31,7 +31,7 @@ import { FolderOpen, FloppyDisk, Trash } from "@phosphor-icons/react";
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState('step1');
-  const { students, groups, settings, loadProject } = useClasszleStore();
+  const { students, groups, settings, movementHistory, loadProject } = useClasszleStore();
 
   // Named Save/Load States
   const [projectList, setProjectList] = useState<string[]>([]);
@@ -75,7 +75,7 @@ export default function Home() {
       return;
     }
 
-    const dataObj = { students, groups, settings };
+    const dataObj = { students, groups, settings, movementHistory };
     const dataStr = JSON.stringify(dataObj, null, 2);
 
     if (window.electronAPI) {

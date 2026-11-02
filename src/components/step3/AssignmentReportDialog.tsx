@@ -475,7 +475,7 @@ export function AssignmentReportDialog({
                     </table>
 
                     <div style="margin-top: 50px; text-align: center; font-size: 9pt; color: #999;">
-                        Classzle - 스마트한 학생 배정을 위한 인공지능 배정 도구
+                        Classzle - 학급 편성 도우미
                     </div>
                 </body>
             </html>

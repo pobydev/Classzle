@@ -43,7 +43,9 @@ export function calculateAttendanceNumbers(
 
         // 두 번째 그룹 시작 번호 결정
         // 첫 번째 그룹 인원이 18명을 초과하면 31번부터, 아니면 21번부터 시작
-        const startNumber = firstGroup.length > 18 ? 31 : 21;
+        // 31번으로도 번호가 겹치면 겹치지 않는 다음 십 단위(41, 51...)로 넘어갑니다.
+        let startNumber = firstGroup.length > 18 ? 31 : 21;
+        while (startNumber <= firstGroup.length) startNumber += 10;
 
         // 두 번째 그룹 정렬 및 번호 부여
         const sortedSecond = [...secondGroup].sort((a, b) => {

@@ -66,8 +66,8 @@ export default function PreTransferSettings({
                 <ul className="list-disc list-inside space-y-1">
                     <li>방학 중 전출이 예정된 학생을 선택해주세요.</li>
                     <li>
-                        <strong>균형 배정</strong>: 전출 후에도 반별 인원이 균등하도록,
-                        <span className="text-blue-600 font-bold"> 인원이 많은 반</span>에 우선 배정됩니다.
+                        <strong>균형 배정</strong>: 인원, 남녀, 성적은
+                        <span className="text-blue-600 font-bold"> 전출 뒤 기준</span>으로 맞추고, 전출 예정 학생은 반마다 고르게 나눕니다.
                     </li>
                     <li>
                         <strong>마지막 번호</strong>: 반 번호가 끊기지 않도록, 성명과 관계없이

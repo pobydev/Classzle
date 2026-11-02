@@ -34,6 +34,13 @@ describe('출석 번호', () => {
         expect(result.f).toBe(31);
     });
 
+    it('첫 성별이 30명을 넘어도 번호가 겹치지 않습니다', () => {
+        const males = Array.from({ length: 33 }, (_, i) => named(`m${i}`, `남${i}`, 'M'));
+        const result = calculateAttendanceNumbers([...males, named('f', '여', 'F')], 'maleFirst');
+        expect(result.f).toBe(41);
+        expect(new Set(Object.values(result)).size).toBe(34);
+    });
+
     it('여학생 먼저를 고르면 여학생이 1번부터 시작합니다', () => {
         const result = calculateAttendanceNumbers(
             [named('m', '가', 'M'), named('f', '나', 'F')],

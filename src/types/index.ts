@@ -95,10 +95,21 @@ export interface ClassStats {
 
 // 제약 조건 위반 정보
 export interface Violation {
-    type: 'AVOID' | 'KEEP' | 'BEHAVIOR_IMBALANCE' | 'GENDER_IMBALANCE' | 'FIXED_CLASS';
+    type:
+        | 'UNASSIGNED'
+        | 'FIXED_CLASS'
+        | 'AVOID'
+        | 'KEEP'
+        | 'GROUP_IMBALANCE'
+        | 'COUNT_IMBALANCE'
+        | 'GENDER_IMBALANCE'
+        | 'TRANSFER'
+        | 'BEHAVIOR_IMBALANCE';
     message: string;
     studentIds: string[];
     className?: string;
+    key?: string;                  // 같은 어김인지 비교할 때 씁니다
+    amount?: number;               // 그룹, 인원처럼 정도가 있는 어김의 크기
 }
 
 export interface ElectronAPI {
