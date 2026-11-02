@@ -7,7 +7,8 @@
     "productName": "Classzle",
     "appId": "com.classzle.app",
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "public/icons/classzle.ico"
     },
     "directories": {
       "output": "dist"
@@ -16,7 +17,17 @@
       "out/**/*",
       "dist-electron/**/*",
       "package.json"
-    ]
+    ],
+    "nsis": {
+      "artifactName": "Classzle-Setup-${version}.${ext}",
+      "installerIcon": "public/icons/classzle.ico",
+      "uninstallerIcon": "public/icons/classzle.ico"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "pobydev",
+      "repo": "Classzle"
+    }
   },
   "scripts": {
     "dev": "next dev",
@@ -27,7 +38,9 @@
     "electron:build-main": "cd main && npx tsc",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development npm run electron:build-main && electron .\"",
     "electron:export": "next build",
-    "electron:build": "npm run electron:build-main && npm run build && electron-builder --win"
+    "electron:build": "npm run electron:build-main && npm run build && electron-builder --win",
+    "test:update": "node scripts/update-smoke.mjs",
+    "test:shell": "node scripts/shell-smoke.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
@@ -39,6 +52,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.11",
     "exceljs": "^4.4.0",
     "next": "^16.0.10",
     "react": "^19.2.3",

@@ -1,3 +1,5 @@
+import type { UpdateStatus } from '@/lib/updates';
+
 // 학생 생활지도 유형
 export type BehaviorType = 'NONE' | 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL';
 
@@ -127,6 +129,12 @@ export interface ElectronAPI {
     deleteProject: (name: string) => Promise<boolean>;
     printPreview: (html: string) => Promise<boolean>;
     confirmDialog: (message: string) => Promise<boolean>;
+    windowAction: (action: 'minimize' | 'maximize' | 'close') => void;
+    getUpdateInfo: () => Promise<{ updates: 'on' | 'off'; status: UpdateStatus }>;
+    checkForUpdates: () => Promise<void>;
+    downloadUpdate: () => Promise<void>;
+    installUpdate: () => Promise<void>;
+    onUpdateStatus: (listener: (status: UpdateStatus) => void) => () => void;
 }
 
 declare global {

@@ -155,3 +155,56 @@
 .bg-accent\/50 {
   background-color: var(--wash);
 }
+
+/* 슬로건 전용: 학교안심 받아쓰기체 (SIL OFL 1.1) */
+@font-face {
+  font-family: 'Hakgyoansim';
+  src: url('/fonts/HakgyoansimBadasseugi-L.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  /* 제목 바 높이. 보드처럼 창 높이에 맞추는 화면이 함께 씁니다. */
+  --shell-top: 34px;
+}
+
+/* 창 맨 위 바: 끌어서 창을 옮깁니다. */
+.titlebar {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+.titlebar-controls {
+  -webkit-app-region: no-drag;
+}
+
+.slogan {
+  font-family: 'Hakgyoansim', 'Pretendard', sans-serif;
+}
+
+/* 사이드바 구역 이름 */
+.section-label {
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--soft);
+}
+
+/* 스크롤바: 평소에는 보이지 않고 마우스를 올린 곳에서만 나타납니다 (brand/DESIGN.md).
+   scrollbar-width를 쓰면 아래 규칙이 무시되고 기본 스크롤바가 나오므로 쓰지 않습니다. */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 10px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+}

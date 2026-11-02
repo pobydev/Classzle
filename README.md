@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Classzle (클래즐)
 
-## Getting Started
+선생님을 위한 학급 편성 프로그램입니다. 학생 명단을 넣고 조건을 정하면 다음 학년도 반을 나눕니다. made by gnilab
 
-First, run the development server:
+## 내려받기
+
+[최신 버전](https://github.com/pobydev/Classzle/releases/latest)에서 Windows 설치 파일을 받습니다.
+
+## 할 수 있는 일
+
+- 양식 A(이전 학년도 명단)와 양식 B(이미 나눈 배정안)로 명단 넣기
+- 분산 배정 그룹, 피해야 할 관계, 같은 반 희망, 고정 배정, 전출 예정 조건
+- 신규 배정, 현재 배정 수정, 균형 조정
+- 학생을 눌러 추천을 보고 교환하기, 되돌리기, 변경 이력
+- 배정 리포트, 반별과 이전 반별 결과 엑셀
+
+## 학생 정보
+
+학생 정보는 이 컴퓨터 밖으로 나가지 않습니다. 인터넷은 새 버전 확인에만 씁니다.
+
+- 켤 때 GitHub에서 새 버전이 있는지 확인합니다. 학생 정보는 보내지 않습니다. 설치는 동의할 때만 하고, 사용 가이드 창에서 확인을 끌 수 있습니다.
+- 저장 파일은 암호화되지 않습니다. 다른 사람이 쓰는 컴퓨터에는 저장하지 말아 주세요.
+
+## 개발
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
+npm test                  # 시험
+npm run electron:dev      # 개발 모드로 앱 실행
+npm run electron:build    # 설치 파일 만들기 (dist 폴더)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+새 버전을 낼 때는 `dist`의 `Classzle-Setup-<버전>.exe`, `.blockmap`, `latest.yml` 세 파일을 모두 GitHub Release에 올립니다. 하나라도 빠지면 설치된 앱이 새 버전을 받지 못합니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+앱을 띄우는 시험은 `@playwright/test`를 저장소 밖에 설치하고 그 폴더를 `PW_DIR`로 줍니다.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run electron:build-main && npm run build
+PW_DIR=<폴더> npm run test:shell
+npm run electron:build
+PW_DIR=<폴더> npm run test:update
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+문의: pobydev@gmail.com

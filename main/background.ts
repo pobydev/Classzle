@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, protocol, net, Menu, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { setupUpdates } from './updater';
 
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -13,6 +14,9 @@ app.commandLine.appendSwitch('enable-print-preview');
 app.on('session-created', (session) => session.setSpellCheckerLanguages([]));
 
 let mainWindow: BrowserWindow | null = null;
+
+// 설치본에는 public이 없고 빌드 결과인 out에 같은 파일이 있습니다.
+const appIcon = path.join(__dirname, '..', isDev ? 'public' : 'out', 'icons', 'classzle-256.png');
 
 // 커스텀 프로토콜 등록 (앱 시작 시 필수)
 protocol.registerSchemesAsPrivileged([
@@ -114,6 +118,17 @@ ipcMain.handle('delete-project', async (event, name: string) => {
     }
 });
 
+// 창 틀을 직접 그리므로 최소화, 최대화, 닫기를 화면의 버튼에서 받습니다.
+ipcMain.on('window-action', (_event, action: 'minimize' | 'maximize' | 'close') => {
+    if (!mainWindow) return;
+    if (action === 'minimize') mainWindow.minimize();
+    if (action === 'maximize') {
+        if (mainWindow.isMaximized()) mainWindow.unmaximize();
+        else mainWindow.maximize();
+    }
+    if (action === 'close') mainWindow.close();
+});
+
 ipcMain.handle('confirm-dialog', async (event, message: string) => {
     if (!mainWindow) return false;
     const { response } = await dialog.showMessageBox(mainWindow, {
@@ -171,7 +186,7 @@ ipcMain.handle('print-preview', async (event, htmlContent: string) => {
             width: 1000,
             height: 800,
             title: '인쇄 미리보기',
-            icon: path.join(__dirname, '..', 'public', 'favicon.png'),
+            icon: appIcon,
             webPreferences: {
                 plugins: true // PDF 뷰어 플러그인 허용
             }
@@ -197,13 +212,16 @@ function createWindow() {
         height: 900,
         minWidth: 1200,
         minHeight: 700,
+        // 창 틀은 앱 화면의 TitleBar가 그립니다 (brand/DESIGN.md).
+        frame: false,
+        backgroundColor: '#f3f6fa',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
         },
-        title: 'Classzle - 학급 편성 도우미',
-        icon: path.join(__dirname, '..', 'public', 'favicon.png'),
+        title: 'Classzle',
+        icon: appIcon,
         show: false,
     });
 
@@ -236,44 +254,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-    // 메뉴 설정
-    const template: Electron.MenuItemConstructorOptions[] = [
-        {
-            label: '파일',
-            submenu: [
-                { role: 'quit', label: '종료' }
-            ]
-        },
-        {
-            label: '보기',
-            submenu: [
-                { role: 'reload', label: '새로고침' },
-                { role: 'forceReload', label: '강제 새로고침' },
-                { type: 'separator' },
-                ...(isDev
-                    ? ([
-                        { role: 'toggleDevTools', label: '개발자 도구', accelerator: 'F12' },
-                        { type: 'separator' },
-                    ] as Electron.MenuItemConstructorOptions[])
-                    : []),
-                { role: 'resetZoom', label: '확대/축소 초기화' },
-                { role: 'zoomIn', label: '확대' },
-                { role: 'zoomOut', label: '축소' },
-                { type: 'separator' },
-                { role: 'togglefullscreen', label: '전체화면' }
-            ]
-        },
-        {
-            label: '창',
-            submenu: [
-                { role: 'minimize', label: '최소화' },
-                { role: 'close', label: '닫기' }
-            ]
-        }
-    ];
+    Menu.setApplicationMenu(null);
 
-    const menu = Menu.buildFromTemplate(template);
-    Menu.setApplicationMenu(menu);
+    setupUpdates((status) => mainWindow?.webContents.send('update-status', status));
 
     // app 프로토콜 핸들러 등록
     protocol.handle('app', (request) => {

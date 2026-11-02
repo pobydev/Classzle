@@ -17,4 +17,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteProject: (name: string) => ipcRenderer.invoke('delete-project', name),
     printPreview: (html: string) => ipcRenderer.invoke('print-preview', html),
     confirmDialog: (message: string) => ipcRenderer.invoke('confirm-dialog', message),
+    windowAction: (action: string) => ipcRenderer.send('window-action', action),
+    getUpdateInfo: () => ipcRenderer.invoke('update-info'),
+    checkForUpdates: () => ipcRenderer.invoke('update-check'),
+    downloadUpdate: () => ipcRenderer.invoke('update-download'),
+    installUpdate: () => ipcRenderer.invoke('update-install'),
+    onUpdateStatus: (listener: (status: unknown) => void) => {
+        const relay = (_event: unknown, status: unknown) => listener(status);
+        ipcRenderer.on('update-status', relay);
+        return () => ipcRenderer.removeListener('update-status', relay);
+    },
 });
