@@ -35,7 +35,7 @@ const HARD = { avoid: 9000, keep: 4500, group: 1800, count: 900, gender: 450 };
 // 가장 무거운 -3 학생 기준: 2 x (level3 65 + typeLevel3 65 + type 2 + band 10 + previous 1.5) + 6 x total 6 = 323.
 // 합계 때문에 -3, -2가 몰리지 않으려면 한 명을 옮겨 얻는 다른 이득을 다 더해도(-3: 36 + 4 + 20 + 3 = 63, -2: 24 + 4 + 20 + 3 = 51)
 // 벌점 한 칸보다 작아야 합니다. 그래서 level3과 typeLevel3은 65, level2와 typeLevel2는 55입니다.
-const FULL_WEIGHTS: Weights = {
+export const FULL_WEIGHTS: Weights = {
     ...HARD,
     transfer: 60,
     level3: 65,

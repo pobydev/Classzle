@@ -1,5 +1,6 @@
 import type { CustomGroup, Student } from '@/types';
-import { compileProblem, resolveClassIndex, type Weights } from './assignment/problem';
+import { FULL_WEIGHTS } from './assignment';
+import { compileProblem, resolveClassIndex } from './assignment/problem';
 
 export interface SwapRecommendation {
     studentId: string;
@@ -18,28 +19,8 @@ export function describeScoreGapChange(change: number): string {
     return `성적 평균 차이 ${Math.abs(change).toFixed(1)} ${change < 0 ? '줄어듦' : '늘어남'}`;
 }
 
-const WEIGHTS: Weights = {
-    avoid: 6000,
-    keep: 3000,
-    group: 1200,
-    count: 600,
-    gender: 300,
-    transfer: 60,
-    level3: 65,
-    level2: 55,
-    level1: 2,
-    typeLevel3: 65,
-    typeLevel2: 55,
-    typeLevel1: 1,
-    leader: 14,
-    leaderStrong: 6,
-    type: 2,
-    band: 10,
-    score: 0.5,
-    total: 6,
-    previous: 1.5,
-    moved: 0,
-};
+// 배정과 같은 잣대로 추천합니다.
+export const RECOMMEND_WEIGHTS = FULL_WEIGHTS;
 
 /**
  * 고른 학생과 바꿔도 조건을 새로 어기지 않는 상대를 균형이 좋아지는 순서로 찾습니다.
@@ -55,7 +36,7 @@ export function recommendSwaps(
     const self = students.findIndex((s) => s.id === studentId);
     if (self < 0) return [];
 
-    const problem = compileProblem(students, classCount, groups, WEIGHTS);
+    const problem = compileProblem(students, classCount, groups, RECOMMEND_WEIGHTS);
     const { c, classNames, fixedTo, stay, score, meanScore, scoreWeight, guidancePoints, meanGuidance, dims, dimsOf, avoidAdj, keepAdj } = problem;
     const classOf = students.map((s) => resolveClassIndex(s.assigned_class, classNames));
     const home = classOf[self];
@@ -84,7 +65,7 @@ export function recommendSwaps(
     };
     const scoreTerm = (sum: number, count: number) =>
         count > 0 ? Math.abs(sum / count - meanScore) * scoreWeight : 0;
-    const guidanceTerm = (sum: number) => Math.abs(sum - meanGuidance) * WEIGHTS.total;
+    const guidanceTerm = (sum: number) => Math.abs(sum - meanGuidance) * RECOMMEND_WEIGHTS.total;
     // 전출 뒤 학생이 없는 반은 평균이 없으므로 차이를 말할 수 없습니다.
     const averageGap = (sumA: number, countA: number, sumB: number, countB: number) =>
         countA > 0 && countB > 0 ? Math.abs(sumA / countA - sumB / countB) : null;
@@ -93,13 +74,13 @@ export function recommendSwaps(
         let delta = 0;
         for (const other of avoidAdj[i]) {
             if (other === partner) continue;
-            if (classOf[other] === from) delta -= WEIGHTS.avoid;
-            else if (classOf[other] === to) delta += WEIGHTS.avoid;
+            if (classOf[other] === from) delta -= RECOMMEND_WEIGHTS.avoid;
+            else if (classOf[other] === to) delta += RECOMMEND_WEIGHTS.avoid;
         }
         for (const other of keepAdj[i]) {
             if (other === partner) continue;
-            if (classOf[other] === from) delta += WEIGHTS.keep;
-            else if (classOf[other] === to) delta -= WEIGHTS.keep;
+            if (classOf[other] === from) delta += RECOMMEND_WEIGHTS.keep;
+            else if (classOf[other] === to) delta -= RECOMMEND_WEIGHTS.keep;
         }
         return delta;
     };
