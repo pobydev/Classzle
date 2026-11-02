@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import { useClasszleStore } from '@/lib/store';
 import { assignStudents, collectViolations, type AssignmentMode } from '@/lib/assignment';
+import { assignmentNotices } from '@/lib/assignment/messages';
 import { calculateClassStats } from '@/lib/stats';
 import { validateMove, validateSwap } from '@/lib/validation';
 import { exportToExcel, studentsLeftOutOfExport } from '@/lib/excel';
@@ -236,14 +237,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
 
             setIsReportOpen(true); // 결과 리포트 열기
 
-            if (result.moved > 0) {
-                toast.success(`${result.moved}명의 학생 배정이 변경되었습니다.`);
-            } else {
-                toast.info('어긴 조건이 없어 옮긴 학생이 없습니다.');
-            }
-            if (result.violations.length > 0) {
-                toast.warning(`지키지 못한 조건이 ${result.violations.length}건 있습니다. 아래 조건 준수 현황을 확인해 주세요.`);
-            }
+            assignmentNotices(result.moved, result.violations.length).forEach((notice) => toast[notice.kind](notice.text));
         }, 100);
     };
 
