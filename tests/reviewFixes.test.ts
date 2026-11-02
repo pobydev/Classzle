@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FULL_WEIGHTS } from '@/lib/assignment';
+import { calculateBalanceTable, flagColumn } from '@/lib/balanceTable';
 import { RECOMMEND_WEIGHTS, recommendSwaps } from '@/lib/recommend';
 import { makeStudent } from './helpers/students';
 
@@ -73,5 +74,29 @@ describe('13. 새 어김이 있는 교환', () => {
             ...['f1', 'f2', 'f3', 'f4'].map((id) => makeStudent({ id, gender: 'F', assigned_class: '2반' })),
         ];
         expect(ids(recommendSwaps('m1', students, 2, [], 10)).length).toBeGreaterThan(0);
+    });
+});
+
+describe('17. 리더 칸', () => {
+    it('다른 반에 다 있는데 리더가 없는 반을 표시합니다', () => {
+        expect(flagColumn([0, 2, 2, 2], 1, 'aboveOrNone').cells.map((c) => c.flagged)).toEqual([true, false, false, false]);
+    });
+
+    it('표에서도 그렇습니다', () => {
+        const leaders = (cn: string, count: number) =>
+            Array.from({ length: count }, (_, i) => makeStudent({ id: `${cn}${i}`, assigned_class: cn, behavior_type: 'LEADER', behavior_score: 1 }));
+        const table = calculateBalanceTable(
+            [...leaders('2반', 2), ...leaders('3반', 2), ...leaders('4반', 2), makeStudent({ id: 'z', assigned_class: '1반' })],
+            4,
+        );
+        expect(table.rows.map((r) => r.cells.leader.flagged)).toEqual([true, false, false, false]);
+    });
+
+    it('많은 쪽도 그대로 표시하고 리더가 있는 적은 반은 표시하지 않습니다', () => {
+        expect(flagColumn([1, 3, 3, 5], 1, 'aboveOrNone').cells.map((c) => c.flagged)).toEqual([false, false, false, true]);
+    });
+
+    it('차이가 기준 안이면 표시하지 않습니다', () => {
+        expect(flagColumn([0, 1, 1, 1], 1, 'aboveOrNone').cells.some((c) => c.flagged)).toBe(false);
     });
 });

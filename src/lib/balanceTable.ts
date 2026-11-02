@@ -3,8 +3,8 @@ import { compileProblem, isStaying, makeClassNames, previousClassOf, resolveClas
 import { calculateClassStats } from './stats';
 
 // 대부분의 반이 모인 범위에서 벗어난 칸 중 어느 쪽을 표시하는지입니다.
-// 'outside'는 양쪽, 'above'는 많은 쪽만(몰림이 문제인 생활지도), 'none'은 표시하지 않습니다.
-export type FlagMode = 'outside' | 'above' | 'none';
+// 'outside'는 양쪽, 'above'는 많은 쪽만(몰림이 문제인 생활지도), 'aboveOrNone'은 많은 쪽과 하나도 없는 칸(리더), 'none'은 표시하지 않습니다.
+export type FlagMode = 'outside' | 'above' | 'aboveOrNone' | 'none';
 
 export interface BalanceColumn {
     key: string;
@@ -67,7 +67,7 @@ export function flagColumn(values: number[], limit: number | null, flag: FlagMod
         difference: { value: difference, flagged: true },
         cells: values.map((value) => ({
             value,
-            flagged: value > high || (flag === 'outside' && value < low),
+            flagged: value > high || (flag === 'outside' && value < low) || (flag === 'aboveOrNone' && value === 0 && value < low),
         })),
     };
 }
@@ -100,7 +100,7 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
         { key: 'emotional3', label: '-3', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus3 },
         { key: 'emotional2', label: '-2', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus2 },
         { key: 'emotional1', label: '-1', section: '정서', limit: null, flag: 'none', read: (s) => s.emotionalPlus1 },
-        { key: 'leader', label: '리더', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.leaderCount },
+        { key: 'leader', label: '리더', limit: LEVEL_LIMIT, flag: 'aboveOrNone', read: (s) => s.leaderCount },
         // -합계와 +합계는 합계 안을 나눠 보여 주는 숫자입니다. 표시는 합계에만 합니다.
         { key: 'minusTotal', label: '-합계', title: MINUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.minusTotal },
         { key: 'plusTotal', label: '+합계', title: PLUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.plusTotal },
