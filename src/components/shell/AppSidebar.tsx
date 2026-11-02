@@ -120,7 +120,7 @@ export function AppSidebar({
                 <img src="/icons/classzle-128.png" alt="" className="h-[45px] w-[45px] flex-shrink-0" />
                 <div className="min-w-0">
                     <strong className="block text-title !leading-none font-bold text-ink whitespace-nowrap">
-                        클래즐
+                        클래스즐
                         <span className="ml-[7px] text-caption font-normal text-soft">Classzle</span>
                     </strong>
                     <small className="slogan block mt-1.5 text-caption !leading-[1.55] text-soft whitespace-nowrap">

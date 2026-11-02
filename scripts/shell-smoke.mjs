@@ -51,7 +51,7 @@ try {
     // 창 틀과 메뉴
     expect(await app.evaluate(({ Menu }) => Menu.getApplicationMenu())).toBeNull();
     const titlebar = page.locator('.titlebar');
-    await expect(titlebar).toContainText('클래즐');
+    await expect(titlebar).toContainText('클래스즐');
     expect((await titlebar.boundingBox()).height).toBe(34);
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--shell-top').trim())).toBe('34px');
     for (const name of ['창 최소화', '창 최대화', '앱 닫기']) {
@@ -70,7 +70,7 @@ try {
 
     // 옛 머리글과 푸터가 없고, 사이드바에 로고와 슬로건이 있음
     const sidebar = page.locator('aside[data-sidebar="expanded"]');
-    await expect(sidebar).toContainText('클래즐');
+    await expect(sidebar).toContainText('클래스즐');
     await expect(sidebar).toContainText('Classzle');
     await expect(sidebar).toContainText('완벽한 반 편성을 위한');
     await expect(page.getByText('All rights reserved')).toHaveCount(0);

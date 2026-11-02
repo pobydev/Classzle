@@ -13,7 +13,7 @@ export function TitleBar({ projectName }: { projectName: string | null }) {
         <header className="titlebar relative flex-shrink-0 h-[var(--shell-top)] flex items-center justify-between pl-[17px] bg-card border-b border-line text-small">
             <span className="flex items-center gap-2 text-ink">
                 <img src="/icons/classzle-64.png" alt="" className="h-[18px] w-[18px]" />
-                클래즐
+                클래스즐
             </span>
             {projectName && (
                 <span className="absolute left-1/2 -translate-x-1/2 max-w-[40%] truncate text-caption text-soft">
