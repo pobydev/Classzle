@@ -1,6 +1,8 @@
 import { app, BrowserWindow, shell, protocol, net, Menu, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import { pathToFileURL } from 'url';
+import { isPrintSource } from './printFiles';
 import { setupUpdates } from './updater';
 import { projectFilePath } from './projectFiles';
 import { projectNameFromFile, projectNameProblem } from './projectName';
@@ -175,15 +177,22 @@ ipcMain.handle('print-preview', async (event, htmlContent: string) => {
         await fs.writeFile(htmlPath, htmlContent, 'utf-8');
 
         // 2. 변환용 히든 윈도우 생성
+        // 리포트에는 학생 정보가 있습니다. 스크립트를 끄고 리포트 파일 말고는 아무것도 읽지 못하게 합니다.
         const conversionWindow = new BrowserWindow({
             show: false,
             webPreferences: {
                 nodeIntegration: false,
-                contextIsolation: true
+                contextIsolation: true,
+                sandbox: true,
+                javascript: false,
+                partition: 'classzle-print',
             }
         });
+        conversionWindow.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+            callback({ cancel: !isPrintSource(details.url, htmlPath) });
+        });
 
-        await conversionWindow.loadURL(`file://${htmlPath}`);
+        await conversionWindow.loadURL(pathToFileURL(htmlPath).href);
 
         // 3. PDF로 변환
         const pdfData = await conversionWindow.webContents.printToPDF({
