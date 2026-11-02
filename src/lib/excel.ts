@@ -184,31 +184,36 @@ function parseGender(value: any): Gender | null {
 
 // 생활지도 값의 유형과 등급 범위
 const BEHAVIOR_KINDS: { type: BehaviorType; words: string[]; sign: 1 | -1; maxLevel: number }[] = [
-    { type: 'LEADER', words: ['리더', 'LEADER'], sign: 1, maxLevel: 2 },
-    { type: 'BEHAVIOR', words: ['행동', 'BEHAVIOR'], sign: -1, maxLevel: 3 },
-    { type: 'EMOTIONAL', words: ['정서', 'EMOTIONAL'], sign: -1, maxLevel: 3 },
+    { type: 'LEADER', words: ['리더십', '리더형', '리더', 'LEADER'], sign: 1, maxLevel: 2 },
+    { type: 'BEHAVIOR', words: ['행동형', '행동', 'BEHAVIOR'], sign: -1, maxLevel: 3 },
+    { type: 'EMOTIONAL', words: ['정서형', '정서', 'EMOTIONAL'], sign: -1, maxLevel: 3 },
 ];
 
 const NO_BEHAVIOR_VALUES = ['', '해당없음', '없음', '-', 'NONE'];
 
+const BEHAVIOR_WORDS = BEHAVIOR_KINDS.flatMap((kind) => kind.words).join('|');
+// 값의 맨 앞이 유형 낱말이고 그 바로 뒤에 등급 한 자리가 있어야 합니다. '행동 2회'의 2는 등급이 아닙니다.
+const BEHAVIOR_VALUE = new RegExp(`^(${BEHAVIOR_WORDS})\\s*[(\\[:：]?\\s*[+\\-−–]?\\s*(\\d)\\s*[)\\]]?\\s*점?(?=\\s|$|[,.;/])`);
+const OTHER_BEHAVIOR_WORD = new RegExp(BEHAVIOR_WORDS);
+
 // 생활지도 드롭다운 파싱
 // 옵션: 해당없음, 리더(+2), 리더(+1), 행동(-1), 행동(-2), 행동(-3), 정서(-1), 정서(-2), 정서(-3)
-// 유형 낱말 바로 뒤의 숫자만 등급으로 봅니다. 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
+// 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
+// 뒤에 메모가 있어도 읽되, 메모에 다른 유형 낱말이 있거나 애매하면 짐작하지 않고 읽지 못한 값으로 알립니다.
 export function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number; isUnreadable: boolean } {
-    const str = String(value).replace(/\s/g, '').toUpperCase();
-    if (NO_BEHAVIOR_VALUES.includes(str)) {
+    const text = String(value).trim().toUpperCase();
+    if (NO_BEHAVIOR_VALUES.includes(text.replace(/\s/g, ''))) {
         return { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: false };
     }
 
-    for (const kind of BEHAVIOR_KINDS) {
-        const word = kind.words.find((w) => str.includes(w));
-        if (!word) continue;
-        const digits = str.slice(str.indexOf(word) + word.length).match(/^\D*(\d+)/);
-        const level = digits ? Number(digits[1]) : 0;
-        if (level >= 1 && level <= kind.maxLevel) {
+    const match = text.match(BEHAVIOR_VALUE);
+    const kind = match && BEHAVIOR_KINDS.find((candidate) => candidate.words.includes(match[1]));
+    if (match && kind) {
+        const level = Number(match[2]);
+        const note = text.slice(match[0].length);
+        if (level >= 1 && level <= kind.maxLevel && !OTHER_BEHAVIOR_WORD.test(note)) {
             return { behaviorType: kind.type, behaviorScore: kind.sign * level, isUnreadable: false };
         }
-        break;
     }
 
     return { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: true };

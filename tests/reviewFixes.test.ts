@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import { FULL_WEIGHTS } from '@/lib/assignment';
 import { calculateBalanceTable, flagColumn } from '@/lib/balanceTable';
-import { buildResultWorkbook, parseRosterRows } from '@/lib/excel';
+import { buildResultWorkbook, parseBehaviorDropdown, parseRosterRows } from '@/lib/excel';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { RECOMMEND_WEIGHTS, recommendSwaps } from '@/lib/recommend';
 import { groupStudentsByClass } from '@/components/step3/boardModel';
@@ -195,5 +195,43 @@ describe('22. 양식 B의 전입생', () => {
     it('양식 A는 그대로 앞쪽 반을 이전 반으로 읽습니다', () => {
         const { students } = parseRosterRows([{ 학년: 2, 반: 1, 번호: 3, 이름: '가상', 성별: '남', 성적: 1 }]);
         expect(students[0]).toMatchObject({ assigned_class: null, prev_info: '2-1-3' });
+    });
+});
+
+describe('23. 생활지도 읽기', () => {
+    const unreadable = { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: true };
+
+    it.each([
+        ['행동(-2) 리더 2명과 갈등'],
+        ['정서(-2) 행동 1회'],
+        ['행동 관찰 2회'],
+        ['행동 2회'],
+        ['리더 2명과 갈등'],
+        ['학교폭력 행동(-3)'],
+        ['행동(-2) 정서(-1)'],
+        ['행동(-4)'],
+        ['리더(+3)'],
+        ['행동 12'],
+        ['관찰 필요'],
+    ])('애매하면 읽지 않고 경고합니다: %s', (value) => {
+        expect(parseBehaviorDropdown(value)).toEqual(unreadable);
+    });
+
+    it.each([
+        ['행동(-2)', 'BEHAVIOR', -2],
+        ['행동 -2', 'BEHAVIOR', -2],
+        ['행동-2', 'BEHAVIOR', -2],
+        ['행동2', 'BEHAVIOR', -2],
+        ['행동(+1)', 'BEHAVIOR', -1],
+        ['행동형(-3)', 'BEHAVIOR', -3],
+        ['정서(-1)', 'EMOTIONAL', -1],
+        ['리더(+2)', 'LEADER', 2],
+        ['리더(-2)', 'LEADER', 2],
+        ['리더십 +1', 'LEADER', 1],
+        ['behavior(-3)', 'BEHAVIOR', -3],
+        ['EMOTIONAL 2', 'EMOTIONAL', -2],
+        ['행동(-2) 수업 방해가 잦음', 'BEHAVIOR', -2],
+    ])('유형 낱말 바로 뒤의 등급만 읽습니다: %s', (value, behaviorType, behaviorScore) => {
+        expect(parseBehaviorDropdown(value)).toEqual({ behaviorType, behaviorScore, isUnreadable: false });
     });
 });
