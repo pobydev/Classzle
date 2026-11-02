@@ -21,12 +21,21 @@ export interface ScenarioConfig {
     fixed: number;
     groups: number[];
     transfer: number;
+    // 행동형, 정서형 학생 비율입니다. 적지 않으면 8%, 6%입니다.
+    behavior?: number;
+    emotional?: number;
 }
 
 export const SCENARIOS: Record<string, ScenarioConfig> = {
     '작음 5반 140명': { classes: 5, n: 140, avoid: 8, keep: 5, fixed: 3, groups: [5], transfer: 3 },
     '보통 12반 330명': { classes: 12, n: 330, avoid: 20, keep: 12, fixed: 6, groups: [12, 24], transfer: 6 },
     '빡빡 8반 220명': { classes: 8, n: 220, avoid: 60, keep: 30, fixed: 15, groups: [8, 16, 24], transfer: 8 },
+};
+
+// 측정에만 쓰는 문제입니다. 한 반에 같은 유형, 같은 등급이 2명 이상 들어가야 할 만큼 학생이 많습니다.
+export const BENCH_SCENARIOS: Record<string, ScenarioConfig> = {
+    ...SCENARIOS,
+    '생활지도 많음 6반 170명': { classes: 6, n: 170, avoid: 25, keep: 10, fixed: 8, groups: [6, 12], transfer: 4, behavior: 0.2, emotional: 0.12 },
 };
 
 export interface Scenario {
@@ -39,18 +48,20 @@ export interface Scenario {
 export function makeScenario(cfg: ScenarioConfig, seed: number): Scenario {
     const r = seeded(seed);
     const pick = <T,>(arr: T[]) => arr[Math.floor(r() * arr.length)];
+    const behaviorRate = cfg.behavior ?? 0.08;
+    const emotionalRate = behaviorRate + (cfg.emotional ?? 0.06);
     const names = Array.from({ length: cfg.classes }, (_, i) => `${i + 1}반`);
     const students: Student[] = Array.from({ length: cfg.n }, (_, i) => {
         const roll = r();
         let behavior_type: Student['behavior_type'] = 'NONE';
         let behavior_score = 0;
-        if (roll < 0.08) {
+        if (roll < behaviorRate) {
             behavior_type = 'BEHAVIOR';
             behavior_score = -1 - Math.floor(r() * 3);
-        } else if (roll < 0.14) {
+        } else if (roll < emotionalRate) {
             behavior_type = 'EMOTIONAL';
             behavior_score = -1 - Math.floor(r() * 3);
-        } else if (roll < 0.24) {
+        } else if (roll < emotionalRate + 0.1) {
             behavior_type = 'LEADER';
             behavior_score = 1 + Math.floor(r() * 2);
         }
@@ -133,6 +144,26 @@ export function makeScenario(cfg: ScenarioConfig, seed: number): Scenario {
 
 const spread = (values: number[]) => (values.length ? Math.max(...values) - Math.min(...values) : 0);
 
+export const TYPE_LEVELS = [
+    ['b3', 'BEHAVIOR', -3],
+    ['e3', 'EMOTIONAL', -3],
+    ['b2', 'BEHAVIOR', -2],
+    ['e2', 'EMOTIONAL', -2],
+    ['b1', 'BEHAVIOR', -1],
+    ['e1', 'EMOTIONAL', -1],
+] as const;
+export type TypeLevelKey = (typeof TYPE_LEVELS)[number][0];
+
+// 문제에 유형, 등급별 학생이 몇 명 있는지 셉니다. 전출 예정 학생은 뺍니다.
+export function countTypeLevels(students: Student[]): Record<TypeLevelKey, number> {
+    const stay = students.filter((s) => !s.is_pre_transfer);
+    const entries = TYPE_LEVELS.map(([key, type, level]) => [
+        key,
+        stay.filter((s) => s.behavior_type === type && s.behavior_score === level).length,
+    ]);
+    return Object.fromEntries(entries) as Record<TypeLevelKey, number>;
+}
+
 export interface Measure {
     fixed: number;
     avoid: number;
@@ -147,6 +178,13 @@ export interface Measure {
     minus3: number;
     minus2: number;
     minus1: number;
+    // 유형과 등급을 함께 본 반별 차이입니다. b는 행동형, e는 정서형입니다.
+    typeLevel: Record<TypeLevelKey, number>;
+    behaviorTotal: number;
+    emotionalTotal: number;
+    // 반별 생활지도 점수 합계(리더 포함)의 차이, 음수 점수만 더한 합계의 차이입니다.
+    guidanceTotal: number;
+    negativeSum: number;
     leader: number;
     noLeader: number;
     previousAvg: number;
@@ -202,6 +240,13 @@ export function measure(students: Student[], groups: CustomGroup[], names: strin
         minus3: spread(countBy((s) => s.behavior_score === -3)),
         minus2: spread(countBy((s) => s.behavior_score === -2)),
         minus1: spread(countBy((s) => s.behavior_score === -1)),
+        typeLevel: Object.fromEntries(
+            TYPE_LEVELS.map(([key, type, level]) => [key, spread(countBy((s) => s.behavior_type === type && s.behavior_score === level))]),
+        ) as Record<TypeLevelKey, number>,
+        behaviorTotal: spread(countBy((s) => s.behavior_type === 'BEHAVIOR')),
+        emotionalTotal: spread(countBy((s) => s.behavior_type === 'EMOTIONAL')),
+        guidanceTotal: spread(lists.map((l) => l.reduce((a, s) => a + s.behavior_score, 0))),
+        negativeSum: spread(lists.map((l) => l.reduce((a, s) => a + Math.min(s.behavior_score, 0), 0))),
         leader: spread(leaders),
         noLeader: leaders.filter((v) => v === 0).length,
         previousAvg: previousDiffs.reduce((a, b) => a + b, 0) / Math.max(previousDiffs.length, 1),
