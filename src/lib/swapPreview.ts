@@ -9,8 +9,12 @@ export interface ClassFigures {
     male: number;
     female: number;
     average: number;
-    minus3: number;
-    minus2: number;
+    behavior3: number;
+    behavior2: number;
+    behavior1: number;
+    emotional3: number;
+    emotional2: number;
+    emotional1: number;
     leader: number;
     // 리더를 포함한 생활지도 점수 합입니다. 참고 값입니다.
     guidanceTotal: number;
@@ -33,9 +37,14 @@ function figuresOf(stat: ReturnType<typeof calculateClassStats>[number]): ClassF
         count: stat.studentCount,
         male: stat.maleCount,
         female: stat.femaleCount,
-        average: stat.averageScore,
-        minus3: stat.minus3Count,
-        minus2: stat.minus2Count,
+        // 교환으로 평균은 소수점 단위로 움직이므로 반올림하지 않은 값을 줍니다.
+        average: stat.exactAverageScore,
+        behavior3: stat.behaviorPlus3,
+        behavior2: stat.behaviorPlus2,
+        behavior1: stat.behaviorPlus1,
+        emotional3: stat.emotionalPlus3,
+        emotional2: stat.emotionalPlus2,
+        emotional1: stat.emotionalPlus1,
         leader: stat.leaderCount,
         guidanceTotal: stat.behaviorTotal,
     };

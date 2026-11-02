@@ -56,20 +56,23 @@ export function BoardLegend() {
 const FIGURE_ROWS: { label: string; title?: string; format: (f: ClassFigures) => string }[] = [
     { label: '인원', format: (f) => `${f.count}명` },
     { label: '남/여', format: (f) => `${f.male}/${f.female}` },
-    { label: '성적 평균', format: (f) => String(f.average) },
-    { label: '-3', format: (f) => `${f.minus3}명` },
-    { label: '-2', format: (f) => `${f.minus2}명` },
+    { label: '평균', format: (f) => f.average.toFixed(1) },
+    { label: '행동 -3', format: (f) => `${f.behavior3}명` },
+    { label: '행동 -2', format: (f) => `${f.behavior2}명` },
+    { label: '행동 -1', format: (f) => `${f.behavior1}명` },
+    { label: '정서 -3', format: (f) => `${f.emotional3}명` },
+    { label: '정서 -2', format: (f) => `${f.emotional2}명` },
+    { label: '정서 -1', format: (f) => `${f.emotional1}명` },
     { label: '리더', format: (f) => `${f.leader}명` },
     { label: '합계', title: '리더를 포함한 생활지도 점수의 합입니다. 대략 보는 참고 값입니다.', format: (f) => String(f.guidanceTotal) },
 ];
 
+// 달라지지 않는 값은 한 번만 흐리게 적고, 달라지는 값만 화살표와 함께 굵게 적습니다.
 function BeforeAfter({ before, after }: { before: string; after: string }) {
-    const changed = before !== after;
+    if (before === after) return <span className="whitespace-nowrap text-soft tabular-nums">{after}</span>;
     return (
-        <span className="whitespace-nowrap tabular-nums">
-            <span className="text-soft">{before}</span>
-            {' → '}
-            <span className={changed ? 'font-bold text-ink' : 'text-soft'}>{after}</span>
+        <span data-preview-changed className="whitespace-nowrap font-bold text-ink tabular-nums">
+            {before} → {after}
         </span>
     );
 }
@@ -95,13 +98,16 @@ function ComparisonCard({ student, partner, preview, onConfirm, onCancel }: {
                     </tr>
                 </thead>
                 <tbody>
-                    {FIGURE_ROWS.map((row) => (
-                        <tr key={row.label} className="border-b border-line" data-preview-row={row.label}>
-                            <th scope="row" title={row.title} className="py-1 pr-1 text-left font-medium whitespace-nowrap text-ink">{row.label}</th>
-                            <td className="py-1 pr-1"><BeforeAfter before={row.format(first.before)} after={row.format(first.after)} /></td>
-                            <td className="py-1"><BeforeAfter before={row.format(second.before)} after={row.format(second.after)} /></td>
-                        </tr>
-                    ))}
+                    {FIGURE_ROWS.map((row) => {
+                        const changed = row.format(first.before) !== row.format(first.after) || row.format(second.before) !== row.format(second.after);
+                        return (
+                            <tr key={row.label} className="border-b border-line" data-preview-row={row.label}>
+                                <th scope="row" title={row.title} className={`py-0.5 pr-1 text-left whitespace-nowrap ${changed ? 'font-bold text-ink' : 'font-normal text-soft'}`}>{row.label}</th>
+                                <td className="py-0.5 pr-1"><BeforeAfter before={row.format(first.before)} after={row.format(first.after)} /></td>
+                                <td className="py-0.5"><BeforeAfter before={row.format(second.before)} after={row.format(second.after)} /></td>
+                            </tr>
+                        );
+                    })}
                 </tbody>
             </table>
             {preview.violations.length > 0 ? (

@@ -113,7 +113,7 @@ export function BalanceTable({ students, groups, classCount, onOpenClass }: {
                 </tbody>
             </table>
             <p className="px-3 py-2 text-caption text-soft">
-                모두 전출 뒤 기준입니다. 생활지도는 합계가 아니라 등급별 학생 수로 맞춥니다. ▲는 차이가 기준을 넘은 칸입니다. 인원, 남, 여, 그룹, -3, -2, 리더는 2명, -1은 3명 차이부터 표시합니다.
+                모두 전출 뒤 기준입니다. 생활지도는 등급별 학생 수를 먼저 맞추고, 합계는 참고로 봅니다. 인원, 남, 여, 그룹, -3, -2, 리더는 2명, -1은 3명 차이부터 차이 줄에 ▲를 붙이고, 대부분의 반이 모인 범위에서 벗어난 반에도 붙입니다. 생활지도는 많은 쪽만 표시합니다.
             </p>
         </div>
     );
@@ -208,7 +208,7 @@ function DetailContent({ students, groups, classCount }: { students: Student[]; 
                 <section>
                     <SectionTitle>전학년도 반별 생활지도 등급 인원</SectionTitle>
                     <p className="mb-2 text-small text-soft">
-                        담임 선생님마다 기준이 다를 수 있습니다. 한 반만 유독 많거나 적으면 배정 전에 점수를 살펴봐 주세요. 점수를 자동으로 고치지는 않습니다. 기준 예시는 학급별 균형 통계 탭의 점수 기준 상세 안내에 있습니다.
+                        담임 선생님마다 기준이 다를 수 있습니다. 한 반만 유독 많거나 적으면 배정 전에 점수를 살펴봐 주세요. 점수를 자동으로 고치지는 않습니다. 기준 예시는 학급별 균형 통계 탭의 생활지도 기준 안내에 있습니다.
                     </p>
                     <table className="w-full border-collapse text-small">
                         <thead>
@@ -328,7 +328,7 @@ export function CriteriaAndStatus({ hasAssignments, violations }: { hasAssignmen
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="rounded-card bg-card p-4 shadow-card">
                 <h4 className="mb-3 flex items-center gap-1.5 text-body font-bold text-ink">
-                    <Lightbulb size={16} className="text-brand" /> 점수 기준 상세 안내
+                    <Lightbulb size={16} className="text-brand" /> 생활지도 기준 안내
                 </h4>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <CriteriaColumn

@@ -9,26 +9,46 @@ import { makeStudent } from './helpers/students';
 
 describe('차이와 표시 규칙', () => {
     it('기준 안이면 조용합니다', () => {
-        const { difference, cells } = flagColumn([3, 4, 3], 1, 'both');
+        const { difference, cells } = flagColumn([3, 4, 3], 1, 'outside');
         expect(difference).toEqual({ value: 1, flagged: false });
         expect(cells.some((c) => c.flagged)).toBe(false);
     });
 
-    it('both는 많은 반과 적은 반을 모두 표시합니다', () => {
-        const { difference, cells } = flagColumn([5, 4, 3, 5], 1, 'both');
-        expect(difference).toEqual({ value: 2, flagged: true });
-        expect(cells.map((c) => c.flagged)).toEqual([true, false, true, true]);
+    // 12반 화면에서 두 학생을 1반에서 2반으로 옮겼을 때의 값입니다.
+    const flaggedValues = (values: number[], limit: number, flag: 'outside' | 'above') =>
+        flagColumn(values, limit, flag).cells.filter((c) => c.flagged).map((c) => c.value);
+
+    it('대부분의 반에서 벗어난 칸만 표시합니다', () => {
+        const count = [27, 31, 29, 29, 29, 29, 29, 29, 29, 29, 30, 29];
+        const male = [14, 16, 15, 15, 15, 15, 15, 16, 15, 15, 16, 16];
+        const female = [13, 15, 14, 14, 14, 14, 14, 13, 14, 14, 14, 13];
+        expect(flaggedValues(count, 1, 'outside')).toEqual([27, 31]);
+        expect(flagColumn(male, 1, 'outside').cells.map((c) => c.flagged)).toEqual([true, ...Array(11).fill(false)]);
+        expect(flagColumn(female, 1, 'outside').cells.map((c) => c.flagged)).toEqual([false, true, ...Array(10).fill(false)]);
+        // 차이 줄의 표시는 그대로입니다.
+        expect(flagColumn(male, 1, 'outside').difference).toEqual({ value: 2, flagged: true });
     });
 
-    it('max는 몰린 반만 표시합니다', () => {
-        const { difference, cells } = flagColumn([3, 1, 0], 1, 'max');
+    it('outside는 양쪽을 모두 표시합니다', () => {
+        expect(flaggedValues([5, 3, 3, 3, 1], 1, 'outside')).toEqual([5, 1]);
+    });
+
+    it('above는 많은 쪽만 표시합니다', () => {
+        const { difference, cells } = flagColumn([3, 1, 0], 1, 'above');
         expect(difference.flagged).toBe(true);
         expect(cells.map((c) => c.flagged)).toEqual([true, false, false]);
+        expect(flaggedValues([0, 2, 2, 2, 2], 1, 'above')).toEqual([]);
+    });
+
+    it('범위가 여럿이면 낮은 쪽을 골라 몰린 반을 놓치지 않습니다', () => {
+        // 위쪽 범위를 고르면 3명 있는 반이 표시되지 않습니다.
+        expect(flaggedValues([3, 3, 0, 0], 1, 'above')).toEqual([3, 3]);
+        expect(flaggedValues([14, 14, 15, 15, 16, 16], 1, 'outside')).toEqual([16, 16]);
     });
 
     it('-1은 차이 2까지 괜찮고 3부터 표시합니다', () => {
-        expect(flagColumn([2, 0], 2, 'max').difference.flagged).toBe(false);
-        const over = flagColumn([3, 0], 2, 'max');
+        expect(flagColumn([2, 0], 2, 'above').difference.flagged).toBe(false);
+        const over = flagColumn([3, 0], 2, 'above');
         expect(over.difference.flagged).toBe(true);
         expect(over.cells.map((c) => c.flagged)).toEqual([true, false]);
     });
@@ -40,7 +60,7 @@ describe('차이와 표시 규칙', () => {
     });
 
     it('반이 없으면 0입니다', () => {
-        expect(flagColumn([], 1, 'both').difference).toEqual({ value: 0, flagged: false });
+        expect(flagColumn([], 1, 'outside').difference).toEqual({ value: 0, flagged: false });
     });
 });
 
@@ -86,12 +106,13 @@ describe('학급별 균형 표', () => {
         expect(table.columns.find((c) => c.key === 'guidanceTotal')?.title).toContain('참고');
     });
 
-    it('인원, 남, 그룹은 양쪽 칸, 행동 -3은 많은 쪽만 표시합니다', () => {
+    it('인원, 남, 그룹, 행동 -3의 차이 줄과 벗어난 칸을 표시합니다', () => {
         expect(table.difference.count).toEqual({ value: 2, flagged: true });
+        // 두 반뿐이면 낮은 범위를 골라 많은 반을 표시합니다.
         expect(first.cells.count.flagged).toBe(true);
-        expect(second.cells.count.flagged).toBe(true);
-        expect(first.cells.male.flagged && second.cells.male.flagged).toBe(true);
-        expect(first.cells['group:g'].flagged && second.cells['group:g'].flagged).toBe(true);
+        expect(second.cells.count.flagged).toBe(false);
+        expect(first.cells.male.flagged).toBe(true);
+        expect(first.cells['group:g'].flagged).toBe(true);
         expect(first.cells.behavior3.flagged).toBe(true);
         expect(second.cells.behavior3.flagged).toBe(false);
     });

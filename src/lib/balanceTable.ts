@@ -2,8 +2,9 @@ import type { CustomGroup, Student } from '@/types';
 import { compileProblem, isStaying, makeClassNames, previousClassOf, resolveClassIndex, type Weights } from './assignment/problem';
 import { calculateClassStats } from './stats';
 
-// 어느 쪽 칸에 표시하는지입니다. 'both'는 가장 많은 반과 적은 반, 'max'는 몰린 반만, 'none'은 표시하지 않습니다.
-export type FlagMode = 'both' | 'max' | 'none';
+// 대부분의 반이 모인 범위에서 벗어난 칸 중 어느 쪽을 표시하는지입니다.
+// 'outside'는 양쪽, 'above'는 많은 쪽만(몰림이 문제인 생활지도), 'none'은 표시하지 않습니다.
+export type FlagMode = 'outside' | 'above' | 'none';
 
 export interface BalanceColumn {
     key: string;
@@ -36,18 +37,37 @@ export interface BalanceTable {
     rows: BalanceRow[];
 }
 
-// 차이와 표시할 칸을 정합니다. values는 반 순서대로 들어옵니다.
+/**
+ * 차이와 표시할 칸을 정합니다. values는 반 순서대로 들어옵니다.
+ * 차이가 기준을 넘으면, 너비가 기준(limit)인 범위 중 반이 가장 많이 들어가는 범위를 찾아 거기서 벗어난 칸만 표시합니다.
+ * 한 반만 어긋났을 때 그 반만 표시하기 위해서입니다. 범위가 여럿이면 낮은 쪽을 고릅니다.
+ */
 export function flagColumn(values: number[], limit: number | null, flag: FlagMode): { difference: BalanceCell; cells: BalanceCell[] } {
     if (values.length === 0) return { difference: { value: 0, flagged: false }, cells: [] };
-    const max = Math.max(...values);
-    const min = Math.min(...values);
-    const difference = max - min;
-    const over = limit !== null && flag !== 'none' && difference > limit;
+    const difference = Math.max(...values) - Math.min(...values);
+    if (limit === null || flag === 'none' || difference <= limit) {
+        return {
+            difference: { value: difference, flagged: false },
+            cells: values.map((value) => ({ value, flagged: false })),
+        };
+    }
+
+    // 범위의 아래 끝을 실제 값으로만 대 봐도 넣을 수 있는 묶음은 모두 나옵니다.
+    let low = 0;
+    let most = -1;
+    for (const candidate of [...new Set(values)].sort((a, b) => a - b)) {
+        const inside = values.filter((value) => value >= candidate && value <= candidate + limit).length;
+        if (inside > most) {
+            most = inside;
+            low = candidate;
+        }
+    }
+    const high = low + limit;
     return {
-        difference: { value: difference, flagged: over },
+        difference: { value: difference, flagged: true },
         cells: values.map((value) => ({
             value,
-            flagged: over && (value === max || (flag === 'both' && value === min)),
+            flagged: value > high || (flag === 'outside' && value < low),
         })),
     };
 }
@@ -65,17 +85,17 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
 
     type Stat = (typeof stats)[number];
     const specs: (BalanceColumn & { read: (stat: Stat) => number })[] = [
-        { key: 'count', label: '인원', limit: COUNT_LIMIT, flag: 'both', read: (s) => s.studentCount },
-        { key: 'male', label: '남', limit: COUNT_LIMIT, flag: 'both', read: (s) => s.maleCount },
-        { key: 'female', label: '여', limit: COUNT_LIMIT, flag: 'both', read: (s) => s.femaleCount },
+        { key: 'count', label: '인원', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.studentCount },
+        { key: 'male', label: '남', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.maleCount },
+        { key: 'female', label: '여', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.femaleCount },
         { key: 'average', label: '평균', limit: null, flag: 'none', read: (s) => s.averageScore },
-        { key: 'behavior3', label: '-3', section: '행동', limit: LEVEL_LIMIT, flag: 'max', read: (s) => s.behaviorPlus3 },
-        { key: 'behavior2', label: '-2', section: '행동', limit: LEVEL_LIMIT, flag: 'max', read: (s) => s.behaviorPlus2 },
-        { key: 'behavior1', label: '-1', section: '행동', limit: MILD_LEVEL_LIMIT, flag: 'max', read: (s) => s.behaviorPlus1 },
-        { key: 'emotional3', label: '-3', section: '정서', limit: LEVEL_LIMIT, flag: 'max', read: (s) => s.emotionalPlus3 },
-        { key: 'emotional2', label: '-2', section: '정서', limit: LEVEL_LIMIT, flag: 'max', read: (s) => s.emotionalPlus2 },
-        { key: 'emotional1', label: '-1', section: '정서', limit: MILD_LEVEL_LIMIT, flag: 'max', read: (s) => s.emotionalPlus1 },
-        { key: 'leader', label: '리더', limit: LEVEL_LIMIT, flag: 'max', read: (s) => s.leaderCount },
+        { key: 'behavior3', label: '-3', section: '행동', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.behaviorPlus3 },
+        { key: 'behavior2', label: '-2', section: '행동', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.behaviorPlus2 },
+        { key: 'behavior1', label: '-1', section: '행동', limit: MILD_LEVEL_LIMIT, flag: 'above', read: (s) => s.behaviorPlus1 },
+        { key: 'emotional3', label: '-3', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus3 },
+        { key: 'emotional2', label: '-2', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus2 },
+        { key: 'emotional1', label: '-1', section: '정서', limit: MILD_LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus1 },
+        { key: 'leader', label: '리더', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.leaderCount },
         {
             key: 'guidanceTotal',
             label: '합계',
@@ -89,7 +109,7 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
             label: g.name,
             section: '그룹 분산' as const,
             limit: COUNT_LIMIT,
-            flag: 'both' as const,
+            flag: 'outside' as const,
             read: (s: Stat) => s.groupCounts[g.id] ?? 0,
         })),
     ];
@@ -110,10 +130,7 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
     }
 
     // 평균의 차이는 반올림 전 값으로 냅니다. 학생이 없는 반은 평균이 없으므로 뺍니다.
-    const averages = classNames
-        .map((name) => staying.filter((s) => s.assigned_class === name))
-        .filter((list) => list.length > 0)
-        .map((list) => list.reduce((sum, s) => sum + s.academic_score, 0) / list.length);
+    const averages = stats.filter((stat) => stat.studentCount > 0).map((stat) => stat.exactAverageScore);
     difference.average = {
         value: averages.length ? Math.round((Math.max(...averages) - Math.min(...averages)) * 10) / 10 : 0,
         flagged: false,

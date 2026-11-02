@@ -362,7 +362,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
             }
             setPendingSwap(null);
             clearSelection();
-            toast.success('조건을 어기는 줄 알고 학생을 옮겼습니다. 조건 준수 현황에 표시됩니다.');
+            toast.success('조건을 어기는 변경을 적용했습니다. 조건 준수 현황에 표시됩니다.');
         }
     };
 
