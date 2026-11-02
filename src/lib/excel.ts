@@ -75,15 +75,29 @@ function firstValue(row: any, keys: string[]): any {
     return undefined;
 }
 
+function isRepeatedHeaderRow(row: any): boolean {
+    const name = String(firstValue(row, ['이름', 'name', '성명']) ?? '').trim();
+    const gender = String(firstValue(row, ['성별', 'gender']) ?? '').trim();
+    return ['이름', 'name', '성명'].includes(name) && ['성별', 'gender'].includes(gender);
+}
+
+function isTotalRow(row: any): boolean {
+    return ['반', '반(배정)', '반(이전)'].some((key) => String(row[key] ?? '').trim() === '계');
+}
+
 // 엑셀 행을 학생으로 바꿉니다.
-export function parseRosterRows(rows: any[]): ParsedRoster {
+export function parseRosterRows(allRows: any[]): ParsedRoster {
+    // 이 앱이 내보낸 결과 파일은 반마다 머리글 줄과 계 줄이 끼어 있습니다.
+    const isResultFile = allRows.some((row) => row['반(배정)'] !== undefined && row['반(이전)'] !== undefined);
+    const rows = allRows.filter((row) => !isRepeatedHeaderRow(row) && !isTotalRow(row));
+
     const blankGender: string[] = [];
     const blankScore: string[] = [];
     const unreadableBehavior: string[] = [];
     let blankNameRows = 0;
 
     // 빈 칸은 행에 들어오지 않으므로 양식은 파일 전체를 보고 정합니다. 전입생은 이전 반이 빈 칸입니다.
-    const prevClassOf = (row: any) => row['반_1'] || row['class_1'] || row['이전반'] || row['prev_class'];
+    const prevClassOf = (row: any) => row['반_1'] || row['class_1'] || row['이전반'] || row['prev_class'] || row['반(이전)'];
     const isFormB = rows.some((row) => prevClassOf(row) !== undefined);
 
     const students: Student[] = rows.map((row: any) => {
@@ -113,12 +127,12 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
                     // 1. NEIS/기배정 서식 처리 (중복 헤더 발생: 반 vs 반_1)
                     // 순서: 학년(New), 반(New), 번호(New) ... 학년(Old), 반(Old), 번호(Old)
                     const assignedGrade = row['학년'] || row['grade'];
-                    const assignedClass = row['반'] || row['class'];
+                    const assignedClass = row['반'] || row['class'] || row['반(배정)'];
                     const assignedNumber = row['번호'] || row['number'];
 
-                    const prevGrade = row['학년_1'] || row['grade_1'] || row['이전학년'] || row['prev_grade'];
+                    const prevGrade = row['학년_1'] || row['grade_1'] || row['이전학년'] || row['prev_grade'] || row['학년(이전)'];
                     const prevClass = prevClassOf(row);
-                    const prevNumber = row['번호_1'] || row['number_1'] || row['이전번호'] || row['prev_number'];
+                    const prevNumber = row['번호_1'] || row['number_1'] || row['이전번호'] || row['prev_number'] || row['번호(이전)'];
 
                     // 기배정 여부 판단 로직 개선
                     let finalAssignedClass = null;
@@ -156,6 +170,9 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
     });
 
     const warnings: string[] = [];
+    if (isResultFile) {
+        warnings.push('배정 결과 파일을 읽었습니다. 이름, 성별, 성적, 반만 들어왔고 생활지도와 조건은 들어오지 않았습니다. 이어서 작업하려면 저장한 작업을 불러와 주세요.');
+    }
     const listNames = (names: string[]) =>
         names.length > 3 ? `${names.slice(0, 3).join(', ')} 외 ${names.length - 3}명` : names.join(', ');
     if (blankNameRows > 0) {

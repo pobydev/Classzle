@@ -235,3 +235,34 @@ describe('23. 생활지도 읽기', () => {
         expect(parseBehaviorDropdown(value)).toEqual({ behaviorType, behaviorScore, isUnreadable: false });
     });
 });
+
+describe('24. 내보낸 결과 파일을 다시 올릴 때', () => {
+    const header = { '학년(배정)': '학년(배정)', '반(배정)': '반(배정)', '번호(배정)': '번호(배정)', 성명: '성명', 성별: '성별', 성적: '성적', '학년(이전)': '학년(이전)', '반(이전)': '반(이전)', '번호(이전)': '번호(이전)' };
+    const rows = [
+        { '학년(배정)': 3, '반(배정)': 1, '번호(배정)': 1, 성명: '가상가', 성별: '남', 성적: 500, '학년(이전)': 2, '반(이전)': 4, '번호(이전)': 7 },
+        { '반(배정)': '계', '번호(배정)': '1명', 성별: '남:1 여:0', 성적: '500.0' },
+        header,
+        { '학년(배정)': 3, '반(배정)': 2, '번호(배정)': 1, 성명: '가상나', 성별: '여', 성적: 400, '학년(이전)': 2, '반(이전)': 1, '번호(이전)': 2 },
+        { '반(배정)': '계', '번호(배정)': '1명', 성명: '전출 1명 제외', 성별: '남:0 여:1', 성적: '400.0' },
+    ];
+
+    it('머리글 줄과 계 줄을 학생으로 읽지 않습니다', () => {
+        const { students } = parseRosterRows(rows);
+        expect(students.map((s) => s.name)).toEqual(['가상가', '가상나']);
+    });
+
+    it('반과 이전 반을 맞게 읽습니다', () => {
+        const { students } = parseRosterRows(rows);
+        expect(students[0]).toMatchObject({ assigned_class: '1반', prev_info: '2-4-7' });
+    });
+
+    it('결과 파일이라는 것과 빠진 내용을 알립니다', () => {
+        const { warnings } = parseRosterRows(rows);
+        expect(warnings.join()).toContain('배정 결과 파일');
+        expect(warnings.join()).toContain('생활지도');
+    });
+
+    it('평범한 명단에는 그 안내가 없습니다', () => {
+        expect(parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 1 }]).warnings).toEqual([]);
+    });
+});
