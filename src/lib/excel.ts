@@ -258,16 +258,12 @@ export function buildResultWorkbook(
     const { includeDetails = false, groups = [], numberingMethod = 'mixed' } = options;
     const workbook = new ExcelJS.Workbook();
 
-    // 기본 정보에는 성적을 넣지 않습니다. 전출 예정은 명단을 쓰는 데 필요해서 있을 때만 비고로 넣습니다.
+    // 기본 정보에도 성적과 반 평균이 들어갑니다. 담임 협의와 담당 교사가 씁니다. 학생에게 알리는 일은 NEIS로 합니다.
+    // 전출 예정은 명단을 쓰는 데 필요해서 있을 때만 비고로 넣습니다.
     const hasTransfer = students.some((s) => s.is_pre_transfer);
     const lastColumnHeader = includeDetails ? '특이사항/조건' : hasTransfer ? '비고' : null;
     const lastColumnFor = (s: Student) =>
         includeDetails ? formatStudentDetails(s, groups, students) : s.is_pre_transfer ? '전출 예정' : '';
-    const withoutHiddenColumns = (sheet: ExcelJS.Worksheet) => {
-        if (!includeDetails) {
-            sheet.columns = sheet.columns.filter((column) => column.key !== 'score') as ExcelJS.Column[];
-        }
-    };
 
     // 공통 스타일 정의
     const baseFont = { name: 'Pretendard', size: 11 };
@@ -326,7 +322,6 @@ export function buildResultWorkbook(
         { header: '번호(이전)', key: 'prev_number', width: 9 },
     ];
 
-    withoutHiddenColumns(sheet1);
     if (lastColumnHeader) {
         sheet1.columns = [
             ...sheet1.columns,
@@ -548,7 +543,6 @@ export function buildResultWorkbook(
         { header: '번호(배정)', key: 'new_number', width: 9 },
     ];
 
-    withoutHiddenColumns(sheet2);
     if (lastColumnHeader) {
         sheet2.columns = [
             ...sheet2.columns,
@@ -739,11 +733,11 @@ function formatStudentDetails(student: Student, groups: CustomGroup[], allStuden
         }
     });
 
-    // 3. 관계 (피함)
+    // 3. 관계 (분리)
     student.avoid_ids?.forEach(aid => {
         const other = allStudents.find(s => s.id === aid);
         if (other) {
-            details.push(`${other.name}(피함)`);
+            details.push(`${other.name}(분리)`);
         }
     });
 

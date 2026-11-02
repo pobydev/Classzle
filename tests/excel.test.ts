@@ -94,7 +94,7 @@ describe('결과 엑셀', () => {
         const text = allText(false);
         expect(text).toContain('가상가');
         expect(text).not.toContain('행동(');
-        expect(text).not.toContain('(피함)');
+        expect(text).not.toContain('(분리)');
         expect(text).not.toContain('고정');
         expect(text).not.toContain('특이사항');
     });
@@ -102,7 +102,7 @@ describe('결과 엑셀', () => {
     it('상세 정보를 고르면 함께 나갑니다', () => {
         const text = allText(true);
         expect(text).toContain('행동(-3)');
-        expect(text).toContain('가상나(피함)');
+        expect(text).toContain('가상나(분리)');
     });
 
     const scoreList = [
@@ -117,13 +117,22 @@ describe('결과 엑셀', () => {
         return cells.join('|');
     };
 
-    it('기본 정보에는 성적과 반 평균이 없습니다', () => {
+    it('기본 정보에도 성적과 반 평균이 들어갑니다', () => {
         const text = textOf(scoreList, false);
-        expect(text).not.toContain('성적');
-        expect(text).not.toContain('734');
-        expect(text).not.toContain('612');
-        // 평균 행의 소수점 값도 나가지 않습니다.
-        expect(text).not.toMatch(/\d+\.\d/);
+        expect(text).toContain('성적');
+        expect(text).toContain('734');
+        expect(text).toContain('612');
+        // 반 평균 행은 소수점 한 자리입니다.
+        expect(text).toContain('734.0');
+        expect(text).toContain('612.0');
+    });
+
+    it('기본 정보에 성적이 들어가도 생활지도, 관계, 고정 반은 나가지 않습니다', () => {
+        const text = allText(false);
+        expect(text).toContain('성적');
+        expect(text).not.toContain('행동(');
+        expect(text).not.toContain('(분리)');
+        expect(text).not.toContain('고정');
     });
 
     it('기본 정보에도 전출 예정은 비고로 표시합니다', () => {

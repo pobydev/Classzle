@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assignStudents } from '@/lib/assignment';
-import { recommendSwaps } from '@/lib/recommend';
+import { describeScoreGapChange, recommendSwaps } from '@/lib/recommend';
 import { validateMove, validateSwap } from '@/lib/validation';
 import type { Student } from '@/types';
 import { makeScenario, SCENARIOS } from './helpers/problem';
@@ -114,6 +114,65 @@ describe('교환 추천', () => {
     it('없는 학생이나 미배정 학생이면 빈 목록입니다', () => {
         expect(recommendSwaps('없음', two(), 2)).toEqual([]);
         expect(recommendSwaps('a', two({ assigned_class: null }), 2)).toEqual([]);
+    });
+});
+
+describe('교환 뒤 성적 평균 차이', () => {
+    const changeFor = (students: Student[], partner: string) =>
+        recommendSwaps('a', students, 2).find((r) => r.studentId === partner)?.scoreGapChange;
+
+    it('두 반의 평균 차이가 얼마나 변하는지 알려 줍니다', () => {
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1반', academic_score: 900 }),
+            makeStudent({ id: 'k', assigned_class: '1반', academic_score: 800 }),
+            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100 }),
+            makeStudent({ id: 'm', assigned_class: '2반', academic_score: 700 }),
+        ];
+        // 전: 850과 400, 차이 450. b와 바꾸면 450과 800, 차이 350. m과 바꾸면 750과 500, 차이 250.
+        expect(changeFor(students, 'b')).toBeCloseTo(-100);
+        expect(changeFor(students, 'm')).toBeCloseTo(-200);
+    });
+
+    it('평균 차이가 벌어지면 양수입니다', () => {
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1반', academic_score: 400 }),
+            makeStudent({ id: 'k', assigned_class: '1반', academic_score: 600 }),
+            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 700 }),
+            makeStudent({ id: 'm', assigned_class: '2반', academic_score: 300 }),
+        ];
+        // 전: 500과 500, 차이 0. b와 바꾸면 650과 350, 차이 300.
+        expect(changeFor(students, 'b')).toBeCloseTo(300);
+    });
+
+    it('전출 예정 학생은 평균에 넣지 않습니다', () => {
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1반', academic_score: 900 }),
+            makeStudent({ id: 'k', assigned_class: '1반', academic_score: 500 }),
+            makeStudent({ id: 'j', assigned_class: '1반', academic_score: 500 }),
+            makeStudent({ id: 'q', assigned_class: '1반', academic_score: 500 }),
+            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100, is_pre_transfer: true }),
+            makeStudent({ id: 'm', assigned_class: '2반', academic_score: 300 }),
+            makeStudent({ id: 'n', assigned_class: '2반', academic_score: 500 }),
+        ];
+        // 전: 1반 600, 2반 400(전출 학생 뺌), 차이 200.
+        // b와 바꾸면 전출 뒤 인원이 3명씩으로 맞습니다. 1반 500(들어온 b는 전출), 2반 1700/3, 차이 200/3.
+        expect(changeFor(students, 'b')).toBeCloseTo(200 / 3 - 200, 5);
+    });
+
+    it('전출 뒤 학생이 없는 반이 있으면 0입니다', () => {
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1반', academic_score: 900 }),
+            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100, is_pre_transfer: true }),
+        ];
+        expect(changeFor(students, 'b')).toBe(0);
+    });
+
+    it('교사가 읽을 문구로 바꿉니다', () => {
+        expect(describeScoreGapChange(-2.34)).toBe('성적 평균 차이 2.3 줄어듦');
+        expect(describeScoreGapChange(1.26)).toBe('성적 평균 차이 1.3 늘어남');
+        expect(describeScoreGapChange(0.2)).toBe('성적 평균 차이 거의 그대로');
+        expect(describeScoreGapChange(-0.49)).toBe('성적 평균 차이 거의 그대로');
+        expect(describeScoreGapChange(0)).toBe('성적 평균 차이 거의 그대로');
     });
 });
 

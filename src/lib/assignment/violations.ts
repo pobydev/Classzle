@@ -32,14 +32,14 @@ export function collectViolations(
             violations.push({
                 type: 'FIXED_CLASS',
                 key: `FIXED|${s.id}`,
-                message: `${s.name} 학생의 고정 반(${s.fixed_class})이 학급 수를 벗어났습니다.`,
+                message: `${s.name} 학생의 고정 배정(${s.fixed_class})이 학급 수를 벗어났습니다.`,
                 studentIds: [s.id],
             });
         } else if (resolveClassIndex(s.assigned_class, classNames) !== target) {
             violations.push({
                 type: 'FIXED_CLASS',
                 key: `FIXED|${s.id}`,
-                message: `${s.name} 학생은 ${classNames[target]}에 고정인데 ${s.assigned_class || '미배정'} 상태입니다.`,
+                message: `${s.name} 학생은 ${classNames[target]} 고정인데 ${s.assigned_class || '미배정'} 상태입니다.`,
                 studentIds: [s.id],
                 className: s.assigned_class || undefined,
             });
@@ -65,7 +65,7 @@ export function collectViolations(
             violations.push({
                 type: 'AVOID',
                 key,
-                message: `${a.name} 학생과 ${b.name} 학생은 떼어 놓아야 하는데 같은 반(${a.assigned_class})입니다.`,
+                message: `${a.name} 학생과 ${b.name} 학생은 분리 배정인데 같은 반(${a.assigned_class})입니다.`,
                 studentIds: [a.id, b.id],
                 className: a.assigned_class,
             });
@@ -77,7 +77,7 @@ export function collectViolations(
             violations.push({
                 type: 'KEEP',
                 key,
-                message: `${a.name} 학생과 ${b.name} 학생은 함께 두어야 하는데 ${a.assigned_class}과 ${b.assigned_class}으로 나뉘었습니다.`,
+                message: `${a.name} 학생과 ${b.name} 학생은 함께 배정인데 ${a.assigned_class}과 ${b.assigned_class}으로 나뉘었습니다.`,
                 studentIds: [a.id, b.id],
             });
         }
@@ -104,7 +104,7 @@ export function collectViolations(
                 type: 'GROUP_IMBALANCE',
                 key: `GROUP|${group.id}`,
                 amount: spread.amount,
-                message: `'${group.name}' 그룹이 ${spread.text}`,
+                message: `'${group.name}' 그룹 분산: ${spread.text}`,
                 studentIds: [...members],
             });
         }

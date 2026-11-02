@@ -39,8 +39,9 @@ export function calculateClassStats(students: Student[], classCountOrNames: numb
         ? Array.from({ length: classCountOrNames }, (_, i) => `${i + 1}반`)
         : classCountOrNames;
 
-    const averageOf = (list: Student[]) =>
-        list.length > 0 ? Math.round(list.reduce((sum, s) => sum + s.academic_score, 0) / list.length) : 0;
+    const exactAverageOf = (list: Student[]) =>
+        list.length > 0 ? list.reduce((sum, s) => sum + s.academic_score, 0) / list.length : 0;
+    const averageOf = (list: Student[]) => Math.round(exactAverageOf(list));
 
     return classNames.map((cn) => {
         const cs = students.filter((s) => s.assigned_class === cn);
@@ -58,10 +59,11 @@ export function calculateClassStats(students: Student[], classCountOrNames: numb
             stayMaleCount: staying.filter((s) => s.gender === 'M').length,
             stayFemaleCount: staying.filter((s) => s.gender === 'F').length,
             averageScore: averageOf(cs),
+            exactAverageScore: exactAverageOf(cs),
             stayAverageScore: averageOf(staying),
             behaviorTotal: cs.reduce((sum, s) => sum + s.behavior_score, 0),
 
-            // 등급별 인원. 배정은 합계가 아니라 이 인원을 맞춥니다.
+            // 등급별 인원. 배정은 이 인원을 먼저 맞추고, 합계는 참고로 봅니다.
             minus3Count: staying.filter((s) => s.behavior_score <= -3).length,
             minus2Count: staying.filter((s) => s.behavior_score === -2).length,
             minus1Count: staying.filter((s) => s.behavior_score === -1).length,

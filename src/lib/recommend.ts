@@ -6,6 +6,16 @@ export interface SwapRecommendation {
     // 음수일수록 균형이 좋아지는 교환입니다.
     balanceChange: number;
     scoreDifference: number;
+    // 바꾼 뒤 두 반의 전출 뒤 성적 평균 차이가 얼마나 달라지는지입니다. 음수면 차이가 줄어듭니다.
+    scoreGapChange: number;
+}
+
+// 이보다 작은 변화는 교사가 평균을 볼 때 달라 보이지 않습니다.
+const NEGLIGIBLE_GAP_CHANGE = 0.5;
+
+export function describeScoreGapChange(change: number): string {
+    if (Math.abs(change) < NEGLIGIBLE_GAP_CHANGE) return '성적 평균 차이 거의 그대로';
+    return `성적 평균 차이 ${Math.abs(change).toFixed(1)} ${change < 0 ? '줄어듦' : '늘어남'}`;
 }
 
 const WEIGHTS: Weights = {
@@ -18,12 +28,15 @@ const WEIGHTS: Weights = {
     level3: 40,
     level2: 30,
     level1: 8,
+    typeLevel3: 15,
+    typeLevel2: 12,
+    typeLevel1: 4,
     leader: 14,
     leaderStrong: 6,
     type: 5,
     band: 10,
     score: 0.5,
-    previous: 1.5,
+    guidance: 1,
     moved: 0,
 };
 
@@ -42,17 +55,15 @@ export function recommendSwaps(
     if (self < 0) return [];
 
     const problem = compileProblem(students, classCount, groups, WEIGHTS);
-    const { c, classNames, fixedTo, stay, score, meanScore, scoreWeight, dims, dimsOf, avoidAdj, keepAdj } = problem;
+    const { c, classNames, fixedTo, stay, score, meanScore, scoreWeight, guidancePoints, meanGuidance, dims, dimsOf, avoidAdj, keepAdj } = problem;
     const classOf = students.map((s) => resolveClassIndex(s.assigned_class, classNames));
     const home = classOf[self];
     if (home < 0) return [];
-    if (fixedTo[self] >= 0 && fixedTo[self] !== home) {
-        // 고정 반을 어긴 학생은 고정 반으로 가는 교환만 살펴봅니다.
-    }
 
     const counts = new Int32Array(dims.length * c);
     const stayCount = new Int32Array(c);
     const stayScore = new Float64Array(c);
+    const guidanceSum = new Int32Array(c);
     classOf.forEach((cl, i) => {
         if (cl < 0) return;
         const ds = dimsOf[i];
@@ -60,6 +71,7 @@ export function recommendSwaps(
         if (stay[i]) {
             stayCount[cl]++;
             stayScore[cl] += score[i];
+            guidanceSum[cl] += guidancePoints[i];
         }
     });
 
@@ -71,6 +83,10 @@ export function recommendSwaps(
     };
     const scoreTerm = (sum: number, count: number) =>
         count > 0 ? Math.abs(sum / count - meanScore) * scoreWeight : 0;
+    const guidanceTerm = (sum: number) => Math.abs(sum - meanGuidance) * WEIGHTS.guidance;
+    // 전출 뒤 학생이 없는 반은 평균이 없으므로 차이를 말할 수 없습니다.
+    const averageGap = (sumA: number, countA: number, sumB: number, countB: number) =>
+        countA > 0 && countB > 0 ? Math.abs(sumA / countA - sumB / countB) : null;
 
     const pairsDelta = (i: number, from: number, to: number, partner: number) => {
         let delta = 0;
@@ -128,10 +144,19 @@ export function recommendSwaps(
         const otherSum = stayScore[other] - stay[j] * score[j] + stay[self] * score[self];
         soft += scoreTerm(homeSum, homeCount) + scoreTerm(otherSum, otherCount) - beforeScore;
 
+        // 배정과 같은 잣대가 되도록 생활지도 합계 변화도 더합니다.
+        const pointsIn = guidancePoints[j] - guidancePoints[self];
+        soft += guidanceTerm(guidanceSum[home] + pointsIn) + guidanceTerm(guidanceSum[other] - pointsIn)
+            - guidanceTerm(guidanceSum[home]) - guidanceTerm(guidanceSum[other]);
+
+        const gapBefore = averageGap(stayScore[home], stayCount[home], stayScore[other], stayCount[other]);
+        const gapAfter = averageGap(homeSum, homeCount, otherSum, otherCount);
+
         results.push({
             studentId: candidate.id,
             balanceChange: hard + soft,
             scoreDifference: Math.abs(score[self] - score[j]),
+            scoreGapChange: gapBefore === null || gapAfter === null ? 0 : gapAfter - gapBefore,
         });
     });
 

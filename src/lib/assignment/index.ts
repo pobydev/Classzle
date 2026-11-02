@@ -26,22 +26,27 @@ export interface AssignResult {
     iterations: number;
 }
 
-// 어길 때의 벌점입니다. 충돌하면 고정 반, 떼어 놓기, 함께 두기, 그룹, 전체 인원, 남녀 순으로 지킵니다.
-// 고정 반은 학생을 옮기지 않는 것으로 지킵니다.
+// 어길 때의 벌점입니다. 충돌하면 고정 배정, 분리 배정, 함께 배정, 그룹 분산, 전체 인원, 남녀 순으로 지킵니다.
+// 고정 배정은 학생을 옮기지 않는 것으로 지킵니다.
 const HARD = { avoid: 3000, keep: 1500, group: 600, count: 300, gender: 150 };
 
+// 비슷하면 되는 항목입니다. 학생 한 명을 옮겨 얻는 이득이 남녀 벌점 한 칸(150)을 넘지 않아야 조건이 먼저입니다.
+// 가장 무거운 -3 행동 학생 기준: 2 x (level3 40 + typeLevel3 15 + type 5 + band 10) + 6 x guidance 1 = 146.
 const FULL_WEIGHTS: Weights = {
     ...HARD,
     transfer: 60,
     level3: 40,
     level2: 30,
     level1: 8,
+    typeLevel3: 15,
+    typeLevel2: 12,
+    typeLevel1: 4,
     leader: 14,
     leaderStrong: 6,
     type: 5,
     band: 10,
     score: 0.5,
-    previous: 1.5,
+    guidance: 1,
     moved: 0,
 };
 
@@ -51,12 +56,15 @@ const REPAIR_WEIGHTS: Weights = {
     level3: 8,
     level2: 6,
     level1: 2,
+    typeLevel3: 3,
+    typeLevel2: 2,
+    typeLevel1: 1,
     leader: 2,
     leaderStrong: 1,
     type: 1,
     band: 4,
     score: 0.25,
-    previous: 0.2,
+    guidance: 0.2,
     moved: 25,
 };
 
