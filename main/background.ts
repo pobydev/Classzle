@@ -4,7 +4,7 @@ import * as fs from 'fs/promises';
 import { pathToFileURL } from 'url';
 import { isPrintSource } from './printFiles';
 import { setupUpdates } from './updater';
-import { projectFilePath } from './projectFiles';
+import { projectFilePath, writeFileSafely } from './projectFiles';
 import { projectNameFromFile, projectNameProblem } from './projectName';
 
 
@@ -48,7 +48,7 @@ ipcMain.handle('save-project', async (event, data) => {
     if (canceled || !filePath) return false;
 
     try {
-        await fs.writeFile(filePath, data, 'utf-8');
+        await writeFileSafely(filePath, data);
         return true;
     } catch (e) {
         console.error('Failed to save file:', e);
@@ -80,7 +80,7 @@ ipcMain.handle('save-named-project', async (event, name: string, data: string) =
         await ensureProjectsDir();
         const filePath = projectFilePath(getProjectsDir(), name);
         if (!filePath) return false;
-        await fs.writeFile(filePath, data, 'utf-8');
+        await writeFileSafely(filePath, data);
         return true;
     } catch (e) {
         console.error('Failed to save named project:', e);
@@ -160,7 +160,7 @@ ipcMain.handle('save-class-sheets', async (_event, files: { name: string; data: 
     }
     try {
         for (const file of files) {
-            await fs.writeFile(path.join(target, path.basename(file.name)), Buffer.from(file.data));
+            await writeFileSafely(path.join(target, path.basename(file.name)), Buffer.from(file.data));
         }
         return { status: 'saved', folder: target };
     } catch (e) {

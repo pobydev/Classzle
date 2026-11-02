@@ -1,6 +1,8 @@
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { projectFilePath } from '../main/projectFiles';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { projectFilePath, writeFileSafely } from '../main/projectFiles';
 import { findSameProject, overwritesOtherProject, projectNameFromFile, projectNameProblem } from '../main/projectName';
 
 describe('저장 이름', () => {
@@ -65,5 +67,42 @@ describe('덮어쓰기를 물을지', () => {
 
     it('새 이름이면 묻지 않습니다', () => {
         expect(overwritesOtherProject('새 작업', ['Test'], 'Test')).toBe(false);
+    });
+});
+
+describe('파일 안전하게 쓰기', () => {
+    let dir: string;
+    beforeEach(async () => {
+        dir = await fs.mkdtemp(path.join(os.tmpdir(), 'classzle-safe-'));
+    });
+    afterEach(async () => {
+        await fs.rm(dir, { recursive: true, force: true });
+    });
+
+    it('새 파일을 만들고 있던 파일을 바꿉니다', async () => {
+        const file = path.join(dir, '작업.json');
+        await writeFileSafely(file, '첫 내용');
+        await writeFileSafely(file, '둘째 내용');
+        expect(await fs.readFile(file, 'utf-8')).toBe('둘째 내용');
+        expect(await fs.readdir(dir)).toEqual(['작업.json']);
+    });
+
+    it('바꿔치기에 실패하면 원래 것을 건드리지 않고 임시 파일을 남기지 않습니다', async () => {
+        // 폴더는 파일로 바꿔치기할 수 없습니다.
+        const target = path.join(dir, '폴더.json');
+        await fs.mkdir(target);
+        await fs.writeFile(path.join(target, '안.txt'), '그대로');
+        await expect(writeFileSafely(target, '내용')).rejects.toThrow();
+        expect(await fs.readFile(path.join(target, '안.txt'), 'utf-8')).toBe('그대로');
+        expect(await fs.readdir(dir)).toEqual(['폴더.json']);
+    });
+
+    it('쓰기에 실패하면 원래 파일이 그대로입니다', async () => {
+        const file = path.join(dir, '작업.json');
+        await fs.writeFile(file, '원래 내용');
+        // 글자나 바이트가 아니면 쓰기에서 실패합니다. 곧바로 덮어쓰면 이때 파일이 비어 버립니다.
+        await expect(writeFileSafely(file, 123 as unknown as string)).rejects.toThrow();
+        expect(await fs.readFile(file, 'utf-8')).toBe('원래 내용');
+        expect(await fs.readdir(dir)).toEqual(['작업.json']);
     });
 });
