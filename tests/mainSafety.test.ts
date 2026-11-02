@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { appRequestPath } from '../main/appProtocol';
 import { isSafeExternalUrl } from '../main/externalUrl';
 import { createFolderApproval } from '../main/folderApproval';
 import { cleanOldPrintFiles, PRINT_FOLDER } from '../main/printFiles';
@@ -77,5 +78,29 @@ describe('29. 입력표 폴더', () => {
         approval.approve('C:\\고른 폴더');
         expect(approval.take('C:\\고른 폴더')).toBe(true);
         expect(approval.take('C:\\고른 폴더')).toBe(false);
+    });
+});
+
+describe('31. app 주소', () => {
+    const root = path.resolve('가상 앱#1', 'out');
+
+    it('out 폴더의 파일을 가리킵니다', () => {
+        expect(appRequestPath('app://classzle/index.html', root)).toBe(path.join(root, 'index.html'));
+        expect(appRequestPath('app://classzle/_next/static/a.js?v=1', root)).toBe(path.join(root, '_next', 'static', 'a.js'));
+    });
+
+    it('%XX로 적힌 이름을 풀어 줍니다', () => {
+        expect(appRequestPath('app://classzle/fonts/%ED%95%9C%EA%B8%80%23.woff2', root)).toBe(path.join(root, 'fonts', '한글#.woff2'));
+    });
+
+    it('폴더 밖은 가리키지 않습니다', () => {
+        // 주소 규칙이 먼저 ..을 없애므로 폴더 안의 파일이 됩니다.
+        expect(appRequestPath('app://classzle/%2e%2e/%2e%2e/secret.txt', root)).toBe(path.join(root, 'secret.txt'));
+        expect(appRequestPath('app://classzle/..%5c..%5csecret.txt', root)).toBeNull();
+    });
+
+    it('주소를 읽을 수 없으면 null입니다', () => {
+        expect(appRequestPath('app://classzle/%', root)).toBeNull();
+        expect(appRequestPath('주소 아님', root)).toBeNull();
     });
 });

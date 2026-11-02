@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, protocol, net, Menu, ipcMain, dialog } from 
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { pathToFileURL } from 'url';
+import { appRequestPath } from './appProtocol';
 import { isSafeExternalUrl } from './externalUrl';
 import { createFolderApproval } from './folderApproval';
 import { cleanOldPrintFiles, isPrintSource, PRINT_FOLDER } from './printFiles';
@@ -318,11 +319,11 @@ app.whenReady().then(() => {
 
     // app 프로토콜 핸들러 등록
     protocol.handle('app', (request) => {
-        const url = request.url.replace(/^app:\/\/classzle\//, '');
         // out 폴더 내의 파일로 매핑
         // 예: app://classzle/_next/static/... -> out/_next/static/...
-        const filePath = path.join(__dirname, '..', 'out', url);
-        return net.fetch('file://' + filePath);
+        const filePath = appRequestPath(request.url, path.join(__dirname, '..', 'out'));
+        if (!filePath) return new Response('Not found', { status: 404 });
+        return net.fetch(pathToFileURL(filePath).href);
     });
 
     createWindow();
