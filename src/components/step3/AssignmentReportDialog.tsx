@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { HistoryPanel } from './HistoryPanel';
+import { sameClass } from '@/lib/assignment/problem';
 import { buildReportHtml } from '@/lib/reportHtml';
 import { toast } from 'sonner';
 import {
@@ -110,8 +111,8 @@ export function AssignmentReportDialog({
 
                 // 1. 통계 집계 (전역 중복 방지)
                 const isMet = type === 'keep'
-                    ? (s.assigned_class === partner.assigned_class && s.assigned_class !== null)
-                    : (s.assigned_class !== partner.assigned_class && s.assigned_class !== null);
+                    ? sameClass(s.assigned_class, partner.assigned_class)
+                    : (!sameClass(s.assigned_class, partner.assigned_class) && !!s.assigned_class);
 
                 if (!processedGlobalPairs.has(pairId)) {
                     if (type === 'keep') {
@@ -230,7 +231,7 @@ export function AssignmentReportDialog({
             name: s.name,
             class: s.assigned_class || '미배정',
             target: s.fixed_class,
-            isMet: s.assigned_class === s.fixed_class
+            isMet: sameClass(s.assigned_class, s.fixed_class)
         })),
         preTransfer: students.filter(s => s.is_pre_transfer).map(s => ({
             name: s.name,

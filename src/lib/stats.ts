@@ -1,4 +1,5 @@
 import type { CustomGroup, Student } from '@/types';
+import { sameClass } from './assignment/problem';
 import { guidancePointsOf } from './guidance';
 
 export interface PreviousClassLevels {
@@ -45,7 +46,7 @@ export function calculateClassStats(students: Student[], classCountOrNames: numb
     const averageOf = (list: Student[]) => Math.round(exactAverageOf(list));
 
     return classNames.map((cn) => {
-        const cs = students.filter((s) => s.assigned_class === cn);
+        const cs = students.filter((s) => sameClass(s.assigned_class, cn));
         const preTransfer = cs.filter((s) => s.is_pre_transfer);
         const staying = cs.filter((s) => !s.is_pre_transfer);
 

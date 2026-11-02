@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
-import { FULL_WEIGHTS } from '@/lib/assignment';
+import { FULL_WEIGHTS, collectViolations } from '@/lib/assignment';
 import { calculateBalanceTable, flagColumn } from '@/lib/balanceTable';
 import { buildResultWorkbook, parseBehaviorDropdown, parseRosterRows } from '@/lib/excel';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { RECOMMEND_WEIGHTS, recommendSwaps } from '@/lib/recommend';
+import { calculateClassStats } from '@/lib/stats';
+import { previewSwap } from '@/lib/swapPreview';
+import { validateMove } from '@/lib/validation';
 import { groupStudentsByClass } from '@/components/step3/boardModel';
+import { sameClass } from '@/lib/assignment/problem';
 import { makeStudent } from './helpers/students';
 
 const ids = (list: { studentId: string }[]) => list.map((r) => r.studentId);
@@ -264,5 +268,39 @@ describe('24. 내보낸 결과 파일을 다시 올릴 때', () => {
 
     it('평범한 명단에는 그 안내가 없습니다', () => {
         expect(parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 1 }]).warnings).toEqual([]);
+    });
+});
+
+describe('25. 띄어 쓴 반 표기', () => {
+    it('같은 반인지 봅니다', () => {
+        expect(sameClass('1 반', '1반')).toBe(true);
+        expect(sameClass('1', '1반')).toBe(true);
+        expect(sameClass('1반', '2반')).toBe(false);
+        expect(sameClass(null, null)).toBe(false);
+        expect(sameClass('', '')).toBe(false);
+    });
+
+    it('통계가 세어 줍니다', () => {
+        const [first] = calculateClassStats([makeStudent({ assigned_class: '1 반', gender: 'M' })], 2);
+        expect(first.studentCount).toBe(1);
+    });
+
+    it('분리 배정 검사가 잡습니다', () => {
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1 반', avoid_ids: ['b'] }),
+            makeStudent({ id: 'b', assigned_class: '1반', avoid_ids: ['a'] }),
+        ];
+        expect(collectViolations(students, 2, []).map((v) => v.type)).toContain('AVOID');
+    });
+
+    it('같은 반으로 옮기면 어김을 새로 말하지 않습니다', () => {
+        const students = [makeStudent({ id: 'a', assigned_class: '1 반' }), makeStudent({ id: 'b', assigned_class: '1반' })];
+        expect(validateMove('a', '1반', students, 2)).toEqual([]);
+        expect(previewSwap('a', 'b', students, 2)).toBeNull();
+    });
+
+    it('엑셀에서 읽을 때 맞춥니다', () => {
+        const { students } = parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 1, 배정반: '1 반', 고정반: '2 반' }]);
+        expect(students[0]).toMatchObject({ assigned_class: '1반', fixed_class: '2반' });
     });
 });

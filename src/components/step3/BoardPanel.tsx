@@ -5,7 +5,7 @@ import { CaretRight, CheckCircle, Handshake, Prohibit, WarningCircle, X } from '
 import { Button } from '@/components/ui/button';
 import { MINUS_TOTAL_TITLE, PLUS_TOTAL_TITLE, TOTAL_TITLE } from '@/lib/balanceTable';
 import { describeScoreGapChange, type SwapRecommendation } from '@/lib/recommend';
-import { previousClassOf } from '@/lib/assignment/problem';
+import { previousClassOf, sameClass } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
 import type { CustomGroup, Student, Violation } from '@/types';
 import { behaviorMark, groupsOf, relationMemo, UNASSIGNED, type RelationIndex } from './boardModel';
@@ -153,10 +153,10 @@ function RelationList({ kind, student, partnerIds, byId }: {
                     const partner = byId.get(id);
                     if (!partner) return null;
                     const memo = relationMemo(kind, student, partner);
-                    const sameClass = !!student.assigned_class && student.assigned_class === partner.assigned_class;
+                    const together = sameClass(student.assigned_class, partner.assigned_class);
                     const broken = isAvoid
-                        ? sameClass
-                        : !!student.assigned_class && !!partner.assigned_class && !sameClass;
+                        ? together
+                        : !!student.assigned_class && !!partner.assigned_class && !together;
                     return (
                         <li key={id} className="text-small text-ink">
                             <span className="font-semibold">{partner.name}</span>{' '}

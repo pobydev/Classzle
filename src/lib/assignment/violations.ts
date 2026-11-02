@@ -1,5 +1,5 @@
 import type { CustomGroup, Student, Violation } from '@/types';
-import { isStaying, makeClassNames, resolveClassIndex } from './problem';
+import { isStaying, makeClassNames, resolveClassIndex, sameClass } from './problem';
 
 /**
  * 지금 배정이 어긴 조건을 지키는 순서대로 모두 찾습니다.
@@ -61,7 +61,7 @@ export function collectViolations(
     };
 
     eachPair((s) => s.avoid_ids, 'AVOID', (a, b, key) => {
-        if (a.assigned_class && a.assigned_class === b.assigned_class) {
+        if (sameClass(a.assigned_class, b.assigned_class)) {
             violations.push({
                 type: 'AVOID',
                 key,
@@ -73,7 +73,7 @@ export function collectViolations(
     });
 
     eachPair((s) => s.keep_ids, 'KEEP', (a, b, key) => {
-        if (a.assigned_class && b.assigned_class && a.assigned_class !== b.assigned_class) {
+        if (a.assigned_class && b.assigned_class && !sameClass(a.assigned_class, b.assigned_class)) {
             violations.push({
                 type: 'KEEP',
                 key,
@@ -86,7 +86,7 @@ export function collectViolations(
     // 인원과 그룹은 반별 차이 1명까지 인정합니다. 전출 뒤 기준으로 셉니다.
     const staying = students.filter(isStaying);
     const describeSpread = (filter: (s: Student) => boolean) => {
-        const counts = classNames.map((cn) => staying.filter((s) => s.assigned_class === cn && filter(s)).length);
+        const counts = classNames.map((cn) => staying.filter((s) => sameClass(s.assigned_class, cn) && filter(s)).length);
         const max = Math.max(...counts);
         const min = Math.min(...counts);
         if (max - min <= 1) return null;

@@ -1,5 +1,5 @@
 import type { CustomGroup, Student, Violation } from '@/types';
-import { isStaying } from './assignment/problem';
+import { isStaying, sameClass } from './assignment/problem';
 import { calculateClassStats } from './stats';
 import { validateSwap } from './validation';
 
@@ -70,7 +70,7 @@ export function previewSwap(
     const partner = students.find((s) => s.id === partnerId);
     const classA = student?.assigned_class;
     const classB = partner?.assigned_class;
-    if (!classA || !classB || classA === classB) return null;
+    if (!classA || !classB || sameClass(classA, classB)) return null;
 
     const swapped = students.map((s) => {
         if (s.id === studentId) return { ...s, assigned_class: classB };

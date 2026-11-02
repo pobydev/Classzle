@@ -1,5 +1,6 @@
 import type { CustomGroup, Student, Violation } from '@/types';
 import { collectViolations, resolveClassIndex, makeClassNames } from './assignment';
+import { sameClass } from './assignment/problem';
 
 function inferClassCount(students: Student[]): number {
     const numbers = students
@@ -38,7 +39,7 @@ export function validateSwap(
 ): Violation[] {
     const s1 = allStudents.find((s) => s.id === studentId1);
     const s2 = allStudents.find((s) => s.id === studentId2);
-    if (!s1 || !s2 || s1.assigned_class === s2.assigned_class) return [];
+    if (!s1 || !s2 || sameClass(s1.assigned_class, s2.assigned_class)) return [];
     return validateChange(
         { [s1.id]: s2.assigned_class ?? null, [s2.id]: s1.assigned_class ?? null },
         allStudents,
@@ -58,7 +59,7 @@ export function validateMove(
     groups: CustomGroup[] = [],
 ): Violation[] {
     const student = allStudents.find((s) => s.id === studentId);
-    if (!student || student.assigned_class === className) return [];
+    if (!student || sameClass(student.assigned_class, className)) return [];
     const count = classCount ?? Math.max(inferClassCount(allStudents), resolveClassIndex(className, makeClassNames(99)) + 1);
     return validateChange({ [studentId]: className }, allStudents, count, groups);
 }

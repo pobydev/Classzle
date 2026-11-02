@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student, BehaviorType, Gender, CustomGroup, NumberingMethod } from '@/types';
-import { makeClassNames, resolveClassIndex } from './assignment/problem';
+import { makeClassNames, normalizeClassName, resolveClassIndex } from './assignment/problem';
 import { calculateAttendanceNumbers } from './numbering';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -242,15 +242,8 @@ function parseAssignedClass(value: any): string | null {
     const str = String(value).trim();
     if (str === '') return null;
 
-    // "반"이 포함되어 있으면 그대로 사용
-    if (str.includes('반')) return str;
-
-    // 숫자만 있는 경우 "반"을 붙여줌
-    if (/^\d+$/.test(str)) {
-        return `${str}반`;
-    }
-
-    return str;
+    // "1", "1 반"은 "1반"으로 맞춥니다.
+    return normalizeClassName(str);
 }
 
 // 생년월일 파싱 및 정규화 (YYYY.MM.DD.)

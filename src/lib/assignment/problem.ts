@@ -16,6 +16,18 @@ export function resolveClassIndex(value: string | null | undefined, classNames: 
     return digits ? classNames.indexOf(`${Number(digits[1])}반`) : -1;
 }
 
+// 반 표기를 맞춥니다. "2", "2 반"은 "2반"입니다.
+export function normalizeClassName(value: string | null | undefined): string {
+    const text = String(value ?? '').trim();
+    const digits = text.match(/(\d+)\s*반?$/);
+    return digits ? `${Number(digits[1])}반` : text;
+}
+
+export function sameClass(a: string | null | undefined, b: string | null | undefined): boolean {
+    const name = normalizeClassName(a);
+    return name !== '' && name === normalizeClassName(b);
+}
+
 // "3-2-15"에서 전학년도 반(2)을 꺼냅니다.
 export function previousClassOf(student: Student): string | null {
     const parts = String(student.prev_info ?? '').split('-');
