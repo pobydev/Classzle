@@ -42,9 +42,9 @@
 
 5개의 탭으로 구성된 상세 조건 설정:
 
-1. **분산 배정 그룹 설정:** 그룹 명칭, 색상 설정 및 학생 태깅. 하이라이트로 분포 시각화.
-2. **피해야 할 관계 (Avoid):** 분리 배정해야 하는 학생 쌍 지정 + 사유 메모.
-3. **같은 반 희망 (Keep):** 함께 배정해야 하는 학생 쌍 지정 + 사유 메모.
+1. **그룹 분산:** 그룹 명칭, 색상 설정 및 학생 태깅. 하이라이트로 분포 시각화.
+2. **분리 배정 (Avoid):** 같은 반이 되면 안 되는 학생 쌍 지정 + 사유 메모. 학폭 분리를 포함.
+3. **함께 배정 (Keep):** 담임 판단으로 같은 반에 두는 학생 쌍 지정 + 사유 메모. 분리 배정 다음으로 지키고, 어기면 위반으로 표시.
 4. **고정 배정 (Fixed):** 특정 반에 반드시 배정해야 하는 학생 지정 + 사유 메모.
 5. **전출 예정:** 전출 예정 학생 설정 (반당 남녀 균등 분산, 번호 맨 뒤 배정).
 
@@ -91,11 +91,11 @@ interface Student {
 
     // 그룹 및 관계
     group_ids: string[];           // 소속된 CustomGroup ID 목록
-    avoid_ids: string[];           // 피해야 할 학생 ID (분리 배정)
+    avoid_ids: string[];           // 분리 배정 학생 ID
     avoid_memos?: Record<string, string>; // 분리 배정 사유 (Key: 상대ID, Value: 사유)
-    keep_ids: string[];            // 함께해야 할 학생 ID (동반 배정)
-    keep_memos?: Record<string, string>;  // 동반 배정 사유
-    fixed_class?: string;          // 고정 반 (예: "1반")
+    keep_ids: string[];            // 함께 배정 학생 ID
+    keep_memos?: Record<string, string>;  // 함께 배정 사유
+    fixed_class?: string;          // 고정 배정 (예: "1반")
     fixed_class_memo?: string;     // 고정 배정 사유
 
     // 배정 결과
@@ -118,7 +118,7 @@ interface AppSettings {
     classCount: number;            // 편성할 학급 수
     scoreTolerance: number;        // 성적 유사도 허용 범위 (±)
     numberingMethod: NumberingMethod; // 번호 부여 방식
-    useAdvancedConstraints: boolean; // 고급 제약 조건 사용 여부
+    useAdvancedConstraints: boolean; // 고급 조건 사용 여부
 }
 
 // 배정 결과 통계
@@ -183,7 +183,7 @@ interface AssignmentChange {
 
 ### 4.2. 2단계: 균형 최적화 루프 (Optimize Balance)
 
-*성적 균형을 유지하며 모든 제약 조건을 해결.*
+*성적 균형을 유지하며 모든 조건을 해결.*
 
 1. **우선순위(Priority):**
    - 1순위: 고정반 & 상극(Avoid) 해결
@@ -192,15 +192,15 @@ interface AssignmentChange {
    - 4순위: 성별 균형
    - 5순위: 성적 평균 균형
 2. **교환(Swap) 로직:**
-   - 성적 유사 학생끼리 교환하여 제약 조건 해결.
+   - 성적 유사 학생끼리 교환하여 조건 해결.
    - 교환 시 새로운 위반이 발생하지 않도록 검증.
 3. **후처리 보정:**
    - 1차 배정 후 성비와 성적 평균 미세 조정.
 
-### 4.3. 3단계: 제약 조건 해결 (Hard Constraints Solving)
+### 4.3. 3단계: 조건 해결 (Hard Constraints Solving)
 
 - **Avoid 해결:** 상극 관계 학생 분리 배정.
-- **Keep 해결:** 단짝 관계 학생 동반 배정.
+- **Keep 해결:** 함께 배정 학생을 같은 반에 둠.
 - **그룹 분산:** 커스텀 그룹 학생 균등 분산.
 
 ---
@@ -224,7 +224,7 @@ interface AssignmentChange {
 
 ### 5.3. Step 2 화면
 
-* 5개 탭 (분산배정그룹, 피해야할관계, 같은반희망, 고정배정, 전출예정)
+* 5개 탭 (그룹 분산, 분리 배정, 함께 배정, 고정 배정, 전출 예정)
 * 학생 선택 UI: 반 필터 + 3열 그리드 레이아웃
 * 관계 설정 시 사유 메모 입력
 * 설정 내역 요약 표시
@@ -264,7 +264,7 @@ interface AssignmentChange {
 
 ### 6.4. 배정 리포트
 
-* **이행 현황 탭:** 같은반희망/피해야할관계 이행률 및 상세
+* **이행 현황 탭:** 함께 배정/분리 배정 이행률 및 상세
 * **이동 명단 탭:** 최초배정 → 최종배정 이동 학생 목록
 * **변경 누적 이력 탭:** 시간순 변경 이력 (auto/manual 구분)
 * **인쇄 지원:** Electron printPreview API 활용
@@ -333,7 +333,7 @@ src/
 2. ✅ 엑셀 파싱 및 유효성 검사
 3. ✅ Zustand 스토어 설계 및 영속성
 4. ✅ S자 배정 + Suitability Score 알고리즘
-5. ✅ 제약 조건 (Avoid/Keep/Fixed) 처리
+5. ✅ 조건 (Avoid/Keep/Fixed) 처리
 6. ✅ 커스텀 그룹 관리 및 시각화
 7. ✅ 전출 예정 학생 균등 분산
 8. ✅ 클릭으로 교환하는 수동 조정

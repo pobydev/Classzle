@@ -82,7 +82,7 @@ try {
     await page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
     await page.getByText('330명의 학생 데이터 로드 완료').waitFor({ timeout: 30000 });
     await page.getByRole('tab', { name: '2단계 조건 설정' }).click();
-    await page.getByRole('button', { name: '피해야 할 관계' }).waitFor();
+    await page.getByRole('button', { name: '분리 배정' }).waitFor();
     await shot('2-step2');
     await page.getByRole('tab', { name: '3단계 반 편성' }).click();
     await page.getByRole('button', { name: /반편성 시작|배정 실행/ }).waitFor();

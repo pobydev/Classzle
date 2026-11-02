@@ -138,7 +138,7 @@ export function AssignmentReportDialog({
                     const detail = {
                         type,
                         names: [s.name, partner.name],
-                        status: isMet ? '만족' : (type === 'keep' ? '미충족' : '충돌'),
+                        status: isMet ? '만족' : '미충족',
                         classes: [s.assigned_class || '미배정', partner.assigned_class || '미배정'],
                         // 정렬을 위해 원본 학생 객체 저장 (옵션)
                         sortKeyStudent: s
@@ -281,7 +281,7 @@ export function AssignmentReportDialog({
             }).join('');
 
         const groupHtml = groupStats.length === 0
-            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 분산 배정 그룹이 없습니다.</p>'
+            ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 그룹 분산이 없습니다.</p>'
             : groupStats.map(g => `
                 <div style="margin-bottom: 12px;">
                     <strong style="font-size: 11pt; color: #333;">그룹명: ${g.name}</strong>
@@ -319,7 +319,7 @@ export function AssignmentReportDialog({
                                             ${d.type === 'keep'
                         ? 'background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;'
                         : 'background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;'}">
-                                            ${d.type === 'keep' ? '💕 희망' : '🚫 회피'}
+                                            ${d.type === 'keep' ? '함께 배정' : '분리 배정'}
                                         </span>
                                     </td>
                                     <td>
@@ -372,7 +372,7 @@ export function AssignmentReportDialog({
                 ? '<span style="color: #999; font-size: 10pt;">고정 배정 학생 없음</span>'
                 : specialStats.fixed.map(s => `
                                 <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
-                                    <span>${s.name} (${s.target} 반 희망)</span>
+                                    <span>${s.name} (${s.target} 고정)</span>
                                     <span style="color: ${s.isMet ? '#2e7d32' : '#d32f2f'}; font-weight: bold; font-size: 9pt;">
                                         ${s.isMet ? `만족(${s.class || '미배정'})` : `미충족(${s.class || '미배정'})`}
                                     </span>
@@ -431,23 +431,23 @@ export function AssignmentReportDialog({
                         ${specialHtml}
                     </div>
 
-                    <h2>2. 제약 조건 이행 요약</h2>
+                    <h2>2. 조건 이행 요약</h2>
                     <table class="summary-table">
                         <thead>
                             <tr>
-                                <th>구분 (제약 조건)</th>
+                                <th>구분 (조건)</th>
                                 <th>이행수 / 전체수</th>
                                 <th>이행률(%)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td>함께 배정 희망</td>
+                                <td>함께 배정</td>
                                 <td>${relationStats.keepMet} / ${relationStats.keepTotal}</td>
                                 <td>${relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</td>
                             </tr>
                             <tr>
-                                <td>기피 대상 피함</td>
+                                <td>분리 배정</td>
                                 <td>${relationStats.avoidMet} / ${relationStats.avoidTotal}</td>
                                 <td>${relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</td>
                             </tr>
@@ -560,21 +560,21 @@ export function AssignmentReportDialog({
 
                     <div className="flex-1 overflow-y-auto p-6">
                         <TabsContent value="fulfillment" className="m-0 space-y-6">
-                            {/* 관계 제약 이행 요약 */}
+                            {/* 분리 배정, 함께 배정 이행 요약 */}
                             <div className="grid grid-cols-2 gap-4">
                                 <Card className="items-center justify-center text-center py-4 gap-1">
-                                    <div className="text-body font-medium flex items-center gap-1.5"><Handshake size={16} className="text-accent" aria-hidden="true" />함께 배정 희망</div>
+                                    <div className="text-body font-medium flex items-center gap-1.5"><Handshake size={16} className="text-accent" aria-hidden="true" />함께 배정</div>
                                     <div className="text-title font-bold">
                                         {relationStats.keepMet} / {relationStats.keepTotal}
                                     </div>
                                     <p className="text-caption text-soft">쌍별 이행률: {relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</p>
                                 </Card>
                                 <Card className="items-center justify-center text-center py-4 gap-1">
-                                    <div className="text-body font-medium flex items-center gap-1.5"><ArrowsLeftRight size={16} className="text-danger" aria-hidden="true" />기피 대상 피함</div>
+                                    <div className="text-body font-medium flex items-center gap-1.5"><ArrowsLeftRight size={16} className="text-danger" aria-hidden="true" />분리 배정</div>
                                     <div className="text-title font-bold">
                                         {relationStats.avoidMet} / {relationStats.avoidTotal}
                                     </div>
-                                    <p className="text-caption text-soft">충돌 회피율: {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
+                                    <p className="text-caption text-soft">쌍별 이행률: {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
                                 </Card>
                             </div>
 
@@ -582,7 +582,7 @@ export function AssignmentReportDialog({
                             <div className="space-y-4">
                                 <h4 className="font-bold text-body flex items-center gap-2">학급별 관계 상세 현황</h4>
                                 {Object.values(relationStats.classDetails).every((details) => details.length === 0) ? (
-                                    <div className="p-8 text-center text-soft text-body border-2 border-dashed rounded-card">설정된 관계 제약 조건이 없습니다.</div>
+                                    <div className="p-8 text-center text-soft text-body border-2 border-dashed rounded-card">설정된 분리 배정과 함께 배정이 없습니다.</div>
                                 ) : (
                                     <div className="space-y-6">
                                         {Object.entries(relationStats.classDetails)
@@ -604,7 +604,7 @@ export function AssignmentReportDialog({
                                                                             : 'border-transparent text-danger bg-danger-wash px-2.5 py-0.5'
                                                                         }
                                                                     >
-                                                                        {detail.type === 'keep' ? '함께 희망' : '서로 회피'}
+                                                                        {detail.type === 'keep' ? '함께 배정' : '분리 배정'}
                                                                     </Badge>
                                                                     <span className="font-semibold text-ink flex items-center gap-3">
                                                                         <span className="flex items-center gap-1.5">
@@ -643,7 +643,7 @@ export function AssignmentReportDialog({
                                 <div className="space-y-4">
                                     <h4 className="font-bold text-body flex items-center gap-2 text-ink">
                                         <Users size={18} className="text-accent" />
-                                        분산 배정 그룹별 현황
+                                        그룹 분산 현황
                                     </h4>
                                     <div className="space-y-3">
                                         {groupStats.map(g => (
@@ -666,7 +666,7 @@ export function AssignmentReportDialog({
                                             </Card>
                                         ))}
                                     </div>
-                                    {groupStats.length === 0 && <p className="text-body text-soft">설정된 분산 배정 그룹이 없습니다.</p>}
+                                    {groupStats.length === 0 && <p className="text-body text-soft">설정된 그룹 분산이 없습니다.</p>}
                                 </div>
 
                                 <div className="space-y-4">
@@ -685,7 +685,7 @@ export function AssignmentReportDialog({
                                                         <div className="flex items-center gap-2">
                                                             <User size={14} className="text-soft" />
                                                             <span className="font-semibold text-ink">{s.name}</span>
-                                                            <span className="text-soft">({s.target}반 희망)</span>
+                                                            <span className="text-soft">({s.target} 고정)</span>
                                                         </div>
                                                         <Badge
                                                             variant="outline"

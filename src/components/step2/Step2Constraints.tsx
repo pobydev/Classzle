@@ -80,10 +80,10 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
     const [groupStudentSearch, setGroupStudentSearch] = useState<string>('');
     // 고정 배정 학생 검색
     const [fixedStudentSearch, setFixedStudentSearch] = useState<string>('');
-    // 기준 학생용 필터/검색 (피해야 할 관계, 같은 반 희망)
+    // 기준 학생용 필터/검색 (분리 배정, 함께 배정)
     const [baseStudentClassFilter, setBaseStudentClassFilter] = useState<string>('all');
     const [baseStudentSearch, setBaseStudentSearch] = useState<string>('');
-    // 대상 학생용 필터/검색 (피해야 할 관계, 같은 반 희망)
+    // 대상 학생용 필터/검색 (분리 배정, 함께 배정)
     const [targetStudentClassFilter, setTargetStudentClassFilter] = useState<string>('all');
     const [targetStudentSearch, setTargetStudentSearch] = useState<string>('');
     const [tempRelationTargetIds, setTempRelationTargetIds] = useState<string[]>([]);
@@ -462,7 +462,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                         setSelectedStudent(null);
                     }}
                 >
-                    분산 배정 그룹 설정
+                    그룹 분산
                 </Button>
                 <Button
                     variant={relationMode === 'avoid' ? 'default' : 'outline'}
@@ -471,7 +471,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                         setSelectedStudent(null);
                     }}
                 >
-                    피해야 할 관계
+                    분리 배정
                 </Button>
                 <Button
                     variant={relationMode === 'keep' ? 'default' : 'outline'}
@@ -480,7 +480,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                         setSelectedStudent(null);
                     }}
                 >
-                    같은 반 희망
+                    함께 배정
                 </Button>
                 <Button
                     variant={relationMode === 'fixed' ? 'default' : 'outline'}
@@ -507,14 +507,14 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                 {relationMode === null && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-title-sm">분산 배정 그룹 관리</CardTitle>
+                            <CardTitle className="text-title-sm">그룹 분산 설정</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* 안내 메시지 */}
                             <div className="bg-wash p-4 rounded-card text-body text-ink">
-                                <h4 className="font-bold mb-2 flex items-center gap-1.5"><Lightbulb size={16} className="text-accent" aria-hidden="true" /> 분산 배정 그룹 설정 안내</h4>
+                                <h4 className="font-bold mb-2 flex items-center gap-1.5"><Lightbulb size={16} className="text-accent" aria-hidden="true" /> 그룹 분산 설정 안내</h4>
                                 <ul className="list-disc list-inside space-y-1">
-                                    <li><strong>분산 배정</strong>: 그룹 내 학생들을 모든 반에 고르게 배치합니다.</li>
+                                    <li><strong>그룹 분산</strong>: 그룹 학생을 모든 반에 고르게 나눕니다.</li>
                                     <li><strong>예시</strong>: '생활지도 유형' 그룹을 만들면, 해당 학생들이 한 반에 몰리지 않도록 배치됩니다.</li>
                                 </ul>
                             </div>
@@ -742,24 +742,24 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                 {(relationMode === 'avoid' || relationMode === 'keep') && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-title-sm">{relationMode === 'avoid' ? '피해야 할 관계 설정' : '같은 반 희망 설정'}</CardTitle>
+                            <CardTitle className="text-title-sm">{relationMode === 'avoid' ? '분리 배정 설정' : '함께 배정 설정'}</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* 안내 메시지 */}
                             <div className="bg-wash p-4 rounded-card text-body text-ink">
                                 <h4 className="font-bold mb-2 flex items-center gap-1.5">
                                     <Lightbulb size={16} className="text-accent" aria-hidden="true" />
-                                    {relationMode === 'avoid' ? '피해야 할 관계 설정 안내' : '같은 반 희망 설정 안내'}
+                                    {relationMode === 'avoid' ? '분리 배정 설정 안내' : '함께 배정 설정 안내'}
                                 </h4>
                                 <ul className="list-disc list-inside space-y-1">
                                     {relationMode === 'avoid' ? (
                                         <>
-                                            <li><strong>분리 배치</strong>: 선택된 학생들은 반드시 다른 반에 배치됩니다.</li>
+                                            <li><strong>분리 배정</strong>: 같은 반이 되면 안 되는 학생입니다. 선택한 학생들은 다른 반에 배정합니다.</li>
                                             <li><strong>예시</strong>: 학폭 사안으로 분리해야 하는 경우, 사이가 좋지 않은 경우</li>
                                         </>
                                     ) : (
                                         <>
-                                            <li><strong>함께 배치</strong>: 선택된 학생들은 가능하면 같은 반에 배치됩니다.</li>
+                                            <li><strong>함께 배정</strong>: 담임 판단으로 같은 반에 두는 학생입니다. 분리 배정 다음으로 지키는 조건이고, 어기면 위반으로 표시합니다.</li>
                                             <li><strong>예시</strong>: 담임 판단하에 생활지도상, 혹은 교우관계상 붙여줄 필요가 있다고 판단되는 경우</li>
                                         </>
                                     )}
@@ -843,8 +843,8 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                         <div>
                                             <h3 className="font-bold text-emph">
                                                 {selectedStudent
-                                                    ? `${selectedStudent.name}(${selectedStudent.prev_info}) 학생의 ${relationMode === 'avoid' ? '피해야 할' : '함께해야 할'} 관계 설정`
-                                                    : `${relationMode === 'avoid' ? '피해야 할 관계' : '같은 반 희망'} 현황`
+                                                    ? `${selectedStudent.name}(${selectedStudent.prev_info}) 학생의 ${relationMode === 'avoid' ? '분리 배정' : '함께 배정'} 설정`
+                                                    : `${relationMode === 'avoid' ? '분리 배정' : '함께 배정'} 현황`
                                                 }
                                             </h3>
                                             <p className="text-body text-soft">
@@ -937,7 +937,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                             {/* 관계 대상 목록 */}
                                             <div className="border rounded-input p-2 flex flex-col h-full overflow-hidden">
                                                 <div className="mb-2 font-bold text-body">
-                                                    {relationMode === 'avoid' ? '떨어져야 할 학생' : '함께해야 할 학생'} ({tempRelationTargetIds.length}명)
+                                                    {relationMode === 'avoid' ? '분리 배정 학생' : '함께 배정 학생'} ({tempRelationTargetIds.length}명)
                                                 </div>
                                                 <div className="flex-1 overflow-y-auto space-y-2 bg-canvas rounded-card p-2 border">
                                                     {students
@@ -1115,7 +1115,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                                             ) : (
                                                 <div className="flex flex-col items-center justify-center h-full text-soft bg-canvas rounded-card">
                                                     <p className="mb-1">
-                                                        {relationMode === 'avoid' ? '설정된 피해야 할 관계가 없습니다.' : '설정된 같은 반 희망이 없습니다.'}
+                                                        {relationMode === 'avoid' ? '설정된 분리 배정이 없습니다.' : '설정된 함께 배정이 없습니다.'}
                                                     </p>
                                                     <p>왼쪽에서 기준 학생을 선택하여 추가해 주세요.</p>
                                                 </div>
@@ -1381,7 +1381,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{editingGroup ? '그룹 수정' : '새 그룹 추가'}</DialogTitle>
-                        <DialogDescription>분산 배정할 그룹 정보를 입력해 주세요.</DialogDescription>
+                        <DialogDescription>모든 반에 고르게 나눌 그룹의 정보를 입력해 주세요.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid grid-cols-4 items-center gap-4">
