@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { version } from '../../package.json';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import Step1Setup from '@/components/step1/Step1Setup';
@@ -31,6 +31,7 @@ export default function Home() {
   const [boardActive, setBoardActive] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const projects = useSavedProjects({ onLoaded: () => setActiveTab('step1') });
+  const leaveStep2 = useRef<(() => Promise<boolean>) | null>(null);
   const updates = useUpdates();
 
   useEffect(() => {
@@ -42,6 +43,12 @@ export default function Home() {
   useEffect(() => {
     setIsCollapsed(showsBoard);
   }, [showsBoard]);
+
+  // 2단계의 저장하지 않은 변경은 단계를 떠나면 사라지므로 어느 길로 떠나든 묻습니다.
+  const changeStep = async (next: string) => {
+    if (activeTab === 'step2' && next !== 'step2' && leaveStep2.current && !(await leaveStep2.current())) return;
+    setActiveTab(next);
+  };
 
   const saveProject = async () => {
     if (await projects.save(projectName)) {
@@ -64,7 +71,7 @@ export default function Home() {
 
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={changeStep}
         orientation="vertical"
         className="flex-1 min-h-0 flex-row gap-0"
       >
@@ -84,8 +91,9 @@ export default function Home() {
 
           <TabsContent value="step2" className="p-5">
             <Step2Constraints
-              onBack={() => setActiveTab('step1')}
-              onNext={() => setActiveTab('step3')}
+              onBack={() => changeStep('step1')}
+              onNext={() => changeStep('step3')}
+              leaveGuard={leaveStep2}
             />
           </TabsContent>
 

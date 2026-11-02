@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type MutableRefObject } from 'react';
 import { useClasszleStore } from '@/lib/store';
 import { CustomGroup, Student } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +30,8 @@ import { useConfirm } from '@/components/shell/ConfirmProvider';
 interface Step2ConstraintsProps {
     onBack: () => void;
     onNext: () => void;
+    // 앱 틀이 이 단계를 떠나기 전에 부릅니다. 머무르기로 하면 false입니다.
+    leaveGuard: MutableRefObject<(() => Promise<boolean>) | null>;
 }
 
 const GROUP_COLORS = [
@@ -43,7 +45,7 @@ const GROUP_COLORS = [
     { name: '청록', value: 'bg-cyan-200 text-cyan-800' },
 ];
 
-export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsProps) {
+export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2ConstraintsProps) {
     const {
         students,
         groups,
@@ -251,19 +253,22 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
         return false;
     };
 
-    const handleNext = async () => {
-        if (hasAnyUnsavedChanges()) {
-            const confirmed = await confirm({
+    // 사이드바, 이전, 다음 어느 길로 떠나도 앱 틀이 이 질문을 거칩니다.
+    useEffect(() => {
+        leaveGuard.current = async () => {
+            if (!hasAnyUnsavedChanges()) return true;
+            return confirm({
                 title: '저장하지 않은 변경 사항이 있습니다.',
-                description: '변경 사항을 버리고 다음 단계로 갈까요?',
+                description: '변경 사항을 버리고 이동할까요?',
                 confirmLabel: '버리고 이동',
                 cancelLabel: '이 화면에 머무르기',
                 danger: true,
             });
-            if (!confirmed) return;
-        }
-        onNext();
-    };
+        };
+        return () => {
+            leaveGuard.current = null;
+        };
+    });
 
     const handleSelectBaseStudent = async (student: Student) => {
         // Check for unsaved changes before switching
@@ -1445,7 +1450,7 @@ export default function Step2Constraints({ onBack, onNext }: Step2ConstraintsPro
                 </Button>
                 <Button
                     size="lg"
-                    onClick={handleNext}
+                    onClick={onNext}
                 >
                     다음: 반편성 실행
                     <ArrowRight size={16} aria-hidden="true" />
