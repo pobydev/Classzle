@@ -33,7 +33,7 @@ const EXTRA_ROUNDS = 6;
  * 항목별 인원을 들고 있어서 한 번 옮길 때 그 학생과 관련된 항목만 다시 셉니다.
  */
 export function solve(problem: Problem, options: SolveOptions): SolveResult {
-    const { n, c, fixedTo, gender, stay, score, meanScore, scoreWeight, difficultyPoints, meanDifficulty, avoidAdj, keepAdj, dims, dimsOf, weights } = problem;
+    const { n, c, fixedTo, gender, stay, score, meanScore, scoreWeight, guidancePoints, meanGuidance, avoidAdj, keepAdj, dims, dimsOf, weights } = problem;
     const { rng, reference } = options;
     const cls = Int32Array.from(options.initial);
 
@@ -50,7 +50,7 @@ export function solve(problem: Problem, options: SolveOptions): SolveResult {
 
     const stayCount = new Int32Array(c);
     const stayScore = new Float64Array(c);
-    const difficultySum = new Int32Array(c);
+    const guidanceSum = new Int32Array(c);
 
     // 반, 성별별 학생 목록. 무작위로 고르고 옮기는 일을 바로 할 수 있게 위치를 함께 둡니다.
     const roster: number[][] = Array.from({ length: c * 2 }, () => []);
@@ -67,7 +67,7 @@ export function solve(problem: Problem, options: SolveOptions): SolveResult {
         if (stay[i]) {
             stayCount[cl]++;
             stayScore[cl] += score[i];
-            difficultySum[cl] += difficultyPoints[i];
+            guidanceSum[cl] += guidancePoints[i];
         }
     }
 
@@ -79,7 +79,7 @@ export function solve(problem: Problem, options: SolveOptions): SolveResult {
     const scoreTerm = (sum: number, count: number) =>
         count > 0 ? Math.abs(sum / count - meanScore) * scoreWeight : 0;
     // 절대값이라 학생 한 명을 옮겨 얻는 이득은 점수의 2배 x 가중치를 넘지 않습니다. 합계 때문에 -3이 몰리는 일을 이 상한으로 막습니다.
-    const difficultyTerm = (sum: number) => Math.abs(sum - meanDifficulty) * weights.difficulty;
+    const guidanceTerm = (sum: number) => Math.abs(sum - meanGuidance) * weights.total;
 
     const computeCost = () => {
         let total = 0;
@@ -88,7 +88,7 @@ export function solve(problem: Problem, options: SolveOptions): SolveResult {
         for (let d = 0; d < dimCount; d++) {
             for (let cl = 0; cl < c; cl++) total += penalty(counts[d * c + cl], d) * dimWeight[d];
         }
-        for (let cl = 0; cl < c; cl++) total += scoreTerm(stayScore[cl], stayCount[cl]) + difficultyTerm(difficultySum[cl]);
+        for (let cl = 0; cl < c; cl++) total += scoreTerm(stayScore[cl], stayCount[cl]) + guidanceTerm(guidanceSum[cl]);
         if (reference) {
             for (let i = 0; i < n; i++) if (reference[i] !== cls[i]) total += weights.moved;
         }
@@ -143,12 +143,12 @@ export function solve(problem: Problem, options: SolveOptions): SolveResult {
             stayScore[to] += score[i];
             stayCount[to]++;
             delta += scoreTerm(stayScore[from], stayCount[from]) + scoreTerm(stayScore[to], stayCount[to]) - before;
-            const points = difficultyPoints[i];
+            const points = guidancePoints[i];
             if (points !== 0) {
-                delta += difficultyTerm(difficultySum[from] - points) + difficultyTerm(difficultySum[to] + points)
-                    - difficultyTerm(difficultySum[from]) - difficultyTerm(difficultySum[to]);
-                difficultySum[from] -= points;
-                difficultySum[to] += points;
+                delta += guidanceTerm(guidanceSum[from] - points) + guidanceTerm(guidanceSum[to] + points)
+                    - guidanceTerm(guidanceSum[from]) - guidanceTerm(guidanceSum[to]);
+                guidanceSum[from] -= points;
+                guidanceSum[to] += points;
             }
         }
 

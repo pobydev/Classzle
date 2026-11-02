@@ -16,8 +16,10 @@ export interface ClassFigures {
     emotional2: number;
     emotional1: number;
     leader: number;
-    // 어려움 합계입니다. 맞추는 목표입니다.
-    difficultyTotal: number;
+    minusTotal: number;
+    plusTotal: number;
+    // 어려운 학생과 리더의 점수를 모두 더한 값입니다. 맞추는 목표입니다.
+    guidanceTotal: number;
 }
 
 export interface SwapPreviewClass {
@@ -46,7 +48,9 @@ function figuresOf(stat: ReturnType<typeof calculateClassStats>[number]): ClassF
         emotional2: stat.emotionalPlus2,
         emotional1: stat.emotionalPlus1,
         leader: stat.leaderCount,
-        difficultyTotal: stat.difficultyTotal,
+        minusTotal: stat.minusTotal,
+        plusTotal: stat.plusTotal,
+        guidanceTotal: stat.guidanceTotal,
     };
 }
 

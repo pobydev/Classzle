@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { CaretRight, CheckCircle, Handshake, Prohibit, WarningCircle, X } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import { MINUS_TOTAL_TITLE, PLUS_TOTAL_TITLE, TOTAL_TITLE } from '@/lib/balanceTable';
 import { describeScoreGapChange, type SwapRecommendation } from '@/lib/recommend';
 import { previousClassOf } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
@@ -63,7 +64,9 @@ const FIGURE_ROWS: { label: string; title?: string; format: (f: ClassFigures) =>
     { label: '정서 -2', format: (f) => `${f.emotional2}명` },
     { label: '정서 -1', format: (f) => `${f.emotional1}명` },
     { label: '리더', format: (f) => `${f.leader}명` },
-    { label: '합계', title: '어려운 학생의 점수만 더한 값입니다. 리더는 더하지 않습니다.', format: (f) => String(f.difficultyTotal) },
+    { label: '-합계', title: MINUS_TOTAL_TITLE, format: (f) => String(f.minusTotal) },
+    { label: '+합계', title: PLUS_TOTAL_TITLE, format: (f) => String(f.plusTotal) },
+    { label: '합계', title: TOTAL_TITLE, format: (f) => String(f.guidanceTotal) },
 ];
 
 // 달라지지 않는 값은 한 번만 흐리게 적고, 달라지는 값만 화살표와 함께 굵게 적습니다.

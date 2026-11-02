@@ -1,5 +1,5 @@
 import type { CustomGroup, Student } from '@/types';
-import { difficultyOf } from './difficulty';
+import { guidancePointsOf } from './guidance';
 
 export interface PreviousClassLevels {
     previousClass: string;
@@ -62,10 +62,12 @@ export function calculateClassStats(students: Student[], classCountOrNames: numb
             averageScore: averageOf(cs),
             exactAverageScore: exactAverageOf(cs),
             stayAverageScore: averageOf(staying),
-            behaviorTotal: cs.reduce((sum, s) => sum + s.behavior_score, 0),
-            difficultyTotal: cs.reduce((sum, s) => sum + difficultyOf(s), 0),
+            // 합계는 어려운 학생과 리더의 점수를 모두 더한 값입니다. 앞의 둘은 그 안을 나눠 보여 주는 값입니다.
+            minusTotal: cs.reduce((sum, s) => sum + Math.min(guidancePointsOf(s), 0), 0),
+            plusTotal: cs.reduce((sum, s) => sum + Math.max(guidancePointsOf(s), 0), 0),
+            guidanceTotal: cs.reduce((sum, s) => sum + guidancePointsOf(s), 0),
 
-            // 등급별 인원. 배정은 -3, -2가 몰리지 않게 먼저 맞추고, 그다음 어려움 합계를 맞춥니다.
+            // 등급별 인원. 배정은 -3, -2가 몰리지 않게 먼저 맞추고, 그다음 합계를 맞춥니다.
             minus3Count: staying.filter((s) => s.behavior_score <= -3).length,
             minus2Count: staying.filter((s) => s.behavior_score === -2).length,
             minus1Count: staying.filter((s) => s.behavior_score === -1).length,

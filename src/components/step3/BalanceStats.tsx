@@ -42,6 +42,9 @@ function Flagged({ cell, text, bold }: { cell: BalanceCell; text?: string; bold?
     );
 }
 
+// 등급 칸 뒤에 오는 칸입니다.
+const AFTER_LEVELS = ['leader', 'minusTotal', 'plusTotal', 'guidanceTotal'];
+
 export function BalanceTable({ students, groups, classCount, onOpenClass }: {
     students: Student[];
     groups: CustomGroup[];
@@ -50,8 +53,8 @@ export function BalanceTable({ students, groups, classCount, onOpenClass }: {
 }) {
     const table = useMemo(() => calculateBalanceTable(students, classCount, groups), [students, classCount, groups]);
     const single = (section: BalanceColumn['section']) => table.columns.filter((c) => c.section === section);
-    const before = table.columns.filter((c) => !c.section && c.key !== 'leader' && c.key !== 'difficultyTotal');
-    const leader = table.columns.filter((c) => c.key === 'leader' || c.key === 'difficultyTotal');
+    const before = table.columns.filter((c) => !c.section && !AFTER_LEVELS.includes(c.key));
+    const leader = table.columns.filter((c) => AFTER_LEVELS.includes(c.key));
     const behavior = single('행동');
     const emotional = single('정서');
     const groupColumns = single('그룹 분산');
@@ -113,7 +116,7 @@ export function BalanceTable({ students, groups, classCount, onOpenClass }: {
                 </tbody>
             </table>
             <p className="px-3 py-2 text-caption text-soft">
-                생활지도는 -3, -2가 몰리지 않게 먼저 맞추고, 그다음 어려움 합계를 맞춥니다. -1 인원은 합계에 맞춰 달라질 수 있습니다. 모두 전출 뒤 기준입니다. 인원, 남, 여, 그룹, -3, -2, 리더는 2명, 합계는 3 차이부터 차이 줄에 ▲를 붙이고, 대부분의 반이 모인 범위에서 벗어난 반에도 붙입니다. 생활지도는 많은 쪽, 합계는 어려움이 큰 쪽만 표시합니다.
+                생활지도는 -3, -2가 몰리지 않게 먼저 맞추고, 그다음 합계를 맞춥니다. 합계는 어려운 학생과 리더의 점수를 모두 더한 값입니다. -1 인원은 합계에 맞춰 달라질 수 있습니다. 모두 전출 뒤 기준입니다. 인원, 남, 여, 그룹, -3, -2, 리더는 2명, 합계는 3 차이부터 차이 줄에 ▲를 붙이고, 대부분의 반이 모인 범위에서 벗어난 반에도 붙입니다. 생활지도는 많은 쪽, 합계는 어려움이 큰 쪽만 표시합니다.
             </p>
         </div>
     );

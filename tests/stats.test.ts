@@ -23,7 +23,7 @@ describe('학급 통계', () => {
             maleCount: 1,
             femaleCount: 2,
             averageScore: 200,
-            behaviorTotal: -3,
+            guidanceTotal: -3,
             behaviorPlus3: 1,
             emotionalPlus2: 1,
             scorePlus2: 1,

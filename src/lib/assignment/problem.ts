@@ -1,5 +1,5 @@
 import type { CustomGroup, Student } from '@/types';
-import { difficultyOf } from '../difficulty';
+import { guidancePointsOf } from '../guidance';
 
 export function makeClassNames(classCount: number): string[] {
     return Array.from({ length: classCount }, (_, i) => `${i + 1}반`);
@@ -45,7 +45,7 @@ export interface Weights {
     type: number;
     band: number;
     score: number;
-    difficulty: number;
+    total: number;
     previous: number;
     moved: number;
 }
@@ -70,9 +70,9 @@ export interface Problem {
     score: Float64Array;
     meanScore: number;
     scoreWeight: number;
-    // 전출 뒤 남는 학생의 어려움 점수(difficulty.ts)와, 그 합을 반 수로 나눈 값입니다.
-    difficultyPoints: Int32Array;
-    meanDifficulty: number;
+    // 전출 뒤 남는 학생의 생활지도 점수(guidance.ts)와, 그 합을 반 수로 나눈 값입니다.
+    guidancePoints: Int32Array;
+    meanGuidance: number;
     avoidAdj: number[][];
     keepAdj: number[][];
     avoidEdges: [number, number][];
@@ -245,8 +245,8 @@ export function compileProblem(
     const meanScore = stayScores.length ? stayScores.reduce((a, b) => a + b, 0) / stayScores.length : 0;
     const scoreWeight = (weights.score * 1000) / Math.max(1, max - min);
 
-    const difficultyPoints = Int32Array.from(students, (s, i) => (stay[i] ? difficultyOf(s) : 0));
-    const meanDifficulty = difficultyPoints.reduce((a, b) => a + b, 0) / Math.max(1, c);
+    const guidancePoints = Int32Array.from(students, (s, i) => (stay[i] ? guidancePointsOf(s) : 0));
+    const meanGuidance = guidancePoints.reduce((a, b) => a + b, 0) / Math.max(1, c);
 
     return {
         n,
@@ -258,8 +258,8 @@ export function compileProblem(
         score,
         meanScore,
         scoreWeight,
-        difficultyPoints,
-        meanDifficulty,
+        guidancePoints,
+        meanGuidance,
         avoidAdj: avoid.adj,
         keepAdj: keep.adj,
         avoidEdges: avoid.edges,

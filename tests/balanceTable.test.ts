@@ -98,12 +98,41 @@ describe('학급별 균형 표', () => {
         expect(first.cells.average.flagged).toBe(false);
     });
 
-    it('합계는 전출 뒤 어려움 합계이고 리더를 더하지 않으며 어려움이 큰 반을 표시합니다', () => {
+    it('합계는 전출 뒤 값이고 리더를 더하며 어려움이 큰 반을 표시합니다', () => {
         // 1반 -3 -3 -3, 2반 리더 +2. 2반의 전출 예정 -3은 뺍니다.
-        expect(first.cells.difficultyTotal).toEqual({ value: -9, flagged: true });
-        expect(second.cells.difficultyTotal).toEqual({ value: 0, flagged: false });
-        expect(table.difference.difficultyTotal).toEqual({ value: 9, flagged: true });
-        expect(table.columns.find((c) => c.key === 'difficultyTotal')?.title).toBe('어려운 학생의 점수만 더한 값입니다. 리더는 더하지 않습니다.');
+        expect(first.cells.guidanceTotal).toEqual({ value: -9, flagged: true });
+        expect(second.cells.guidanceTotal).toEqual({ value: 2, flagged: false });
+        expect(table.difference.guidanceTotal).toEqual({ value: 11, flagged: true });
+        expect(table.columns.find((c) => c.key === 'guidanceTotal')?.title).toBe('어려운 학생과 리더의 생활지도 점수를 모두 더한 값입니다.');
+    });
+
+    it('-합계와 +합계는 합계 안을 나눠 보여 주고 ▲를 붙이지 않습니다', () => {
+        expect(first.cells.minusTotal).toEqual({ value: -9, flagged: false });
+        expect(first.cells.plusTotal).toEqual({ value: 0, flagged: false });
+        expect(second.cells.minusTotal).toEqual({ value: 0, flagged: false });
+        expect(second.cells.plusTotal).toEqual({ value: 2, flagged: false });
+        expect(table.difference.minusTotal).toEqual({ value: 9, flagged: false });
+        expect(table.difference.plusTotal).toEqual({ value: 2, flagged: false });
+        expect(table.columns.map((c) => c.label)).toEqual(expect.arrayContaining(['-합계', '+합계', '합계']));
+    });
+
+    it('양수와 음수가 섞여도 어려움이 큰 쪽에 표시합니다', () => {
+        const mixed = (scores: number[]) =>
+            calculateBalanceTable(
+                scores.map((score, i) =>
+                    makeStudent({
+                        id: `m${i}`,
+                        assigned_class: `${i + 1}반`,
+                        behavior_type: score > 0 ? 'LEADER' : score < 0 ? 'BEHAVIOR' : 'NONE',
+                        behavior_score: score,
+                    }),
+                ),
+                scores.length,
+            ).rows.map((row) => row.cells.guidanceTotal.flagged);
+        // 대부분이 +1, +2인데 한 반만 -3입니다.
+        expect(mixed([-3, 1, 2, 2])).toEqual([true, false, false, false]);
+        // 리더가 많은 반은 어려움이 작은 쪽이라 표시하지 않습니다.
+        expect(mixed([2, -1, -1, -1])).toEqual([false, false, false, false]);
     });
 
     describe('합계의 표시 기준', () => {
@@ -114,10 +143,10 @@ describe('학급별 균형 표', () => {
                 ),
                 totals.length,
             );
-        const flags = (totals: number[]) => withTotals(totals).rows.map((row) => row.cells.difficultyTotal.flagged);
+        const flags = (totals: number[]) => withTotals(totals).rows.map((row) => row.cells.guidanceTotal.flagged);
 
         it('차이 2까지는 표시하지 않습니다', () => {
-            expect(withTotals([-3, -2, -1]).difference.difficultyTotal).toEqual({ value: 2, flagged: false });
+            expect(withTotals([-3, -2, -1]).difference.guidanceTotal).toEqual({ value: 2, flagged: false });
             expect(flags([-3, -2, -1])).toEqual([false, false, false]);
         });
 
@@ -128,11 +157,11 @@ describe('학급별 균형 표', () => {
 
         it('어려움이 작은 반은 표시하지 않습니다', () => {
             expect(flags([-3, -3, -3, 0])).toEqual([false, false, false, false]);
-            expect(withTotals([-3, -3, -3, 0]).difference.difficultyTotal.flagged).toBe(true);
+            expect(withTotals([-3, -3, -3, 0]).difference.guidanceTotal.flagged).toBe(true);
         });
 
         it('표시해도 칸의 값은 음수 그대로입니다', () => {
-            expect(withTotals([-3, 0]).rows[0].cells.difficultyTotal.value).toBe(-3);
+            expect(withTotals([-3, 0]).rows[0].cells.guidanceTotal.value).toBe(-3);
         });
     });
 

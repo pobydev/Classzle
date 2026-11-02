@@ -74,7 +74,11 @@ export function flagColumn(values: number[], limit: number | null, flag: FlagMod
 
 const COUNT_LIMIT = 1;
 const LEVEL_LIMIT = 1;
-const DIFFICULTY_LIMIT = 2;
+const TOTAL_LIMIT = 2;
+
+export const MINUS_TOTAL_TITLE = '어려운 학생의 점수만 더한 값입니다.';
+export const PLUS_TOTAL_TITLE = '리더의 점수만 더한 값입니다.';
+export const TOTAL_TITLE = '어려운 학생과 리더의 생활지도 점수를 모두 더한 값입니다.';
 
 export function calculateBalanceTable(students: Student[], classCount: number, groups: CustomGroup[] = []): BalanceTable {
     const classNames = makeClassNames(classCount);
@@ -97,15 +101,18 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
         { key: 'emotional2', label: '-2', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus2 },
         { key: 'emotional1', label: '-1', section: '정서', limit: null, flag: 'none', read: (s) => s.emotionalPlus1 },
         { key: 'leader', label: '리더', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.leaderCount },
+        // -합계와 +합계는 합계 안을 나눠 보여 주는 숫자입니다. 표시는 합계에만 합니다.
+        { key: 'minusTotal', label: '-합계', title: MINUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.minusTotal },
+        { key: 'plusTotal', label: '+합계', title: PLUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.plusTotal },
         {
-            key: 'difficultyTotal',
+            key: 'guidanceTotal',
             label: '합계',
-            title: '어려운 학생의 점수만 더한 값입니다. 리더는 더하지 않습니다.',
-            limit: DIFFICULTY_LIMIT,
+            title: TOTAL_TITLE,
+            limit: TOTAL_LIMIT,
             flag: 'above',
-            read: (s) => s.difficultyTotal,
-            // 값이 음수이므로 부호를 바꿔 어려움이 큰 반을 표시합니다.
-            flagBy: (s) => -s.difficultyTotal,
+            read: (s) => s.guidanceTotal,
+            // 낮을수록 어려운 반이므로 부호를 바꿔 어려움이 큰 쪽을 표시합니다. 양수가 섞여도 같습니다.
+            flagBy: (s) => -s.guidanceTotal,
         },
         ...groups.map((g) => ({
             key: `group:${g.id}`,

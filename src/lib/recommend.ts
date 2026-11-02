@@ -36,7 +36,7 @@ const WEIGHTS: Weights = {
     type: 2,
     band: 10,
     score: 0.5,
-    difficulty: 6,
+    total: 6,
     previous: 1.5,
     moved: 0,
 };
@@ -56,7 +56,7 @@ export function recommendSwaps(
     if (self < 0) return [];
 
     const problem = compileProblem(students, classCount, groups, WEIGHTS);
-    const { c, classNames, fixedTo, stay, score, meanScore, scoreWeight, difficultyPoints, meanDifficulty, dims, dimsOf, avoidAdj, keepAdj } = problem;
+    const { c, classNames, fixedTo, stay, score, meanScore, scoreWeight, guidancePoints, meanGuidance, dims, dimsOf, avoidAdj, keepAdj } = problem;
     const classOf = students.map((s) => resolveClassIndex(s.assigned_class, classNames));
     const home = classOf[self];
     if (home < 0) return [];
@@ -64,7 +64,7 @@ export function recommendSwaps(
     const counts = new Int32Array(dims.length * c);
     const stayCount = new Int32Array(c);
     const stayScore = new Float64Array(c);
-    const difficultySum = new Int32Array(c);
+    const guidanceSum = new Int32Array(c);
     classOf.forEach((cl, i) => {
         if (cl < 0) return;
         const ds = dimsOf[i];
@@ -72,7 +72,7 @@ export function recommendSwaps(
         if (stay[i]) {
             stayCount[cl]++;
             stayScore[cl] += score[i];
-            difficultySum[cl] += difficultyPoints[i];
+            guidanceSum[cl] += guidancePoints[i];
         }
     });
 
@@ -84,7 +84,7 @@ export function recommendSwaps(
     };
     const scoreTerm = (sum: number, count: number) =>
         count > 0 ? Math.abs(sum / count - meanScore) * scoreWeight : 0;
-    const difficultyTerm = (sum: number) => Math.abs(sum - meanDifficulty) * WEIGHTS.difficulty;
+    const guidanceTerm = (sum: number) => Math.abs(sum - meanGuidance) * WEIGHTS.total;
     // 전출 뒤 학생이 없는 반은 평균이 없으므로 차이를 말할 수 없습니다.
     const averageGap = (sumA: number, countA: number, sumB: number, countB: number) =>
         countA > 0 && countB > 0 ? Math.abs(sumA / countA - sumB / countB) : null;
@@ -145,10 +145,10 @@ export function recommendSwaps(
         const otherSum = stayScore[other] - stay[j] * score[j] + stay[self] * score[self];
         soft += scoreTerm(homeSum, homeCount) + scoreTerm(otherSum, otherCount) - beforeScore;
 
-        // 배정과 같은 잣대가 되도록 어려움 합계 변화도 더합니다.
-        const pointsIn = difficultyPoints[j] - difficultyPoints[self];
-        soft += difficultyTerm(difficultySum[home] + pointsIn) + difficultyTerm(difficultySum[other] - pointsIn)
-            - difficultyTerm(difficultySum[home]) - difficultyTerm(difficultySum[other]);
+        // 배정과 같은 잣대가 되도록 합계 변화도 더합니다.
+        const pointsIn = guidancePoints[j] - guidancePoints[self];
+        soft += guidanceTerm(guidanceSum[home] + pointsIn) + guidanceTerm(guidanceSum[other] - pointsIn)
+            - guidanceTerm(guidanceSum[home]) - guidanceTerm(guidanceSum[other]);
 
         const gapBefore = averageGap(stayScore[home], stayCount[home], stayScore[other], stayCount[other]);
         const gapAfter = averageGap(homeSum, homeCount, otherSum, otherCount);
