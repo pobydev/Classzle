@@ -22,7 +22,7 @@ const storage = {
         window.electronAPI ? window.electronAPI.getProjectList() : readBrowserList(),
     read: async (name: string): Promise<string | null> =>
         window.electronAPI ? window.electronAPI.loadNamedProject(name) : localStorage.getItem(dataKey(name)),
-    write: async (name: string, data: string): Promise<boolean> => {
+    write: async (name: string, data: string): Promise<boolean | 'locked'> => {
         if (window.electronAPI) return window.electronAPI.saveNamedProject(name, data);
         localStorage.setItem(dataKey(name), data);
         const list = readBrowserList();
@@ -87,7 +87,12 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
         }
         const data = JSON.stringify({ students, groups, settings, movementHistory }, null, 2);
         try {
-            if (!(await storage.write(name, data))) throw new Error('write failed');
+            const written = await storage.write(name, data);
+            if (written === 'locked') {
+                toast.error('다른 프로그램이 이 작업 파일을 쓰고 있어 저장하지 못했습니다. 그 프로그램을 닫고 다시 저장해 주세요.');
+                return false;
+            }
+            if (!written) throw new Error('write failed');
         } catch (e) {
             console.error(e);
             toast.error('저장하지 못했습니다.');

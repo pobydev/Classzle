@@ -125,7 +125,7 @@ export interface ElectronAPI {
     };
     saveProject: (data: string) => Promise<boolean>;
     loadProject: () => Promise<string | null>;
-    saveNamedProject: (name: string, data: string) => Promise<boolean>;
+    saveNamedProject: (name: string, data: string) => Promise<boolean | 'locked'>;
     loadNamedProject: (name: string) => Promise<string | null>;
     getProjectList: () => Promise<string[]>;
     deleteProject: (name: string) => Promise<boolean>;
@@ -134,7 +134,7 @@ export interface ElectronAPI {
         files: { name: string; data: Uint8Array }[],
         folder?: string,
     ) => Promise<
-        | { status: 'canceled' | 'failed' }
+        | { status: 'canceled' | 'failed' | 'locked' }
         | { status: 'saved'; folder: string }
         | { status: 'exists'; folder: string; existing: string[] }
     >;

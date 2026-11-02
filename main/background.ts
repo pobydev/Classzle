@@ -7,7 +7,7 @@ import { isSafeExternalUrl } from './externalUrl';
 import { createFolderApproval } from './folderApproval';
 import { cleanOldPrintFiles, isPrintSource, PRINT_FOLDER } from './printFiles';
 import { setupUpdates } from './updater';
-import { projectFilePath, writeFileSafely } from './projectFiles';
+import { cleanLeftoverTemp, isFileLockedError, projectFilePath, writeFileSafely } from './projectFiles';
 import { projectNameFromFile, projectNameProblem } from './projectName';
 
 
@@ -89,7 +89,7 @@ ipcMain.handle('save-named-project', async (event, name: string, data: string) =
         return true;
     } catch (e) {
         console.error('Failed to save named project:', e);
-        return false;
+        return isFileLockedError(e) ? 'locked' : false;
     }
 });
 
@@ -178,7 +178,7 @@ ipcMain.handle('save-class-sheets', async (_event, files: { name: string; data: 
         return { status: 'saved', folder: target };
     } catch (e) {
         console.error('Failed to save class sheets:', e);
-        return { status: 'failed' };
+        return { status: isFileLockedError(e) ? 'locked' : 'failed' };
     }
 });
 
@@ -316,6 +316,7 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
 
     void cleanOldPrintFiles(app.getPath('temp'));
+    void cleanLeftoverTemp(getProjectsDir());
 
     setupUpdates((status) => mainWindow?.webContents.send('update-status', status));
 

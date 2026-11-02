@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { projectFilePath, writeFileSafely } from '../main/projectFiles';
+import { cleanLeftoverTemp, isFileLockedError, projectFilePath, writeFileSafely } from '../main/projectFiles';
 import { findSameProject, overwritesOtherProject, projectNameFromFile, projectNameProblem, resolveSaveName } from '../main/projectName';
 
 describe('저장 이름', () => {
@@ -122,5 +122,41 @@ describe('옛 이름 다시 저장', () => {
         expect(resolveSaveName('가'.repeat(120), []).problem).toContain('100자');
         expect(resolveSaveName('', ['가상']).problem).toContain('입력');
         expect(resolveSaveName('새 작업', ['가상'])).toEqual({ name: '새 작업', problem: null });
+    });
+});
+
+describe('남은 임시 파일', () => {
+    let dir: string;
+    const touch = async (name: string, ageMs: number) => {
+        const file = path.join(dir, name);
+        await fs.writeFile(file, '가상');
+        const when = new Date(Date.now() - ageMs);
+        await fs.utimes(file, when, when);
+    };
+    beforeEach(async () => {
+        dir = await fs.mkdtemp(path.join(os.tmpdir(), 'classzle-left-'));
+    });
+    afterEach(async () => {
+        await fs.rm(dir, { recursive: true, force: true });
+    });
+
+    it('오래된 임시 파일만 지웁니다', async () => {
+        await touch('작업.json.123.456.tmp', 3600000);
+        await touch('방금.json.123.456.tmp', 0);
+        await touch('작업.json', 3600000);
+        await touch('메모.tmp', 3600000);
+        await cleanLeftoverTemp(dir);
+        expect((await fs.readdir(dir)).sort()).toEqual(['메모.tmp', '방금.json.123.456.tmp', '작업.json'].sort());
+    });
+
+    it('폴더가 없어도 멈추지 않습니다', async () => {
+        await expect(cleanLeftoverTemp(path.join(dir, '없음'))).resolves.toBeUndefined();
+    });
+
+    it('잠긴 파일의 오류를 알아봅니다', () => {
+        expect(isFileLockedError({ code: 'EPERM' })).toBe(true);
+        expect(isFileLockedError({ code: 'EBUSY' })).toBe(true);
+        expect(isFileLockedError({ code: 'ENOSPC' })).toBe(false);
+        expect(isFileLockedError(null)).toBe(false);
     });
 });

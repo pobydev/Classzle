@@ -105,6 +105,10 @@ export function ClassSheetPanel() {
                     if (!overwrite) return;
                     result = await api.saveClassSheets(files, result.folder);
                 }
+                if (result.status === 'locked') {
+                    toast.error('입력표 파일이 다른 프로그램에서 열려 있어 저장하지 못했습니다. 엑셀을 닫고 다시 저장해 주세요.');
+                    return;
+                }
                 if (result.status === 'failed') {
                     toast.error('입력표를 저장하지 못했습니다.');
                     return;
