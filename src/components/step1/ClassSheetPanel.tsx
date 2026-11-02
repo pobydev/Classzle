@@ -149,7 +149,8 @@ export function ClassSheetPanel() {
                 confirmLabel: plan.updates.length > 0 ? '반영' : '확인',
             });
             if (!answer || plan.updates.length === 0) return;
-            useClasszleStore.setState((state) => ({ students: applyBehaviorUpdates(state.students, plan.updates) }));
+            const store = useClasszleStore.getState();
+            store.applyGuidance(applyBehaviorUpdates(store.students, plan.updates));
             toast.success(`생활지도 ${plan.updates.length}명을 반영했습니다.`);
         } finally {
             setIsBusy(false);

@@ -37,7 +37,10 @@ interface ClasszleStore {
     resetAssignments: () => void;
     applyAssignment: (students: Student[], changes: AssignmentChange[], startHistory: boolean) => void;
 
-    // 되돌리기. 배정과 이력만 되돌리고 그 사이에 바꾼 조건은 그대로 둡니다.
+    // 입력표 반영도 되돌리기 한 번으로 돌아옵니다.
+    applyGuidance: (students: Student[]) => void;
+
+    // 되돌리기. 배정, 이력, 입력표로 넣은 생활지도만 되돌리고 그 사이에 바꾼 조건은 그대로 둡니다.
     undoStack: UndoSnapshot[];
     undoLastChange: () => void;
 
@@ -66,19 +69,30 @@ const defaultSettings: AppSettings = {
     useAdvancedConstraints: true,
 };
 
+type GuidanceValue = Pick<Student, 'behavior_type' | 'behavior_score'>;
+
 interface UndoSnapshot {
     assignments: Record<string, string | null>;
     movementHistory: AssignmentChange[];
+    // 입력표를 반영하기 전의 생활지도입니다. 번호 방식은 표시 설정이라 기록하지 않습니다.
+    guidance?: Record<string, GuidanceValue>;
 }
 
 const MAX_UNDO = 30;
 
-function withSnapshot(state: { students: Student[]; movementHistory: AssignmentChange[]; undoStack: UndoSnapshot[] }): UndoSnapshot[] {
+function withSnapshot(
+    state: { students: Student[]; movementHistory: AssignmentChange[]; undoStack: UndoSnapshot[] },
+    keepGuidance = false,
+): UndoSnapshot[] {
     const assignments: Record<string, string | null> = {};
+    const guidance: Record<string, GuidanceValue> = {};
     state.students.forEach((s) => {
         assignments[s.id] = s.assigned_class ?? null;
+        if (keepGuidance) guidance[s.id] = { behavior_type: s.behavior_type, behavior_score: s.behavior_score };
     });
-    return [...state.undoStack, { assignments, movementHistory: state.movementHistory }].slice(-MAX_UNDO);
+    const snapshot: UndoSnapshot = { assignments, movementHistory: state.movementHistory };
+    if (keepGuidance) snapshot.guidance = guidance;
+    return [...state.undoStack, snapshot].slice(-MAX_UNDO);
 }
 
 // 지운 학생을 다른 학생의 관계와 메모에서도 뺍니다.
@@ -239,15 +253,22 @@ export const useClasszleStore = create<ClasszleStore>()(
                 movementHistory: startHistory ? [] : [...state.movementHistory, ...changes]
             })),
 
+            applyGuidance: (students) => set((state) => ({
+                undoStack: withSnapshot(state, true),
+                students,
+            })),
+
             undoLastChange: () => set((state) => {
                 const last = state.undoStack[state.undoStack.length - 1];
                 if (!last) return state;
                 return {
                     undoStack: state.undoStack.slice(0, -1),
                     movementHistory: last.movementHistory,
-                    students: state.students.map((s) =>
-                        s.id in last.assignments ? { ...s, assigned_class: last.assignments[s.id] } : s
-                    ),
+                    students: state.students.map((s) => ({
+                        ...s,
+                        ...(s.id in last.assignments ? { assigned_class: last.assignments[s.id] } : {}),
+                        ...last.guidance?.[s.id],
+                    })),
                 };
             }),
 

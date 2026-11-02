@@ -111,3 +111,36 @@ describe('다른 작업이 시작됐는지', () => {
         expect(useClasszleStore.getState().workId).toBe(start);
     });
 });
+
+describe('입력표 반영과 되돌리기', () => {
+    const roster = () => [
+        makeStudent({ id: 'a', assigned_class: '1반' }),
+        makeStudent({ id: 'b', assigned_class: '2반', behavior_type: 'LEADER', behavior_score: 1 }),
+    ];
+    const withGuidance = (list: ReturnType<typeof roster>) =>
+        list.map((s) => (s.id === 'a' ? { ...s, behavior_type: 'BEHAVIOR' as const, behavior_score: -2 } : s));
+
+    beforeEach(() => {
+        store().resetAll();
+        store().setStudents(roster());
+    });
+
+    it('직전 변경이 입력표 반영이면 그것을 되돌립니다', () => {
+        store().swapStudents('a', 'b');
+        store().applyGuidance(withGuidance(store().students));
+        store().undoLastChange();
+        const a = store().students.find((s) => s.id === 'a')!;
+        expect(a).toMatchObject({ behavior_type: 'NONE', behavior_score: 0 });
+        // 앞선 교환은 아직 되돌리지 않았습니다.
+        expect(a.assigned_class).toBe('2반');
+        store().undoLastChange();
+        expect(classOf('a')).toBe('1반');
+    });
+
+    it('반을 옮긴 뒤 되돌려도 입력표 값은 그대로입니다', () => {
+        store().applyGuidance(withGuidance(store().students));
+        store().swapStudents('a', 'b');
+        store().undoLastChange();
+        expect(store().students.find((s) => s.id === 'a')).toMatchObject({ assigned_class: '1반', behavior_score: -2 });
+    });
+});
