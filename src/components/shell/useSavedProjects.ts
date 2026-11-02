@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { findSameProject, overwritesOtherProject, projectNameProblem } from '../../../main/projectName';
+import { parseProjectFile } from '@/lib/projectFile';
 import { useClasszleStore } from '@/lib/store';
 import { useConfirm } from './ConfirmProvider';
 
@@ -100,8 +101,8 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
     };
 
     const apply = (content: string): boolean => {
-        const data = JSON.parse(content);
-        if (!data.students || !data.settings) return false;
+        const data = parseProjectFile(content);
+        if (!data) return false;
         loadProject(data);
         onLoaded();
         return true;
