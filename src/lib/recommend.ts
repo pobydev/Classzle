@@ -70,6 +70,11 @@ export function recommendSwaps(
     const averageGap = (sumA: number, countA: number, sumB: number, countB: number) =>
         countA > 0 && countB > 0 ? Math.abs(sumA / countA - sumB / countB) : null;
 
+    // 이 학생이 옮겨서 새로 생기는 분리 배정, 함께 배정 어김이 있는지 봅니다.
+    const breaksPair = (i: number, from: number, to: number, partner: number) =>
+        avoidAdj[i].some((other) => other !== partner && classOf[other] === to)
+        || keepAdj[i].some((other) => other !== partner && classOf[other] === from);
+
     const pairsDelta = (i: number, from: number, to: number, partner: number) => {
         let delta = 0;
         for (const other of avoidAdj[i]) {
@@ -95,6 +100,9 @@ export function recommendSwaps(
         if (fixedTo[self] >= 0 && fixedTo[self] !== other) return;
         if (fixedTo[j] >= 0 && fixedTo[j] !== home) return;
 
+        // 다른 조건을 고치는 이득과 합치지 않고 새 어김이 하나라도 있으면 뺍니다.
+        if (breaksPair(self, home, other, j) || breaksPair(j, other, home, self)) return;
+
         // 항목별 인원 변화를 임시 표에 모읍니다. 둘이 같은 항목에 있으면 서로 상쇄됩니다.
         let hard = pairsDelta(self, home, other, j) + pairsDelta(j, other, home, self);
         let soft = 0;
@@ -107,17 +115,24 @@ export function recommendSwaps(
             const d = dimsOf[j][k];
             change.set(d, (change.get(d) ?? 0) - 1);
         }
+        let addsViolation = false;
         change.forEach((amount, d) => {
             if (amount === 0) return;
             const base = d * c;
             const va = counts[base + home];
             const vb = counts[base + other];
-            const delta = dims[d].weight * (penalty(va - amount, d) - penalty(va, d) + penalty(vb + amount, d) - penalty(vb, d));
-            if (dims[d].hard) hard += delta;
-            else soft += delta;
+            const homeChange = penalty(va - amount, d) - penalty(va, d);
+            const otherChange = penalty(vb + amount, d) - penalty(vb, d);
+            const delta = dims[d].weight * (homeChange + otherChange);
+            if (dims[d].hard) {
+                hard += delta;
+                // 어김이 다른 반으로 옮겨 가기만 해도 그 반에는 새 어김입니다.
+                if (homeChange > 0 || otherChange > 0) addsViolation = true;
+            } else {
+                soft += delta;
+            }
         });
-        // 조건을 새로 어기면 추천하지 않습니다.
-        if (hard > 0) return;
+        if (addsViolation) return;
 
         const beforeScore = scoreTerm(stayScore[home], stayCount[home]) + scoreTerm(stayScore[other], stayCount[other]);
         const homeCount = stayCount[home] - stay[self] + stay[j];
