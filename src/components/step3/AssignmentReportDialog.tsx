@@ -26,7 +26,8 @@ import {
     Buildings,
     TrendUp,
     Clock,
-    Swap
+    Swap,
+    Handshake
 } from '@phosphor-icons/react';
 
 export function AssignmentReportDialog({
@@ -523,9 +524,9 @@ export function AssignmentReportDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent id="report-dialog-content" className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0">
+            <DialogContent id="report-dialog-content" className="sm:max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
                 <DialogHeader className="p-6 pb-2">
-                    <DialogTitle className="text-2xl flex items-center gap-2">
+                    <DialogTitle className="text-title flex items-center gap-2">
                         학생 배정 상세 분석 리포트
                     </DialogTitle>
                 </DialogHeader>
@@ -536,20 +537,20 @@ export function AssignmentReportDialog({
                         <TabsList className="w-full justify-start h-12 bg-transparent gap-6 p-0">
                             <TabsTrigger
                                 value="fulfillment"
-                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2"
+                                className="flex-none h-full border-0 border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none px-2"
                             >
                                 이행 현황
                             </TabsTrigger>
                             <TabsTrigger
                                 value="movements"
-                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2 flex items-center gap-1.5"
+                                className="flex-none h-full border-0 border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none px-2 flex items-center gap-1.5"
                             >
                                 <TrendUp size={16} />
                                 이동 명단 ({movementStats.length})
                             </TabsTrigger>
                             <TabsTrigger
                                 value="history"
-                                className="h-full border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none px-2 flex items-center gap-1.5"
+                                className="flex-none h-full border-0 border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none px-2 flex items-center gap-1.5"
                             >
                                 <Clock size={16} />
                                 변경 이력 ({history.length})
@@ -561,72 +562,72 @@ export function AssignmentReportDialog({
                         <TabsContent value="fulfillment" className="m-0 space-y-6">
                             {/* 관계 제약 이행 요약 */}
                             <div className="grid grid-cols-2 gap-4">
-                                <Card className="bg-pink-50/30 border-pink-100 flex flex-col items-center justify-center text-center py-4 rounded-xl shadow-sm">
-                                    <div className="text-sm font-medium text-pink-700 mb-1">함께 배정 희망</div>
-                                    <div className="text-2xl font-bold text-pink-600">
+                                <Card className="items-center justify-center text-center py-4 gap-1">
+                                    <div className="text-body font-medium flex items-center gap-1.5"><Handshake size={16} className="text-accent" aria-hidden="true" />함께 배정 희망</div>
+                                    <div className="text-title font-bold">
                                         {relationStats.keepMet} / {relationStats.keepTotal}
                                     </div>
-                                    <p className="text-xs text-pink-600/70">쌍별 이행률: {relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</p>
+                                    <p className="text-caption text-soft">쌍별 이행률: {relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</p>
                                 </Card>
-                                <Card className="bg-red-50/30 border-red-100 flex flex-col items-center justify-center text-center py-4 rounded-xl shadow-sm">
-                                    <div className="text-sm font-medium text-red-700 mb-1">기피 대상 피함</div>
-                                    <div className="text-2xl font-bold text-red-600">
+                                <Card className="items-center justify-center text-center py-4 gap-1">
+                                    <div className="text-body font-medium flex items-center gap-1.5"><ArrowsLeftRight size={16} className="text-danger" aria-hidden="true" />기피 대상 피함</div>
+                                    <div className="text-title font-bold">
                                         {relationStats.avoidMet} / {relationStats.avoidTotal}
                                     </div>
-                                    <p className="text-xs text-red-600/70">충돌 회피율: {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
+                                    <p className="text-caption text-soft">충돌 회피율: {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
                                 </Card>
                             </div>
 
                             {/* 관계 상세 현황 (반별 그룹화) */}
                             <div className="space-y-4">
-                                <h4 className="font-bold text-sm flex items-center gap-2">학급별 관계 상세 현황</h4>
-                                {Object.keys(relationStats.classDetails).length === 0 ? (
-                                    <div className="p-8 text-center text-muted-foreground text-sm border-2 border-dashed rounded-xl">설정된 관계 제약 조건이 없습니다.</div>
+                                <h4 className="font-bold text-body flex items-center gap-2">학급별 관계 상세 현황</h4>
+                                {Object.values(relationStats.classDetails).every((details) => details.length === 0) ? (
+                                    <div className="p-8 text-center text-soft text-body border-2 border-dashed rounded-card">설정된 관계 제약 조건이 없습니다.</div>
                                 ) : (
                                     <div className="space-y-6">
                                         {Object.entries(relationStats.classDetails)
                                             .filter(([_, details]) => details.length > 0)
                                             .map(([className, details]) => (
                                                 <div key={className} className="space-y-3">
-                                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                                        <Buildings size={18} className="text-slate-400" weight="fill" />
-                                                        <span className="text-[13px]">이전 학년도: {className}</span>
+                                                    <h4 className="font-bold text-ink flex items-center gap-2 bg-canvas p-2.5 rounded-card border border-line">
+                                                        <Buildings size={18} className="text-soft" />
+                                                        <span className="text-small">이전 학년도: {className}</span>
                                                     </h4>
-                                                    <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                                    <div className="divide-y divide-line bg-card rounded-card border border-line overflow-hidden">
                                                         {details.map((detail, idx) => (
-                                                            <div key={idx} className="flex items-center justify-between p-4 px-5 text-sm hover:bg-slate-50 transition-colors">
+                                                            <div key={idx} className="flex items-center justify-between p-4 px-5 text-body hover:bg-surface-hover transition-colors">
                                                                 <div className="flex items-center gap-4">
                                                                     <Badge
                                                                         variant="outline"
                                                                         className={detail.type === 'keep'
-                                                                            ? 'border-blue-200 text-blue-700 bg-blue-50/50 rounded-full px-2.5 py-0.5'
-                                                                            : 'border-red-200 text-red-700 bg-red-50/50 rounded-full px-2.5 py-0.5'
+                                                                            ? 'border-tint text-accent-ink bg-wash px-2.5 py-0.5'
+                                                                            : 'border-transparent text-danger bg-danger-wash px-2.5 py-0.5'
                                                                         }
                                                                     >
                                                                         {detail.type === 'keep' ? '함께 희망' : '서로 회피'}
                                                                     </Badge>
-                                                                    <span className="font-semibold text-slate-700 flex items-center gap-3">
+                                                                    <span className="font-semibold text-ink flex items-center gap-3">
                                                                         <span className="flex items-center gap-1.5">
-                                                                            <User size={16} className="text-slate-400" />
+                                                                            <User size={16} className="text-soft" />
                                                                             {detail.names[0]}
-                                                                            <Badge variant="secondary" className="text-[11px] px-1.5 h-5 font-normal text-slate-500 bg-slate-100 hover:bg-slate-200">{detail.classes[0]}</Badge>
+                                                                            <Badge variant="secondary" className="text-micro px-1.5 h-5 font-normal text-soft bg-surface-hover hover:bg-line">{detail.classes[0]}</Badge>
                                                                         </span>
-                                                                        <ArrowsLeftRight size={14} className="text-slate-300" />
+                                                                        <ArrowsLeftRight size={14} className="text-soft" />
                                                                         <span className="flex items-center gap-1.5">
-                                                                            <User size={16} className="text-slate-400" />
+                                                                            <User size={16} className="text-soft" />
                                                                             {detail.names[1]}
-                                                                            <Badge variant="secondary" className="text-[11px] px-1.5 h-5 font-normal text-slate-500 bg-slate-100 hover:bg-slate-200">{detail.classes[1]}</Badge>
+                                                                            <Badge variant="secondary" className="text-micro px-1.5 h-5 font-normal text-soft bg-surface-hover hover:bg-line">{detail.classes[1]}</Badge>
                                                                         </span>
                                                                     </span>
                                                                 </div>
                                                                 <Badge
-                                                                    className={`min-w-[60px] justify-center text-[11px] font-bold ${detail.status === '만족'
-                                                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                                                        : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                                                                    className={`min-w-[60px] justify-center text-micro font-bold ${detail.status === '만족'
+                                                                        ? 'bg-wash text-accent-ink border-tint'
+                                                                        : 'bg-danger-wash text-danger border-transparent'
                                                                         }`}
                                                                     variant="outline"
                                                                 >
-                                                                    {detail.status === '만족' ? <CheckCircle size={14} className="mr-1" weight="fill" /> : <WarningCircle size={14} className="mr-1" weight="fill" />}
+                                                                    {detail.status === '만족' ? <CheckCircle size={14} className="mr-1" /> : <WarningCircle size={14} className="mr-1" />}
                                                                     {detail.status}
                                                                 </Badge>
                                                             </div>
@@ -640,80 +641,80 @@ export function AssignmentReportDialog({
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
                                 <div className="space-y-4">
-                                    <h4 className="font-bold text-sm flex items-center gap-2 text-slate-800">
-                                        <Users size={18} className="text-indigo-500" weight="bold" />
+                                    <h4 className="font-bold text-body flex items-center gap-2 text-ink">
+                                        <Users size={18} className="text-accent" />
                                         분산 배정 그룹별 현황
                                     </h4>
                                     <div className="space-y-3">
                                         {groupStats.map(g => (
-                                            <Card key={g.name} className="overflow-hidden border-slate-200 shadow-sm rounded-2xl">
-                                                <CardHeader className="p-3.5 py-2.5 bg-slate-50/50 border-b flex flex-row items-center gap-2">
-                                                    <div className="w-1.5 h-3.5 rounded-full bg-indigo-400" />
-                                                    <CardTitle className="text-xs font-bold text-slate-700">{g.name}</CardTitle>
+                                            <Card key={g.name} className="overflow-hidden py-0 gap-0">
+                                                <CardHeader className="p-3.5 py-2.5 bg-canvas border-b flex flex-row items-center gap-2">
+                                                    <div className={`w-3 h-3 rounded-full ${g.color.split(' ')[0]}`} />
+                                                    <CardTitle className="text-caption font-bold text-ink">{g.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-4">
-                                                    <div className="flex flex-wrap gap-1.5 text-xs">
+                                                    <div className="flex flex-wrap gap-1.5 text-caption">
                                                         {g.students.map((s, i) => (
-                                                            <span key={i} className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                                                                <User size={12} className="text-slate-400" />
-                                                                {s.name} <span className="opacity-30">|</span> {s.class}
+                                                            <span key={i} className="bg-surface-hover text-soft px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                                                                <User size={12} className="text-soft" />
+                                                                {s.name} <span className="text-faint">|</span> {s.class}
                                                             </span>
                                                         ))}
-                                                        {g.students.length === 0 && <span className="text-muted-foreground opacity-60">소속 학생 없음</span>}
+                                                        {g.students.length === 0 && <span className="text-soft">소속 학생 없음</span>}
                                                     </div>
                                                 </CardContent>
                                             </Card>
                                         ))}
                                     </div>
-                                    {groupStats.length === 0 && <p className="text-sm text-muted-foreground opacity-60 italic">설정된 분산 배정 그룹이 없습니다.</p>}
+                                    {groupStats.length === 0 && <p className="text-body text-soft">설정된 분산 배정 그룹이 없습니다.</p>}
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h4 className="font-bold text-sm flex items-center gap-2 text-slate-800">
-                                        <CheckCircle size={18} className="text-indigo-500" weight="bold" />
+                                    <h4 className="font-bold text-body flex items-center gap-2 text-ink">
+                                        <CheckCircle size={18} className="text-accent" />
                                         고정 배정 및 특수 현황
                                     </h4>
                                     <div className="space-y-3">
-                                        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-                                            <CardHeader className="p-3.5 py-2.5 bg-slate-50/50 border-b">
-                                                <CardTitle className="text-xs font-bold text-slate-700">고정 배정 학생</CardTitle>
+                                        <Card className="overflow-hidden py-0 gap-0">
+                                            <CardHeader className="p-3.5 py-2.5 bg-canvas border-b">
+                                                <CardTitle className="text-caption font-bold text-ink">고정 배정 학생</CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-4 space-y-2.5">
                                                 {specialStats.fixed.map((s, i) => (
-                                                    <div key={i} className="flex justify-between items-center text-xs">
+                                                    <div key={i} className="flex justify-between items-center text-caption">
                                                         <div className="flex items-center gap-2">
-                                                            <User size={14} className="text-slate-400" />
-                                                            <span className="font-semibold text-slate-700">{s.name}</span>
-                                                            <span className="text-slate-400">({s.target}반 희망)</span>
+                                                            <User size={14} className="text-soft" />
+                                                            <span className="font-semibold text-ink">{s.name}</span>
+                                                            <span className="text-soft">({s.target}반 희망)</span>
                                                         </div>
                                                         <Badge
                                                             variant="outline"
-                                                            className={`text-[10px] h-5 rounded-full px-2 ${s.isMet
-                                                                ? 'border-emerald-200 text-emerald-700 bg-emerald-50'
-                                                                : 'border-red-200 text-red-700 bg-red-50'
+                                                            className={`text-micro h-5 rounded-full px-2 ${s.isMet
+                                                                ? 'border-tint text-accent-ink bg-wash'
+                                                                : 'border-transparent text-danger bg-danger-wash'
                                                                 }`}
                                                         >
                                                             {s.isMet ? '만족' : '미충족'} ({s.class})
                                                         </Badge>
                                                     </div>
                                                 ))}
-                                                {specialStats.fixed.length === 0 && <p className="text-xs text-muted-foreground opacity-60">고정 배정 학생 없음</p>}
+                                                {specialStats.fixed.length === 0 && <p className="text-caption text-soft">고정 배정 학생 없음</p>}
                                             </CardContent>
                                         </Card>
 
-                                        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden">
-                                            <CardHeader className="p-3.5 py-2.5 bg-slate-50/50 border-b">
-                                                <CardTitle className="text-xs font-bold text-slate-700">전출 예정 학생</CardTitle>
+                                        <Card className="overflow-hidden py-0 gap-0">
+                                            <CardHeader className="p-3.5 py-2.5 bg-canvas border-b">
+                                                <CardTitle className="text-caption font-bold text-ink">전출 예정 학생</CardTitle>
                                             </CardHeader>
                                             <CardContent className="p-4">
-                                                <div className="flex flex-wrap gap-1.5 text-xs">
+                                                <div className="flex flex-wrap gap-1.5 text-caption">
                                                     {specialStats.preTransfer.map((s, i) => (
-                                                        <span key={i} className="text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 font-medium flex items-center gap-1">
-                                                            <User size={12} className="text-indigo-400" />
-                                                            {s.name} <span className="opacity-30">|</span> {s.class}
+                                                        <span key={i} className="text-accent-ink bg-wash px-2.5 py-1 rounded-full border border-tint font-medium flex items-center gap-1">
+                                                            <User size={12} className="text-accent" />
+                                                            {s.name} <span className="text-faint">|</span> {s.class}
                                                         </span>
                                                     ))}
-                                                    {specialStats.preTransfer.length === 0 && <span className="text-muted-foreground opacity-60">전출 예정 학생 없음</span>}
+                                                    {specialStats.preTransfer.length === 0 && <span className="text-soft">전출 예정 학생 없음</span>}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -724,39 +725,39 @@ export function AssignmentReportDialog({
 
                         <TabsContent value="movements" className="m-0 space-y-4">
                             <div className="flex justify-between items-center">
-                                <p className="text-sm text-muted-foreground">최초 배정 결과 대비 <strong>{movementStats.length}명</strong>의 학생이 이동되었습니다.</p>
+                                <p className="text-body text-soft">최초 배정 결과 대비 <strong>{movementStats.length}명</strong>의 학생이 이동되었습니다.</p>
                             </div>
 
                             {movementStats.length === 0 ? (
-                                <div className="text-center py-20 text-muted-foreground border border-dashed rounded-2xl bg-slate-50/50">
-                                    <Info size={32} className="mx-auto mb-3 opacity-20" />
-                                    <p className="text-sm">이동한 학생이 없습니다.</p>
+                                <div className="text-center py-20 text-soft border border-dashed rounded-card bg-canvas">
+                                    <Info size={32} className="mx-auto mb-3 text-faint" />
+                                    <p className="text-body">이동한 학생이 없습니다.</p>
                                 </div>
                             ) : (
-                                <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                                <div className="divide-y divide-line bg-card rounded-card border border-line overflow-hidden">
                                     {movementStats.map((s, i) => (
-                                        <div key={s.id} className="flex items-center justify-between p-4 px-5 text-sm hover:bg-slate-50 transition-colors">
+                                        <div key={s.id} className="flex items-center justify-between p-4 px-5 text-body hover:bg-surface-hover transition-colors">
                                             <div className="flex items-center gap-5">
-                                                <span className="text-xs font-bold text-slate-300 w-5">{i + 1}</span>
+                                                <span className="text-caption font-bold text-soft w-5">{i + 1}</span>
                                                 <div className="flex items-center gap-2">
-                                                    <User size={16} className="text-slate-400" />
-                                                    <span className="font-bold text-slate-700">{s.name}</span>
-                                                    <Badge variant="secondary" className="text-[11px] px-1.5 h-5 font-normal text-slate-500 bg-slate-100 hover:bg-slate-200">
+                                                    <User size={16} className="text-soft" />
+                                                    <span className="font-bold text-ink">{s.name}</span>
+                                                    <Badge variant="secondary" className="text-micro px-1.5 h-5 font-normal text-soft bg-surface-hover hover:bg-line">
                                                         {s.prev_info.split('-').slice(0, 2).join('-')} 반
                                                     </Badge>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[11px] font-medium text-slate-400 uppercase tracking-tighter">최초</span>
-                                                    <Badge variant="outline" className="font-semibold text-slate-500 bg-white border-slate-200 px-2 py-0.5 rounded-lg">
+                                                    <span className="text-caption text-soft">최초</span>
+                                                    <Badge variant="outline" className="font-semibold text-soft bg-card border-line px-2 py-0.5 rounded-card">
                                                         {s.initialClass}
                                                     </Badge>
                                                 </div>
-                                                <ArrowRight size={14} weight="bold" className="text-slate-300" />
+                                                <ArrowRight size={14} className="text-soft" />
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[11px] font-medium text-indigo-400 uppercase tracking-tighter">최종</span>
-                                                    <Badge className="bg-indigo-500 text-white font-bold border-none px-3 py-1 rounded-lg shadow-sm">
+                                                    <span className="text-caption text-accent-ink">최종</span>
+                                                    <Badge className="font-bold border-none px-3 py-1 rounded-input">
                                                         {s.finalClass}
                                                     </Badge>
                                                 </div>
@@ -769,10 +770,10 @@ export function AssignmentReportDialog({
 
                         <TabsContent value="history" className="m-0">
                             {history.length === 0 ? (
-                                <div className="text-center py-20 text-muted-foreground border border-dashed rounded-2xl bg-slate-50/50">
-                                    <Clock size={32} className="mx-auto mb-3 opacity-20" />
-                                    <p className="text-sm font-medium">배정 변경 이력이 없습니다.</p>
-                                    <p className="text-xs opacity-60 mt-1">자동 배정 이후의 수동 변경 사항이 여기에 표시됩니다.</p>
+                                <div className="text-center py-20 text-soft border border-dashed rounded-card bg-canvas">
+                                    <Clock size={32} className="mx-auto mb-3 text-faint" />
+                                    <p className="text-body font-medium">배정 변경 이력이 없습니다.</p>
+                                    <p className="text-caption mt-1">자동 배정 이후의 수동 변경 사항이 여기에 표시됩니다.</p>
                                 </div>
                             ) : (
                                 <HistoryPanel history={history} students={students} />
@@ -780,7 +781,7 @@ export function AssignmentReportDialog({
                         </TabsContent>
                     </div>
 
-                    <div className="p-4 border-t px-6 flex justify-between bg-gray-50">
+                    <div className="p-4 border-t px-6 flex justify-between bg-canvas">
                         <Button
                             variant="outline"
                             onClick={handlePrint}

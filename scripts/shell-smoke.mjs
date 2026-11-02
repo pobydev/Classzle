@@ -97,6 +97,31 @@ try {
     await expect(titlebar).toContainText('가상 작업');
     checks.push('이름을 정해 저장하면 목록과 제목 바에 나옴');
 
+    // 지금 연 작업을 다시 저장하면 묻지 않고, 다른 작업의 이름이면 묻습니다.
+    const saveAs = async (name) => {
+        await sidebar.getByRole('button', { name: '작업 저장' }).click();
+        await page.getByLabel('이름').fill(name);
+        await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
+    };
+    await saveAs('가상 작업');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await saveAs('가상 작업 2');
+    await expect(sidebar.getByRole('button', { name: '가상 작업 2', exact: true })).toBeVisible();
+    await saveAs('가상 작업');
+    const overwrite = page.getByRole('alertdialog').or(page.getByRole('dialog').filter({ hasText: '이미 있습니다' }));
+    await expect(overwrite).toContainText('이미 있습니다');
+    await shot('4a-overwrite');
+    await overwrite.getByRole('button', { name: '취소' }).click();
+    await expect(page.getByLabel('이름')).toHaveValue('가상 작업');
+    await page.getByRole('dialog').getByRole('button', { name: '취소' }).click();
+    await saveAs('가상 작업');
+    await page.getByRole('dialog').filter({ hasText: '이미 있습니다' }).getByRole('button', { name: '덮어쓰기' }).click();
+    await expect(titlebar).toContainText('가상 작업');
+    await sidebar.getByRole('button', { name: '가상 작업 2 삭제' }).click({ force: true });
+    await page.getByRole('dialog').getByRole('button', { name: '삭제' }).click();
+    await expect(sidebar.getByRole('button', { name: '가상 작업 2', exact: true })).toHaveCount(0);
+    checks.push('같은 이름은 앱 안의 창으로 묻고, 지금 연 작업을 다시 저장하면 묻지 않음');
+
     await sidebar.getByRole('button', { name: '가상 작업', exact: true }).click();
     const confirmDialog = page.getByRole('dialog');
     await expect(confirmDialog).toContainText('이 작업을 불러올까요?');

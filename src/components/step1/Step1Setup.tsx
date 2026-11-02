@@ -24,7 +24,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { PencilSimple, Trash } from '@phosphor-icons/react';
+import {
+    ArrowRight,
+    ChartBar,
+    CheckCircle,
+    CircleNotch,
+    ClipboardText,
+    DownloadSimple,
+    Minus,
+    NotePencil,
+    PencilSimple,
+    Plus,
+    Question,
+    Trash,
+    UploadSimple,
+} from '@phosphor-icons/react';
+import { BehaviorChip, BehaviorIcon } from '@/components/BehaviorChip';
+import { useConfirm } from '@/components/shell/ConfirmProvider';
 import {
     Dialog,
     DialogContent,
@@ -43,6 +59,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         students, setStudents, settings, setClassCount, resetAll,
         updateStudent, addStudent, deleteStudent, clearMovements, setGroups
     } = useClasszleStore();
+    const confirm = useConfirm();
     const [isDragging, setIsDragging] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
     const [errorMessage, setErrorMessage] = useState('');
@@ -110,10 +127,12 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
     }, [settings.classCount]);
 
     const handleResetAll = async () => {
-        const message = '정말 모든 데이터를 삭제하고 초기화하시겠습니까?\n저장하지 않은 진행 상황은 모두 사라집니다.';
-        const confirmed = window.electronAPI
-            ? await window.electronAPI.confirmDialog(message)
-            : confirm(message);
+        const confirmed = await confirm({
+            title: '모든 내용을 지우고 처음으로 돌아갈까요?',
+            description: '저장하지 않은 내용은 모두 사라집니다.',
+            confirmLabel: '전체 초기화',
+            danger: true,
+        });
 
         if (confirmed) {
             resetAll();
@@ -131,10 +150,12 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
         // 지금 작업을 새 명단으로 덮어쓰기 전에 묻습니다.
         if (useClasszleStore.getState().students.length > 0) {
-            const message = '지금 작업 중인 학생, 그룹, 배정, 변경 이력이 새 파일 내용으로 바뀝니다.\n저장하지 않은 내용은 사라집니다. 계속하시겠습니까?';
-            const confirmed = window.electronAPI
-                ? await window.electronAPI.confirmDialog(message)
-                : confirm(message);
+            const confirmed = await confirm({
+                title: '새 파일로 바꿀까요?',
+                description: '지금 작업 중인 학생, 그룹, 배정, 변경 이력이 새 파일 내용으로 바뀝니다. 저장하지 않은 내용은 사라집니다.',
+                confirmLabel: '바꾸기',
+                danger: true,
+            });
             if (!confirmed) return;
         }
 
@@ -186,7 +207,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             setUploadStatus('error');
             setErrorMessage((error as Error).message);
         }
-    }, [setStudents, setClassCount, clearMovements]);
+    }, [setStudents, setClassCount, clearMovements, setGroups, confirm]);
 
 
     const handleDrop = useCallback(
@@ -235,45 +256,23 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
         }
     };
 
-    const getBehaviorColor = (type: BehaviorType, score: number) => {
-        if (type === 'NONE') return '';
-        if (type === 'LEADER') {
-            // 리더: 양수 점수 (1, 2)
-            if (score >= 2) return 'bg-green-200'; // 강한 리더
-            return 'bg-green-100'; // 일반 리더
-        }
-        if (type === 'BEHAVIOR') {
-            // 행동: 음수 점수 (-1, -2, -3)
-            // 점수가 낮을수록(절대값이 클수록) 진한 색
-            if (score <= -3) return 'bg-orange-300';
-            if (score <= -2) return 'bg-orange-200';
-            return 'bg-orange-100';
-        }
-        if (type === 'EMOTIONAL') {
-            // 정서: 음수 점수 (-1, -2, -3)
-            if (score <= -3) return 'bg-blue-300';
-            if (score <= -2) return 'bg-blue-200';
-            return 'bg-blue-100';
-        }
-        return '';
-    };
-
     return (
         <div className="space-y-6">
             {/* 상단: 기초 정보 입력 + 통계 */}
-            <Card className="rounded-xl border-indigo-100 shadow-lg shadow-indigo-500/5 bg-white/80 backdrop-blur">
+            <Card>
                 <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                        📝 기초 정보 입력
+                    <CardTitle className="text-title-sm flex items-center gap-2">
+                        <NotePencil size={20} className="text-accent" aria-hidden="true" />
+                        기초 정보 입력
                     </CardTitle>
                     <CardDescription>
-                        학급 수를 설정하고 학생 명단 엑셀 파일을 업로드하세요.
+                        학급 수를 설정하고 학생 명단 엑셀 파일을 업로드해 주세요.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     {/* 학급 수 설정 */}
-                    <div className="flex items-center gap-4 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <label className="font-medium min-w-[140px] text-slate-700">편성할 학급 수</label>
+                    <div className="flex items-center gap-4 mb-6 bg-canvas p-4 rounded-card border border-line">
+                        <label className="font-medium min-w-[140px] text-ink">편성할 학급 수</label>
                         <Input
                             type="number"
                             min={2}
@@ -294,9 +293,9 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                     setLocalClassCount(settings.classCount.toString());
                                 }
                             }}
-                            className="w-24 bg-white border-slate-200 focus-visible:ring-indigo-500 rounded-lg"
+                            className="w-24"
                         />
-                        <span className="text-muted-foreground">개 반</span>
+                        <span className="text-soft">개 반</span>
                     </div>
 
                     {/* 엑셀 업로드 영역 */}
@@ -308,10 +307,10 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                             {/* 파일 업로드 영역 */}
                             <div
                                 className={`
-                                    border-2 border-dashed rounded-xl p-6 text-center transition-all h-[280px] flex flex-col items-center justify-center relative
-                                    ${isDragging ? 'border-indigo-500 bg-indigo-50/50 scale-[1.02]' : 'border-slate-200 hover:border-indigo-300 hover:bg-slate-50/50'}
-                                    ${uploadStatus === 'error' ? 'border-red-400 bg-red-50/30' : ''}
-                                    ${uploadStatus === 'success' ? 'border-emerald-400 bg-emerald-50/30' : ''}
+                                    border-2 border-dashed rounded-window p-6 text-center transition-colors h-[280px] flex flex-col items-center justify-center relative
+                                    ${isDragging ? 'border-accent bg-wash' : 'border-hairline hover:border-ring hover:bg-surface-hover'}
+                                    ${uploadStatus === 'error' ? 'border-danger bg-danger-wash' : ''}
+                                    ${uploadStatus === 'success' ? 'border-accent bg-wash' : ''}
                                 `}
                                 onDragOver={(e) => {
                                     e.preventDefault();
@@ -322,24 +321,24 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                             >
                                 {uploadStatus === 'loading' ? (
                                     <div className="space-y-2">
-                                        <div className="animate-spin text-2xl">⏳</div>
-                                        <p className="text-sm">파일 처리 중...</p>
+                                        <CircleNotch size={28} className="mx-auto animate-spin text-accent" aria-hidden="true" />
+                                        <p className="text-body">파일 처리 중...</p>
                                     </div>
                                 ) : uploadStatus === 'success' ? (
                                     <div className="space-y-1">
-                                        <div className="text-2xl">✅</div>
-                                        <p className="text-green-600 font-medium text-sm">
+                                        <CheckCircle size={28} className="mx-auto text-accent" aria-hidden="true" />
+                                        <p className="text-accent-ink font-medium text-body">
                                             {students.length}명의 학생 데이터 로드 완료
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
-                                        <div className="text-2xl">📤</div>
-                                        <p className="font-medium text-sm">
+                                        <UploadSimple size={28} className="mx-auto text-accent" aria-hidden="true" />
+                                        <p className="font-medium text-body">
                                             엑셀 파일을 드래그하거나 클릭
                                         </p>
                                         {uploadStatus === 'error' && (
-                                            <p className="text-destructive text-xs">{errorMessage}</p>
+                                            <p className="text-danger text-caption">{errorMessage}</p>
                                         )}
                                         <input
                                             type="file"
@@ -361,31 +360,38 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                             <div>
                                 <div className="flex gap-2 flex-wrap mb-2">
                                     <Button variant="outline" size="sm" onClick={() => setIsGuideOpen(true)}>
-                                        ❓ 엑셀 작성 가이드
+                                        <Question size={16} aria-hidden="true" />
+                                        엑셀 작성 가이드
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={downloadSampleExcel}>
-                                        📥 양식 A (이전학년 명단)
+                                        <DownloadSimple size={16} aria-hidden="true" />
+                                        양식 A (이전학년 명단)
                                     </Button>
                                     <Button variant="outline" size="sm" onClick={downloadPreAssignedSampleExcel}>
-                                        📥 양식 B (신학년 기배정안)
+                                        <DownloadSimple size={16} aria-hidden="true" />
+                                        양식 B (신학년 기배정안)
                                     </Button>
                                     {students.length > 0 && (
                                         <Button variant="destructive" size="sm" onClick={handleResetAll}>
-                                            🗑️ 전체 초기화
+                                            <Trash size={16} aria-hidden="true" />
+                                            전체 초기화
                                         </Button>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground break-keep">
+                                <p className="text-caption text-soft break-keep">
                                     <strong>양식 A</strong>: 새로 반을 편성할 때 (이전 학년도 반/번호 정보만 필요) &nbsp;|&nbsp;
                                     <strong>양식 B</strong>: 기존 배정안을 수정할 때 (신학년 배정 결과 포함) -
-                                    둘 중 하나에 학생 정보를 붙여넣고 업로드하세요.
+                                    둘 중 하나에 학생 정보를 붙여넣고 업로드해 주세요.
                                 </p>
                             </div>
 
                             <Dialog open={isGuideOpen} onOpenChange={setIsGuideOpen}>
                                 <DialogContent className="sm:max-w-[60vw] max-h-[80vh] overflow-y-auto">
                                     <DialogHeader>
-                                        <DialogTitle>📊 엑셀 파일 작성 가이드</DialogTitle>
+                                        <DialogTitle className="flex items-center gap-2">
+                                            <ChartBar size={20} className="text-accent" aria-hidden="true" />
+                                            엑셀 파일 작성 가이드
+                                        </DialogTitle>
                                         <DialogDescription>학생 데이터 엑셀 파일 작성 방법을 안내합니다.</DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-6 pt-4">
@@ -397,27 +403,27 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
                                             <TabsContent value="form-a" className="space-y-6">
                                                 <div className="space-y-2">
-                                                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                                                        <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
+                                                    <h3 className="font-semibold text-title-sm flex items-center gap-2">
+                                                        <span className="bg-wash text-accent w-6 h-6 rounded-full flex items-center justify-center text-body">1</span>
                                                         필수 열(Column) 구성 (양식 A)
                                                     </h3>
-                                                    <p className="text-sm text-muted-foreground ml-8">
+                                                    <p className="text-body text-soft ml-8">
                                                         새로 반 편성을 할 때 사용합니다. 엑셀 헤더에 아래 항목들이 포함되어야 합니다.
                                                     </p>
-                                                    <div className="ml-8 border rounded-md overflow-hidden">
+                                                    <div className="ml-8 border rounded-input overflow-hidden">
                                                         <Table>
-                                                            <TableHeader className="bg-muted/50">
+                                                            <TableHeader className="bg-canvas">
                                                                 <TableRow>
                                                                     <TableHead className="w-24">항목</TableHead>
                                                                     <TableHead>설명 및 예시</TableHead>
                                                                 </TableRow>
                                                             </TableHeader>
-                                                            <TableBody className="text-sm">
+                                                            <TableBody className="text-body">
                                                                 <TableRow>
                                                                     <TableCell className="font-medium">학년/반/번호</TableCell>
                                                                     <TableCell>
                                                                         학생의 이전 학적 정보입니다.<br />
-                                                                        <span className="text-muted-foreground text-xs">예: 2 (학년), 1 (반), 15 (번호)</span>
+                                                                        <span className="text-soft text-caption">예: 2 (학년), 1 (반), 15 (번호)</span>
                                                                     </TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
@@ -446,41 +452,41 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
                                             <TabsContent value="form-b" className="space-y-6">
                                                 <div className="space-y-2">
-                                                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                                                        <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
+                                                    <h3 className="font-semibold text-title-sm flex items-center gap-2">
+                                                        <span className="bg-wash text-accent w-6 h-6 rounded-full flex items-center justify-center text-body">1</span>
                                                         필수 열(Column) 구성 (양식 B)
                                                     </h3>
-                                                    <p className="text-sm text-muted-foreground ml-8">
+                                                    <p className="text-body text-soft ml-8">
                                                         이미 배정된 결과를 초기 데이터로 불러올 때 사용합니다.<br />
-                                                        (반 편성 탭에서 <strong>기존 배정 유지</strong>를 선택하여 이어서 작업 가능)
+                                                        (반 편성 탭에서 <strong>현재 배정 수정</strong>을 선택하여 이어서 작업 가능)
                                                     </p>
-                                                    <div className="ml-8 border rounded-md overflow-hidden">
+                                                    <div className="ml-8 border rounded-input overflow-hidden">
                                                         <Table>
-                                                            <TableHeader className="bg-muted/50">
+                                                            <TableHeader className="bg-canvas">
                                                                 <TableRow>
                                                                     <TableHead className="w-32">항목</TableHead>
                                                                     <TableHead>설명 및 예시</TableHead>
                                                                 </TableRow>
                                                             </TableHeader>
-                                                            <TableBody className="text-sm">
+                                                            <TableBody className="text-body">
                                                                 <TableRow>
                                                                     <TableCell className="font-medium">
-                                                                        <span className="text-indigo-600 font-bold">배정 학년/반/번호</span>
+                                                                        <span className="text-accent-ink font-bold">배정 학년/반/번호</span>
                                                                         <br />(앞쪽 열)
                                                                     </TableCell>
                                                                     <TableCell>
-                                                                        <span className="font-semibold text-indigo-600">새로 배정된</span> 정보입니다.<br />
-                                                                        <span className="text-muted-foreground text-xs">예: 3 (학년), 1 (반), 1 (번호)</span>
+                                                                        <span className="font-semibold text-accent-ink">새로 배정된</span> 정보입니다.<br />
+                                                                        <span className="text-soft text-caption">예: 3 (학년), 1 (반), 1 (번호)</span>
                                                                     </TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
                                                                     <TableCell className="font-medium">
-                                                                        <span className="text-slate-500 font-bold">이전 학년/반/번호</span>
+                                                                        <span className="text-soft font-bold">이전 학년/반/번호</span>
                                                                         <br />(뒤쪽 열)
                                                                     </TableCell>
                                                                     <TableCell>
-                                                                        <span className="font-semibold text-slate-500">작년(이전)</span> 학적 정보입니다.<br />
-                                                                        <span className="text-muted-foreground text-xs">예: 2 (학년), 1 (반), 15 (번호)</span>
+                                                                        <span className="font-semibold text-soft">작년(이전)</span> 학적 정보입니다.<br />
+                                                                        <span className="text-soft text-caption">예: 2 (학년), 1 (반), 15 (번호)</span>
                                                                     </TableCell>
                                                                 </TableRow>
                                                                 <TableRow>
@@ -499,41 +505,41 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                         </Tabs>
 
                                         <div className="space-y-2 pt-4 border-t">
-                                            <h3 className="font-semibold text-lg flex items-center gap-2">
-                                                <span className="bg-primary/10 text-primary w-6 h-6 rounded-full flex items-center justify-center text-sm">2</span>
+                                            <h3 className="font-semibold text-title-sm flex items-center gap-2">
+                                                <span className="bg-wash text-accent w-6 h-6 rounded-full flex items-center justify-center text-body">2</span>
                                                 생활지도 입력 값 (공통 중요)
                                             </h3>
-                                            <p className="text-sm text-muted-foreground ml-8">
+                                            <p className="text-body text-soft ml-8">
                                                 '생활지도' 열에는 아래 형식의 텍스트가 정확히 입력되어야 점수가 반영됩니다.
                                             </p>
                                             <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="border rounded-md p-3 bg-green-50/50 border-green-100">
-                                                    <span className="font-bold text-green-700 block mb-2">🟢 리더십 (점수 가산)</span>
-                                                    <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                                                        <li><code className="text-foreground font-semibold">리더(+2)</code> : 리더십이 탁월한 학생 (회장감)</li>
-                                                        <li><code className="text-foreground font-semibold">리더(+1)</code> : 모범적이고 성실한 학생</li>
+                                                <div className="border rounded-input p-3">
+                                                    <span className="font-bold text-ink flex items-center gap-1.5 mb-2"><BehaviorIcon type="LEADER" /> 리더십 (점수 가산)</span>
+                                                    <ul className="list-disc list-inside text-body space-y-1 text-soft">
+                                                        <li><code className="text-ink font-semibold">리더(+2)</code> : 리더십이 탁월한 학생 (회장감)</li>
+                                                        <li><code className="text-ink font-semibold">리더(+1)</code> : 모범적이고 성실한 학생</li>
                                                     </ul>
                                                 </div>
-                                                <div className="border rounded-md p-3 bg-red-50/50 border-red-100">
-                                                    <span className="font-bold text-red-700 block mb-2">🔴 행동 특성 (점수 차감)</span>
-                                                    <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                                                        <li><code className="text-foreground font-semibold">행동(-3)</code> : 심각한 방해, 학교폭력 등 집중 관리 필요</li>
-                                                        <li><code className="text-foreground font-semibold">행동(-2)</code> : 잦은 방해, 지속적 지도 필요</li>
-                                                        <li><code className="text-foreground font-semibold">행동(-1)</code> : 가벼운 딴짓, 관심 필요</li>
+                                                <div className="border rounded-input p-3">
+                                                    <span className="font-bold text-ink flex items-center gap-1.5 mb-2"><BehaviorIcon type="BEHAVIOR" /> 행동 특성 (점수 차감)</span>
+                                                    <ul className="list-disc list-inside text-body space-y-1 text-soft">
+                                                        <li><code className="text-ink font-semibold">행동(-3)</code> : 심각한 방해, 학교폭력 등 집중 관리 필요</li>
+                                                        <li><code className="text-ink font-semibold">행동(-2)</code> : 잦은 방해, 지속적 지도 필요</li>
+                                                        <li><code className="text-ink font-semibold">행동(-1)</code> : 가벼운 딴짓, 관심 필요</li>
                                                     </ul>
                                                 </div>
-                                                <div className="border rounded-md p-3 bg-blue-50/50 border-blue-100">
-                                                    <span className="font-bold text-blue-700 block mb-2">🔵 정서 특성 (점수 차감)</span>
-                                                    <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                                                        <li><code className="text-foreground font-semibold">정서(-3)</code> : 특별한 케어/전문가 개입 필요</li>
-                                                        <li><code className="text-foreground font-semibold">정서(-2)</code> : 교우관계/정서 지원 필요</li>
-                                                        <li><code className="text-foreground font-semibold">정서(-1)</code> : 다소 예민함, 배려 필요</li>
+                                                <div className="border rounded-input p-3">
+                                                    <span className="font-bold text-ink flex items-center gap-1.5 mb-2"><BehaviorIcon type="EMOTIONAL" /> 정서 특성 (점수 차감)</span>
+                                                    <ul className="list-disc list-inside text-body space-y-1 text-soft">
+                                                        <li><code className="text-ink font-semibold">정서(-3)</code> : 특별한 케어/전문가 개입 필요</li>
+                                                        <li><code className="text-ink font-semibold">정서(-2)</code> : 교우관계/정서 지원 필요</li>
+                                                        <li><code className="text-ink font-semibold">정서(-1)</code> : 다소 예민함, 배려 필요</li>
                                                     </ul>
                                                 </div>
-                                                <div className="border rounded-md p-3 bg-slate-50 border-slate-200">
-                                                    <span className="font-bold text-slate-700 block mb-2">⚪ 해당 없음</span>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        <code className="text-foreground font-semibold">해당없음</code> 또는 빈 칸<br />
+                                                <div className="border rounded-input p-3">
+                                                    <span className="font-bold text-ink flex items-center gap-1.5 mb-2"><Minus size={16} className="text-soft" aria-hidden="true" /> 해당 없음</span>
+                                                    <p className="text-body text-soft">
+                                                        <code className="text-ink font-semibold">해당없음</code> 또는 빈 칸<br />
                                                         (0점으로 처리됨)
                                                     </p>
                                                 </div>
@@ -550,24 +556,24 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
 
                         {/* 오른쪽: 통계 (1/3) */}
                         <div className="grid grid-cols-2 gap-3 content-start">
-                            <div className="bg-secondary rounded-lg p-4 text-center h-[134px] flex flex-col justify-center">
-                                <div className="text-2xl font-bold">{students.length}</div>
-                                <div className="text-xs text-muted-foreground">전체 학생</div>
+                            <div className="bg-surface-hover rounded-card p-4 text-center h-[134px] flex flex-col justify-center">
+                                <div className="text-title font-bold">{students.length}</div>
+                                <div className="text-caption text-soft">전체 학생</div>
                             </div>
-                            <div className="bg-secondary rounded-lg p-4 text-center h-[134px] flex flex-col justify-center">
-                                <div className="text-2xl font-bold text-blue-600">
+                            <div className="bg-surface-hover rounded-card p-4 text-center h-[134px] flex flex-col justify-center">
+                                <div className="text-title font-bold">
                                     {students.filter((s) => s.gender === 'M').length}
                                 </div>
-                                <div className="text-xs text-muted-foreground">남학생</div>
+                                <div className="text-caption text-soft">남학생</div>
                             </div>
-                            <div className="bg-secondary rounded-lg p-4 text-center h-[134px] flex flex-col justify-center">
-                                <div className="text-2xl font-bold text-pink-600">
+                            <div className="bg-surface-hover rounded-card p-4 text-center h-[134px] flex flex-col justify-center">
+                                <div className="text-title font-bold">
                                     {students.filter((s) => s.gender === 'F').length}
                                 </div>
-                                <div className="text-xs text-muted-foreground">여학생</div>
+                                <div className="text-caption text-soft">여학생</div>
                             </div>
-                            <div className="bg-secondary rounded-lg p-4 text-center h-[134px] flex flex-col justify-center">
-                                <div className="text-2xl font-bold">
+                            <div className="bg-surface-hover rounded-card p-4 text-center h-[134px] flex flex-col justify-center">
+                                <div className="text-title font-bold">
                                     {students.length > 0
                                         ? Math.round(
                                             students.reduce((sum, s) => sum + s.academic_score, 0) /
@@ -575,7 +581,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                         )
                                         : '-'}
                                 </div>
-                                <div className="text-xs text-muted-foreground">평균 성적</div>
+                                <div className="text-caption text-soft">평균 성적</div>
                             </div>
                         </div>
                     </div>
@@ -589,7 +595,8 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                         <CardHeader>
                             <div className="flex items-center justify-between flex-wrap gap-4">
                                 <CardTitle className="flex items-center gap-2">
-                                    📋 학생 관리
+                                    <ClipboardText size={20} className="text-accent" aria-hidden="true" />
+                                    학생 관리
                                 </CardTitle>
                                 <div className="flex items-center gap-4">
                                     <Input
@@ -600,12 +607,12 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                     />
                                     <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                                         <DialogTrigger asChild>
-                                            <Button size="sm">+ 학생 추가</Button>
+                                            <Button size="sm"><Plus size={16} aria-hidden="true" />학생 추가</Button>
                                         </DialogTrigger>
                                         <DialogContent>
                                             <DialogHeader>
                                                 <DialogTitle>새 학생 추가</DialogTitle>
-                                                <DialogDescription>새 학생의 정보를 입력하세요.</DialogDescription>
+                                                <DialogDescription>새 학생의 정보를 입력해 주세요.</DialogDescription>
                                             </DialogHeader>
                                             <div className="grid gap-4 py-4">
                                                 <div className="grid grid-cols-4 items-center gap-4">
@@ -754,9 +761,9 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                     })()}
                                 </TabsList>
 
-                                <div className="rounded-md border overflow-auto max-h-[500px]">
+                                <div className="rounded-input border overflow-auto max-h-[500px]">
                                     <Table>
-                                        <TableHeader className="sticky top-0 bg-background">
+                                        <TableHeader className="sticky top-0 bg-canvas">
                                             <TableRow>
                                                 <TableHead className="w-[60px] text-center">#</TableHead>
                                                 <TableHead className="text-center">이름</TableHead>
@@ -771,11 +778,8 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                         </TableHeader>
                                         <TableBody>
                                             {filteredStudents.map((student, index) => (
-                                                <TableRow
-                                                    key={student.id}
-                                                    className={getBehaviorColor(student.behavior_type, student.behavior_score)}
-                                                >
-                                                    <TableCell className="text-muted-foreground text-center">{index + 1}</TableCell>
+                                                <TableRow key={student.id}>
+                                                    <TableCell className="text-soft text-center">{index + 1}</TableCell>
                                                     <TableCell className="text-center">
                                                         {editingId === student.id ? (
                                                             <Input
@@ -840,7 +844,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                     </TableCell>
                                                     <TableCell className="text-center">
                                                         {editingId === student.id ? (
-                                                            <span className="text-sm font-medium">{student.behavior_score}</span>
+                                                            <span className="text-body font-medium">{student.behavior_score}</span>
                                                         ) : (
                                                             student.behavior_score
                                                         )}
@@ -873,23 +877,18 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                                 </SelectTrigger>
                                                                 <SelectContent>
                                                                     <SelectItem value="NONE">-</SelectItem>
-                                                                    <SelectItem value="LEADER:1">🟢 리더 (+1)</SelectItem>
-                                                                    <SelectItem value="LEADER:2">🟢 리더 (+2)</SelectItem>
-                                                                    <SelectItem value="BEHAVIOR:-1">🟠 행동 (-1)</SelectItem>
-                                                                    <SelectItem value="BEHAVIOR:-2">🟠 행동 (-2)</SelectItem>
-                                                                    <SelectItem value="BEHAVIOR:-3">🟠 행동 (-3)</SelectItem>
-                                                                    <SelectItem value="EMOTIONAL:-1">🔵 정서 (-1)</SelectItem>
-                                                                    <SelectItem value="EMOTIONAL:-2">🔵 정서 (-2)</SelectItem>
-                                                                    <SelectItem value="EMOTIONAL:-3">🔵 정서 (-3)</SelectItem>
+                                                                    <SelectItem value="LEADER:1"><BehaviorChip type="LEADER" score={1} /></SelectItem>
+                                                                    <SelectItem value="LEADER:2"><BehaviorChip type="LEADER" score={2} /></SelectItem>
+                                                                    <SelectItem value="BEHAVIOR:-1"><BehaviorChip type="BEHAVIOR" score={-1} /></SelectItem>
+                                                                    <SelectItem value="BEHAVIOR:-2"><BehaviorChip type="BEHAVIOR" score={-2} /></SelectItem>
+                                                                    <SelectItem value="BEHAVIOR:-3"><BehaviorChip type="BEHAVIOR" score={-3} /></SelectItem>
+                                                                    <SelectItem value="EMOTIONAL:-1"><BehaviorChip type="EMOTIONAL" score={-1} /></SelectItem>
+                                                                    <SelectItem value="EMOTIONAL:-2"><BehaviorChip type="EMOTIONAL" score={-2} /></SelectItem>
+                                                                    <SelectItem value="EMOTIONAL:-3"><BehaviorChip type="EMOTIONAL" score={-3} /></SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                         ) : (
-                                                            <span className="text-xs">
-                                                                {student.behavior_type === 'NONE' && '-'}
-                                                                {student.behavior_type === 'LEADER' && `🟢리더 (+${student.behavior_score})`}
-                                                                {student.behavior_type === 'BEHAVIOR' && `🟠행동 (${student.behavior_score})`}
-                                                                {student.behavior_type === 'EMOTIONAL' && `🔵정서 (${student.behavior_score})`}
-                                                            </span>
+                                                            <BehaviorChip type={student.behavior_type} score={student.behavior_score} />
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-center">
@@ -911,18 +910,20 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                                     size="sm"
                                                                     variant="ghost"
                                                                     className="h-7 px-2"
+                                                                    aria-label={`${student.name} 수정`}
                                                                     onClick={() => setEditingId(student.id)}
                                                                 >
-                                                                    ✏️
+                                                                    <PencilSimple size={16} />
                                                                 </Button>
                                                             )}
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-7 px-2 text-destructive"
+                                                                className="h-7 px-2 text-danger hover:text-danger hover:bg-danger-wash"
+                                                                aria-label={`${student.name} 삭제`}
                                                                 onClick={() => deleteStudent(student.id)}
                                                             >
-                                                                🗑️
+                                                                <Trash size={16} />
                                                             </Button>
                                                         </div>
                                                     </TableCell>
@@ -943,9 +944,9 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                     size="lg"
                     onClick={onNext}
                     disabled={students.length === 0}
-                    className="rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/20"
                 >
-                    다음: 조건 설정 →
+                    다음: 조건 설정
+                    <ArrowRight size={16} aria-hidden="true" />
                 </Button>
             </div>
         </div >

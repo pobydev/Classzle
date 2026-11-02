@@ -128,7 +128,6 @@ export interface ElectronAPI {
     getProjectList: () => Promise<string[]>;
     deleteProject: (name: string) => Promise<boolean>;
     printPreview: (html: string) => Promise<boolean>;
-    confirmDialog: (message: string) => Promise<boolean>;
     windowAction: (action: 'minimize' | 'maximize' | 'close') => void;
     getUpdateInfo: () => Promise<{ updates: 'on' | 'off'; status: UpdateStatus }>;
     checkForUpdates: () => Promise<void>;

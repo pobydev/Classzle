@@ -67,6 +67,16 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
             toast.error('작업 이름을 입력해 주세요.');
             return false;
         }
+        // 지금 연 작업을 다시 저장할 때는 묻지 않습니다.
+        if (name !== activeName && names.includes(name)) {
+            const answer = await confirm({
+                title: `'${name}' 작업이 이미 있습니다.`,
+                description: '덮어쓰면 그 작업의 예전 내용은 사라집니다.',
+                confirmLabel: '덮어쓰기',
+                danger: true,
+            });
+            if (!answer) return false;
+        }
         const data = JSON.stringify({ students, groups, settings, movementHistory }, null, 2);
         try {
             if (!(await storage.write(name, data))) throw new Error('write failed');

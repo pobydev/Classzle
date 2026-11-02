@@ -146,16 +146,6 @@
   }
 }
 
-/* 옛 화면 호환: Step2Constraints, PreTransferSettings의 hover:bg-accent와 bg-accent/50은
-   shadcn의 '옅은 바탕'이라는 뜻으로 쓴 것입니다. --accent가 진한 파랑이 되었으므로 옅은 바탕으로 둡니다.
-   두 파일을 고칠 때 hover:bg-wash, bg-wash로 바꾸고 이 묶음을 지웁니다. 새 코드는 쓰지 않습니다.
-   채운 버튼은 bg-accent hover:bg-accent-hover이므로 영향이 없습니다. */
-.hover\:bg-accent:hover,
-.hover\:bg-accent\/50:hover,
-.bg-accent\/50 {
-  background-color: var(--wash);
-}
-
 /* 슬로건 전용: 학교안심 받아쓰기체 (SIL OFL 1.1) */
 @font-face {
   font-family: 'Hakgyoansim';
