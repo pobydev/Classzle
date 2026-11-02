@@ -308,20 +308,12 @@ export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2Co
             added.forEach(id => addAvoidRelation(selectedStudent.id, id, tempRelationMemos[id] || ''));
             removed.forEach(id => removeAvoidRelation(selectedStudent.id, id));
             // Update memo for unchanged relations
-            unchanged.forEach(id => {
-                if (tempRelationMemos[id]) {
-                    addAvoidRelation(selectedStudent.id, id, tempRelationMemos[id]);
-                }
-            });
+            unchanged.forEach(id => addAvoidRelation(selectedStudent.id, id, tempRelationMemos[id] ?? ''));
         } else if (relationMode === 'keep') {
             added.forEach(id => addKeepRelation(selectedStudent.id, id, tempRelationMemos[id] || ''));
             removed.forEach(id => removeKeepRelation(selectedStudent.id, id));
             // Update memo for unchanged relations
-            unchanged.forEach(id => {
-                if (tempRelationMemos[id]) {
-                    addKeepRelation(selectedStudent.id, id, tempRelationMemos[id]);
-                }
-            });
+            unchanged.forEach(id => addKeepRelation(selectedStudent.id, id, tempRelationMemos[id] ?? ''));
         }
 
         setSelectedStudent(null);

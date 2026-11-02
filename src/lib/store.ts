@@ -95,6 +95,14 @@ function withSnapshot(
     return [...state.undoStack, snapshot].slice(-MAX_UNDO);
 }
 
+// 관계 사유를 넣습니다. 비어 있으면 지웁니다.
+function withMemo(memos: Record<string, string> | undefined, otherId: string, memo: string): Record<string, string> {
+    const next = { ...memos };
+    if (memo.trim()) next[otherId] = memo;
+    else delete next[otherId];
+    return next;
+}
+
 // 지운 학생을 다른 학생의 관계와 메모에서도 뺍니다.
 function withoutRelationsTo(student: Student, removedId: string): Student {
     const hasAvoid = student.avoid_ids.includes(removedId);
@@ -280,18 +288,14 @@ export const useClasszleStore = create<ClasszleStore>()(
                         if (!s.avoid_ids.includes(avoidId)) {
                             updates.avoid_ids = [...s.avoid_ids, avoidId];
                         }
-                        if (memo) {
-                            updates.avoid_memos = { ...(s.avoid_memos || {}), [avoidId]: memo };
-                        }
+                        if (memo !== undefined) updates.avoid_memos = withMemo(s.avoid_memos, avoidId, memo);
                     }
                     if (s.id === avoidId) {
                         if (!s.avoid_ids.includes(studentId)) {
                             updates.avoid_ids = [...s.avoid_ids, studentId];
                         }
-                        if (memo) {
-                            // 반대편에도 메모 저장 (선택 사항이나 대칭성 위해)
-                            updates.avoid_memos = { ...(s.avoid_memos || {}), [studentId]: memo };
-                        }
+                        // 반대편에도 메모 저장 (선택 사항이나 대칭성 위해)
+                        if (memo !== undefined) updates.avoid_memos = withMemo(s.avoid_memos, studentId, memo);
                     }
                     if (Object.keys(updates).length > 0) {
                         return { ...s, ...updates };
@@ -331,17 +335,13 @@ export const useClasszleStore = create<ClasszleStore>()(
                         if (!s.keep_ids.includes(keepId)) {
                             updates.keep_ids = [...s.keep_ids, keepId];
                         }
-                        if (memo) {
-                            updates.keep_memos = { ...(s.keep_memos || {}), [keepId]: memo };
-                        }
+                        if (memo !== undefined) updates.keep_memos = withMemo(s.keep_memos, keepId, memo);
                     }
                     if (s.id === keepId) {
                         if (!s.keep_ids.includes(studentId)) {
                             updates.keep_ids = [...s.keep_ids, studentId];
                         }
-                        if (memo) {
-                            updates.keep_memos = { ...(s.keep_memos || {}), [studentId]: memo };
-                        }
+                        if (memo !== undefined) updates.keep_memos = withMemo(s.keep_memos, studentId, memo);
                     }
                     if (Object.keys(updates).length > 0) {
                         return { ...s, ...updates };

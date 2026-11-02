@@ -144,3 +144,29 @@ describe('입력표 반영과 되돌리기', () => {
         expect(store().students.find((s) => s.id === 'a')).toMatchObject({ assigned_class: '1반', behavior_score: -2 });
     });
 });
+
+describe('관계 사유', () => {
+    const find = (id: string) => store().students.find((s) => s.id === id)!;
+
+    beforeEach(() => {
+        store().resetAll();
+        store().setStudents([makeStudent({ id: 'a' }), makeStudent({ id: 'b' })]);
+    });
+
+    it.each([
+        ['분리 배정', 'addAvoidRelation', 'avoid_memos'],
+        ['함께 배정', 'addKeepRelation', 'keep_memos'],
+    ] as const)('%s 사유를 지우고 저장하면 양쪽에서 지워집니다', (_, add, memos) => {
+        store()[add]('a', 'b', '가상 사유');
+        expect(find('a')[memos]).toEqual({ b: '가상 사유' });
+        store()[add]('a', 'b', '');
+        expect(find('a')[memos]).toEqual({});
+        expect(find('b')[memos]).toEqual({});
+    });
+
+    it('사유를 넘기지 않으면 그대로 둡니다', () => {
+        store().addAvoidRelation('a', 'b', '가상 사유');
+        store().addAvoidRelation('a', 'b');
+        expect(find('a').avoid_memos).toEqual({ b: '가상 사유' });
+    });
+});
