@@ -79,26 +79,27 @@ type GuidanceValue = Pick<Student, 'behavior_type' | 'behavior_score'>;
 interface UndoSnapshot {
     assignments: Record<string, string | null>;
     movementHistory: AssignmentChange[];
-    // 입력표를 반영하기 전의 생활지도입니다. 번호 방식은 표시 설정이라 기록하지 않습니다.
-    guidance?: Record<string, GuidanceValue>;
+    // 입력표가 실제로 바꾼 학생의 전과 후입니다. 번호 방식은 표시 설정이라 기록하지 않습니다.
+    guidance?: Record<string, { before: GuidanceValue; applied: GuidanceValue }>;
 }
 
 const MAX_UNDO = 30;
 
 function withSnapshot(
     state: { students: Student[]; movementHistory: AssignmentChange[]; undoStack: UndoSnapshot[] },
-    keepGuidance = false,
+    guidance?: UndoSnapshot['guidance'],
 ): UndoSnapshot[] {
     const assignments: Record<string, string | null> = {};
-    const guidance: Record<string, GuidanceValue> = {};
     state.students.forEach((s) => {
         assignments[s.id] = s.assigned_class ?? null;
-        if (keepGuidance) guidance[s.id] = { behavior_type: s.behavior_type, behavior_score: s.behavior_score };
     });
     const snapshot: UndoSnapshot = { assignments, movementHistory: state.movementHistory };
-    if (keepGuidance) snapshot.guidance = guidance;
+    if (guidance) snapshot.guidance = guidance;
     return [...state.undoStack, snapshot].slice(-MAX_UNDO);
 }
+
+const guidanceOf = (s: Student): GuidanceValue => ({ behavior_type: s.behavior_type, behavior_score: s.behavior_score });
+const sameGuidance = (a: GuidanceValue, b: GuidanceValue) => a.behavior_type === b.behavior_type && a.behavior_score === b.behavior_score;
 
 // 관계 사유를 넣습니다. 비어 있으면 지웁니다.
 function withMemo(memos: Record<string, string> | undefined, otherId: string, memo: string): Record<string, string> {
@@ -268,10 +269,17 @@ export const useClasszleStore = create<ClasszleStore>()(
                 movementHistory: startHistory ? [] : [...state.movementHistory, ...changes]
             })),
 
-            applyGuidance: (students) => set((state) => ({
-                undoStack: withSnapshot(state, true),
-                students,
-            })),
+            applyGuidance: (students) => set((state) => {
+                const before = new Map(state.students.map((s) => [s.id, s]));
+                const guidance: NonNullable<UndoSnapshot['guidance']> = {};
+                students.forEach((s) => {
+                    const old = before.get(s.id);
+                    if (old && !sameGuidance(guidanceOf(old), guidanceOf(s))) {
+                        guidance[s.id] = { before: guidanceOf(old), applied: guidanceOf(s) };
+                    }
+                });
+                return { undoStack: withSnapshot(state, guidance), students };
+            }),
 
             undoLastChange: () => set((state) => {
                 const last = state.undoStack[state.undoStack.length - 1];
@@ -279,11 +287,15 @@ export const useClasszleStore = create<ClasszleStore>()(
                 return {
                     undoStack: state.undoStack.slice(0, -1),
                     movementHistory: last.movementHistory,
-                    students: state.students.map((s) => ({
-                        ...s,
-                        ...(s.id in last.assignments ? { assigned_class: last.assignments[s.id] } : {}),
-                        ...last.guidance?.[s.id],
-                    })),
+                    students: state.students.map((s) => {
+                        const change = last.guidance?.[s.id];
+                        return {
+                            ...s,
+                            ...(s.id in last.assignments ? { assigned_class: last.assignments[s.id] } : {}),
+                            // 입력표 뒤에 표에서 직접 고친 학생은 교사가 마지막으로 넣은 값을 둡니다.
+                            ...(change && sameGuidance(guidanceOf(s), change.applied) ? change.before : {}),
+                        };
+                    }),
                 };
             }),
 
