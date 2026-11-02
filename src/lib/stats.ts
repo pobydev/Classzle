@@ -1,5 +1,35 @@
 import type { CustomGroup, Student } from '@/types';
 
+export interface PreviousClassLevels {
+    previousClass: string;
+    total: number;
+    minus3: number;
+    minus2: number;
+    minus1: number;
+    leader: number;
+}
+
+/**
+ * 전학년도 반별 생활지도 등급 인원입니다. 담임마다 기준이 다를 수 있어 교사가 살펴보는 표입니다.
+ * 점수를 자동으로 고치지는 않습니다.
+ */
+export function calculatePreviousClassLevels(students: Student[]): PreviousClassLevels[] {
+    const rows = new Map<string, PreviousClassLevels>();
+    students.forEach((s) => {
+        const parts = String(s.prev_info ?? '').split('-');
+        const previous = parts.length > 1 ? parts[1].trim() : '';
+        if (!previous || previous === 'undefined') return;
+        const row = rows.get(previous) ?? { previousClass: previous, total: 0, minus3: 0, minus2: 0, minus1: 0, leader: 0 };
+        row.total++;
+        if (s.behavior_score <= -3) row.minus3++;
+        else if (s.behavior_score === -2) row.minus2++;
+        else if (s.behavior_score === -1) row.minus1++;
+        if (s.behavior_type === 'LEADER') row.leader++;
+        rows.set(previous, row);
+    });
+    return [...rows.values()].sort((a, b) => a.previousClass.localeCompare(b.previousClass, 'ko', { numeric: true }));
+}
+
 /**
  * 학급별 통계입니다. 인원과 평균은 전출 전(studentCount, averageScore)과
  * 전출 뒤(stayCount, stayAverageScore)를 모두 줍니다. 배정은 전출 뒤 기준으로 맞춥니다.

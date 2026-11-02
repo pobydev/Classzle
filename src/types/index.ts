@@ -146,4 +146,5 @@ export interface AssignmentChange {
     source?: 'auto' | 'manual'; // 변경 출처 추가
     partnerName?: string;
     partnerId?: string;
+    batchId?: string; // 자동 수정 한 번을 묶는 표시
 }

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useClasszleStore } from '@/lib/store';
 import { assignStudents, collectViolations, type AssignmentMode } from '@/lib/assignment';
-import { calculateClassStats } from '@/lib/stats';
+import { calculateClassStats, calculatePreviousClassLevels } from '@/lib/stats';
 import { recommendSwaps } from '@/lib/recommend';
 import { validateMove, validateSwap } from '@/lib/validation';
 import { exportToExcel } from '@/lib/excel';
@@ -257,6 +257,8 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
         [students, settings.classCount, groups]
     );
 
+    const previousClassLevels = useMemo(() => calculatePreviousClassLevels(students), [students]);
+
     const studentsByClass = useMemo(() => {
         const result: Record<string, Student[]> = {};
         classNames.forEach((cn) => {
@@ -328,6 +330,7 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
 
             // 1차 변경 내역 추출 (단순 이동 리스트)
             const rawChanges: AssignmentChange[] = [];
+            const batchId = String(Date.now());
             result.students.forEach(newStudent => {
                 const oldStudent = beforeStudents.find(s => s.id === newStudent.id);
                 if (oldStudent && oldStudent.assigned_class !== newStudent.assigned_class) {
@@ -338,7 +341,8 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                         newClass: newStudent.assigned_class || null,
                         timestamp: Date.now(),
                         type: 'move',
-                        source: 'auto'
+                        source: 'auto',
+                        batchId
                     });
                 }
             });
@@ -838,6 +842,43 @@ export default function Step3Dashboard({ onBack }: Step3DashboardProps) {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {previousClassLevels.length > 1 && (
+                        <Card className="mt-6 rounded-xl border-indigo-100 shadow-sm bg-white/50 overflow-hidden">
+                            <CardContent className="pt-5">
+                                <h4 className="text-sm font-bold text-slate-800">전학년도 반별 생활지도 등급 인원</h4>
+                                <p className="mt-1 mb-4 text-[13px] text-slate-600 leading-relaxed">
+                                    담임 선생님마다 기준이 다를 수 있습니다. 한 반만 유독 많거나 적으면 배정 전에 점수를 살펴봐 주세요. 점수를 자동으로 고치지는 않습니다. 기준 예시는 아래 점수 기준 상세 안내에 있습니다.
+                                </p>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm border-collapse">
+                                        <thead>
+                                            <tr className="bg-muted">
+                                                <th className="p-2 text-left font-semibold">전학년도 반</th>
+                                                <th className="p-2 text-center font-semibold">학생</th>
+                                                <th className="p-2 text-center font-semibold">-3</th>
+                                                <th className="p-2 text-center font-semibold">-2</th>
+                                                <th className="p-2 text-center font-semibold">-1</th>
+                                                <th className="p-2 text-center font-semibold">리더</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {previousClassLevels.map((row) => (
+                                                <tr key={row.previousClass} className="border-b">
+                                                    <td className="p-2 font-semibold">{row.previousClass}반</td>
+                                                    <td className="p-2 text-center">{row.total}</td>
+                                                    <td className="p-2 text-center">{row.minus3}</td>
+                                                    <td className="p-2 text-center">{row.minus2}</td>
+                                                    <td className="p-2 text-center">{row.minus1}</td>
+                                                    <td className="p-2 text-center">{row.leader}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </TabsContent>
             </Tabs>
 

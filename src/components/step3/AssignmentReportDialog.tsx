@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { HistoryPanel } from './HistoryPanel';
 import {
     Users,
     ArrowsLeftRight,
@@ -768,96 +769,7 @@ export function AssignmentReportDialog({
                                     <p className="text-xs opacity-60 mt-1">자동 배정 이후의 수동 변경 사항이 여기에 표시됩니다.</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center px-1">
-                                        <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                                            <Info size={16} className="text-indigo-500" />
-                                            총 {history.length}건의 변경 이력
-                                        </p>
-                                    </div>
-                                    <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm max-h-[450px] overflow-y-auto">
-                                        {history.map((change, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-4 px-5 text-sm hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-5">
-                                                    <span className="text-xs font-bold text-slate-300 w-5">{idx + 1}</span>
-                                                    <div className="space-y-0.5">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`font-bold text-[14px] ${change.type === 'swap' ? 'text-indigo-700' : 'text-slate-700'}`}>
-                                                                {change.type === 'swap' ? (
-                                                                    <span className="flex items-center gap-2">
-                                                                        <User size={16} className="text-slate-400" /> {change.studentName}
-                                                                        <ArrowsLeftRight size={14} className="text-slate-300" />
-                                                                        <User size={16} className="text-slate-400" /> {change.partnerName}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="flex items-center gap-2">
-                                                                        <User size={16} className="text-slate-400" /> {change.studentName}
-                                                                    </span>
-                                                                )}
-                                                            </span>
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={`text-[9px] h-4 rounded-full px-1.5 ${change.source === 'auto'
-                                                                    ? 'bg-purple-50 text-purple-600 border-purple-100'
-                                                                    : 'bg-amber-50 text-amber-600 border-amber-100'
-                                                                    }`}
-                                                            >
-                                                                {change.source === 'auto' ? '자동' : '수동'}
-                                                            </Badge>
-                                                        </div>
-                                                        <div className="text-[11px] text-slate-400 flex items-center gap-1">
-                                                            <Clock size={12} />
-                                                            {new Date(change.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-4">
-                                                    {change.type === 'swap' ? (
-                                                        <div className="flex flex-col items-end gap-1.5 font-mono text-[11px]">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-slate-500 font-medium w-14 truncate text-right">{change.studentName}</span>
-                                                                <Badge variant="outline" className="text-slate-400 border-slate-200 bg-white font-normal px-1.5 h-5 text-[10px] min-w-[30px] justify-center">
-                                                                    {change.oldClass}
-                                                                </Badge>
-                                                                <ArrowRight size={12} className="text-slate-300" />
-                                                                <Badge className="bg-indigo-500 text-white border-none px-1.5 h-5 text-[10px] min-w-[30px] justify-center shadow-sm">
-                                                                    {change.newClass}
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-slate-500 font-medium w-14 truncate text-right">{change.partnerName}</span>
-                                                                <Badge variant="outline" className="text-slate-400 border-slate-200 bg-white font-normal px-1.5 h-5 text-[10px] min-w-[30px] justify-center">
-                                                                    {change.newClass}
-                                                                </Badge>
-                                                                <ArrowRight size={12} className="text-slate-300" />
-                                                                <Badge className="bg-indigo-500 text-white border-none px-1.5 h-5 text-[10px] min-w-[30px] justify-center shadow-sm">
-                                                                    {change.oldClass}
-                                                                </Badge>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[11px] font-medium text-slate-400 uppercase tracking-tighter">이전</span>
-                                                                <Badge variant="outline" className="font-semibold text-slate-500 bg-white border-slate-200 px-2 py-0.5 rounded-lg">
-                                                                    {change.oldClass || 'N/A'}
-                                                                </Badge>
-                                                            </div>
-                                                            <ArrowRight size={14} weight="bold" className="text-slate-300" />
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[11px] font-medium text-indigo-400 uppercase tracking-tighter">변경</span>
-                                                                <Badge className="bg-indigo-500 text-white font-bold border-none px-3 py-1 rounded-lg shadow-sm">
-                                                                    {change.newClass || 'N/A'}
-                                                                </Badge>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                                <HistoryPanel history={history} students={students} />
                             )}
                         </TabsContent>
                     </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateClassStats } from '@/lib/stats';
+import { calculateClassStats, calculatePreviousClassLevels } from '@/lib/stats';
 import { makeStudent } from './helpers/students';
 
 describe('학급 통계', () => {
@@ -55,5 +55,24 @@ describe('학급 통계', () => {
 
     it('학생이 없는 반의 평균은 0입니다', () => {
         expect(calculateClassStats(students, 3)[2].averageScore).toBe(0);
+    });
+});
+
+describe('전학년도 반별 등급 인원', () => {
+    it('반 번호 순서로 등급별 인원을 셉니다', () => {
+        const rows = calculatePreviousClassLevels([
+            makeStudent({ id: 'a', prev_info: '2-10-1', behavior_score: -3, behavior_type: 'BEHAVIOR' }),
+            makeStudent({ id: 'b', prev_info: '2-2-1', behavior_score: -2, behavior_type: 'EMOTIONAL' }),
+            makeStudent({ id: 'c', prev_info: '2-2-2', behavior_score: 2, behavior_type: 'LEADER' }),
+            makeStudent({ id: 'd', prev_info: '2-2-3', behavior_score: -1, behavior_type: 'BEHAVIOR' }),
+        ]);
+        expect(rows).toEqual([
+            { previousClass: '2', total: 3, minus3: 0, minus2: 1, minus1: 1, leader: 1 },
+            { previousClass: '10', total: 1, minus3: 1, minus2: 0, minus1: 0, leader: 0 },
+        ]);
+    });
+
+    it('전학년도 반을 알 수 없는 학생은 뺍니다', () => {
+        expect(calculatePreviousClassLevels([makeStudent({ id: 'a', prev_info: '' })])).toEqual([]);
     });
 });
