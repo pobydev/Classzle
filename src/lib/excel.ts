@@ -82,6 +82,10 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
     const unreadableBehavior: string[] = [];
     let blankNameRows = 0;
 
+    // 빈 칸은 행에 들어오지 않으므로 양식은 파일 전체를 보고 정합니다. 전입생은 이전 반이 빈 칸입니다.
+    const prevClassOf = (row: any) => row['반_1'] || row['class_1'] || row['이전반'] || row['prev_class'];
+    const isFormB = rows.some((row) => prevClassOf(row) !== undefined);
+
     const students: Student[] = rows.map((row: any) => {
                     const rowName = String(firstValue(row, ['이름', 'name', '성명']) ?? '');
                     const rawGender = firstValue(row, ['성별', 'gender']);
@@ -113,7 +117,7 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
                     const assignedNumber = row['번호'] || row['number'];
 
                     const prevGrade = row['학년_1'] || row['grade_1'] || row['이전학년'] || row['prev_grade'];
-                    const prevClass = row['반_1'] || row['class_1'] || row['이전반'] || row['prev_class'];
+                    const prevClass = prevClassOf(row);
                     const prevNumber = row['번호_1'] || row['number_1'] || row['이전번호'] || row['prev_number'];
 
                     // 기배정 여부 판단 로직 개선
@@ -121,10 +125,10 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
                     let finalPrevInfoForLogic = '';
 
                     // 중복 헤더(반_1)가 존재한다는 것은 "New(반) ... Old(반_1)" 구조라는 뜻
-                    if (prevClass !== undefined) {
+                    if (isFormB) {
                         // 서식 일치: 앞쪽 '반'은 배정반, 뒤쪽 '반_1'은 이전반
                         finalAssignedClass = parseAssignedClass(assignedClass);
-                        finalPrevInfoForLogic = joinPrevInfo(prevGrade, prevClass, prevNumber);
+                        finalPrevInfoForLogic = prevGrade || prevClass || prevNumber ? joinPrevInfo(prevGrade, prevClass, prevNumber) : '';
                     } else {
                         // 중복 헤더 없음: 기존 서식 (학년/반/번호 -> 이전 정보로 간주)
                         // 단, 명시적 '반(배정)' 컬럼이 있으면 그걸 배정반으로 씀

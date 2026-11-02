@@ -181,3 +181,19 @@ describe('21. 글자로 나가는 undefined, NaN', () => {
         }
     });
 });
+
+describe('22. 양식 B의 전입생', () => {
+    it('이전 반이 빈 줄도 앞쪽 반을 배정반으로 읽습니다', () => {
+        const { students } = parseRosterRows([
+            { 학년: 3, 반: 1, 번호: 1, 이름: '가상가', 성별: '남', 성적: 1, 학년_1: 2, 반_1: 5, 번호_1: 7 },
+            { 학년: 3, 반: 2, 번호: 1, 이름: '전입생', 성별: '여', 성적: 1 },
+        ]);
+        expect(students[0]).toMatchObject({ assigned_class: '1반', prev_info: '2-5-7' });
+        expect(students[1]).toMatchObject({ assigned_class: '2반', prev_info: '' });
+    });
+
+    it('양식 A는 그대로 앞쪽 반을 이전 반으로 읽습니다', () => {
+        const { students } = parseRosterRows([{ 학년: 2, 반: 1, 번호: 3, 이름: '가상', 성별: '남', 성적: 1 }]);
+        expect(students[0]).toMatchObject({ assigned_class: null, prev_info: '2-1-3' });
+    });
+});
