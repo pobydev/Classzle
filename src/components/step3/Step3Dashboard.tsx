@@ -22,7 +22,7 @@ import { useClasszleStore } from '@/lib/store';
 import { assignStudents, collectViolations, type AssignmentMode } from '@/lib/assignment';
 import { calculateClassStats } from '@/lib/stats';
 import { validateMove, validateSwap } from '@/lib/validation';
-import { exportToExcel } from '@/lib/excel';
+import { exportToExcel, studentsLeftOutOfExport } from '@/lib/excel';
 import { resolveClassIndex } from '@/lib/assignment/problem';
 import type { AssignmentChange, NumberingMethod, Student, Violation } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -241,6 +241,11 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
             }
         }, 100);
     };
+
+    const leftOutOfExport = useMemo(
+        () => (isExportDialogOpen ? studentsLeftOutOfExport(students, settings.classCount) : []),
+        [isExportDialogOpen, students, settings.classCount]
+    );
 
     const confirmExport = (includeDetails: boolean) => {
         const timestamp = new Date().toISOString().split('T')[0];
@@ -574,6 +579,12 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                         </DialogTitle>
                         <DialogDescription>엑셀 파일에 넣을 정보 수준을 고릅니다.</DialogDescription>
                     </DialogHeader>
+                    {leftOutOfExport.length > 0 && (
+                        <div data-export-left-out className="rounded-button bg-danger-wash p-3 text-small text-ink">
+                            <p className="font-semibold">반이 없는 학생 {leftOutOfExport.length}명은 결과 파일에 들어가지 않습니다.</p>
+                            <p className="mt-1 max-h-24 overflow-y-auto text-caption">{leftOutOfExport.map((s) => s.name).join(', ')}</p>
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 gap-3">
                         <Button
                             variant="outline"

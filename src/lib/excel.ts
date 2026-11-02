@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student, BehaviorType, Gender, CustomGroup, NumberingMethod } from '@/types';
+import { makeClassNames, resolveClassIndex } from './assignment/problem';
 import { calculateAttendanceNumbers } from './numbering';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -264,6 +265,12 @@ export async function exportToExcel(
     window.URL.revokeObjectURL(url);
 }
 
+// 결과 파일에 들어가지 않는 학생입니다. 미배정과, 학급 수를 줄여 없어진 반의 학생입니다. 보드도 이들을 미배정으로 보여 줍니다.
+export function studentsLeftOutOfExport(students: Student[], classCount: number): Student[] {
+    const classNames = makeClassNames(classCount);
+    return students.filter((s) => resolveClassIndex(s.assigned_class, classNames) < 0);
+}
+
 // 결과 통합 문서를 만듭니다. 기본 정보만 고르면 생활지도와 관계 정보가 들어가지 않아야 합니다.
 export function buildResultWorkbook(
     students: Student[],
@@ -272,6 +279,13 @@ export function buildResultWorkbook(
 ): ExcelJS.Workbook {
     const { includeDetails = false, groups = [], numberingMethod = 'mixed' } = options;
     const workbook = new ExcelJS.Workbook();
+
+    // 있는 반에 배정된 학생만 넣고 반 표기를 맞춥니다.
+    const classNames = makeClassNames(classCount);
+    const placedStudents = students.flatMap((s) => {
+        const index = resolveClassIndex(s.assigned_class, classNames);
+        return index < 0 ? [] : [{ ...s, assigned_class: classNames[index] }];
+    });
 
     // 기본 정보에도 성적과 반 평균이 들어갑니다. 담임 협의와 담당 교사가 씁니다. 학생에게 알리는 일은 NEIS로 합니다.
     // 전출 예정은 명단을 쓰는 데 필요해서 있을 때만 비고로 넣습니다.
@@ -358,7 +372,7 @@ export function buildResultWorkbook(
 
     // 데이터 준비 (반별 정렬)
     // 1. 반별로 그룹화하여 정렬
-    const sortedByClass = [...students].filter(s => s.assigned_class).sort((a, b) => {
+    const sortedByClass = [...placedStudents].sort((a, b) => {
         const classA = parseInt(a.assigned_class?.replace(/[^0-9]/g, '') || '0');
         const classB = parseInt(b.assigned_class?.replace(/[^0-9]/g, '') || '0');
         if (classA !== classB) return classA - classB;
@@ -577,7 +591,7 @@ export function buildResultWorkbook(
     });
 
     // 2. 이전 반 -> 이전 번호 순으로 정렬
-    const sortedByPrevClass = [...students].filter(s => s.assigned_class).sort((a, b) => {
+    const sortedByPrevClass = [...placedStudents].sort((a, b) => {
         const parsePrev = (info: string) => {
             const parts = info.split('-');
             return {

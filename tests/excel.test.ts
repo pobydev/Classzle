@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildResultWorkbook, parseRosterRows, requireStudents } from '@/lib/excel';
+import { buildResultWorkbook, parseRosterRows, requireStudents, studentsLeftOutOfExport } from '@/lib/excel';
 import { makeStudent } from './helpers/students';
 
 describe('엑셀 명단 읽기', () => {
@@ -169,5 +169,40 @@ describe('학생을 읽지 못한 파일', () => {
     it('한 명이라도 읽으면 그대로 돌려줍니다', () => {
         const roster = parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 500 }]);
         expect(requireStudents(roster)).toBe(roster);
+    });
+});
+
+describe('결과 파일에 들어가는 학생', () => {
+    const list = [
+        makeStudent({ id: 'a', name: '가상가', assigned_class: '1반' }),
+        makeStudent({ id: 'b', name: '가상나', assigned_class: '2 반' }),
+        makeStudent({ id: 'c', name: '가상다', assigned_class: null }),
+        makeStudent({ id: 'd', name: '가상라', assigned_class: '9반' }),
+    ];
+    const namesIn = (sheetIndex: number) => {
+        const names: string[] = [];
+        buildResultWorkbook(list, 3).worksheets[sheetIndex].eachRow((row) => {
+            const name = String(row.getCell(4).value ?? '');
+            if (name.startsWith('가상')) names.push(name);
+        });
+        return names.sort();
+    };
+
+    it('미배정과 없는 반의 학생을 알립니다', () => {
+        expect(studentsLeftOutOfExport(list, 3).map((s) => s.name)).toEqual(['가상다', '가상라']);
+    });
+
+    it('두 시트 모두 있는 반의 학생만 넣습니다', () => {
+        expect(namesIn(0)).toEqual(['가상가', '가상나']);
+        expect(namesIn(1)).toEqual(['가상가', '가상나']);
+    });
+
+    it('없는 반 번호가 파일에 나가지 않습니다', () => {
+        const classes = new Set<string>();
+        buildResultWorkbook(list, 3).worksheets[0].eachRow((row, n) => {
+            const name = String(row.getCell(4).value ?? '');
+            if (n > 1 && name.startsWith('가상')) classes.add(String(row.getCell(2).value));
+        });
+        expect([...classes]).toEqual(['1', '2']);
     });
 });
