@@ -731,11 +731,11 @@ function formatStudentDetails(student: Student, groups: CustomGroup[], allStuden
         }
     });
 
-    // 3. 관계 (피함)
+    // 3. 관계 (분리)
     student.avoid_ids?.forEach(aid => {
         const other = allStudents.find(s => s.id === aid);
         if (other) {
-            details.push(`${other.name}(피함)`);
+            details.push(`${other.name}(분리)`);
         }
     });
 

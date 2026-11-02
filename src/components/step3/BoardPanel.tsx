@@ -35,31 +35,32 @@ export function BoardLegend() {
                 <span className="flex items-center gap-1"><Mark tone="leader">리+1</Mark>리더</span>
             </p>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="flex items-center gap-1"><Mark>고</Mark>고정 반</span>
-                <span className="flex items-center gap-1"><Mark>떼</Mark>떼어 놓기</span>
-                <span className="flex items-center gap-1"><Mark>함</Mark>함께 두기</span>
+                <span className="flex items-center gap-1"><Mark>고</Mark>고정 배정</span>
+                <span className="flex items-center gap-1"><Mark>분</Mark>분리 배정</span>
+                <span className="flex items-center gap-1"><Mark>함</Mark>함께 배정</span>
                 <span className="flex items-center gap-1"><Mark>전</Mark>전출 예정</span>
             </p>
-            <p>색이 있는 글자 하나는 그룹 이름의 첫 글자입니다.</p>
+            <p>색이 있는 글자 하나는 그룹 분산의 그룹 이름 첫 글자입니다.</p>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="flex items-center gap-1">
                     <span className="relative inline-block h-4 w-6 rounded-input border border-dashed border-accent bg-wash" />
                     <RankBadge rank={1} />추천 순위
                 </span>
-                <span className="flex items-center gap-1"><Prohibit size={13} className="text-danger" />떼어 놓기 상대</span>
-                <span className="flex items-center gap-1"><Handshake size={13} className="text-ink" />함께 두기 상대</span>
+                <span className="flex items-center gap-1"><Prohibit size={13} className="text-danger" />분리 배정 상대</span>
+                <span className="flex items-center gap-1"><Handshake size={13} className="text-ink" />함께 배정 상대</span>
             </p>
         </div>
     );
 }
 
-const FIGURE_ROWS: { label: string; format: (f: ClassFigures) => string }[] = [
+const FIGURE_ROWS: { label: string; title?: string; format: (f: ClassFigures) => string }[] = [
     { label: '인원', format: (f) => `${f.count}명` },
     { label: '남/여', format: (f) => `${f.male}/${f.female}` },
     { label: '성적 평균', format: (f) => String(f.average) },
     { label: '-3', format: (f) => `${f.minus3}명` },
     { label: '-2', format: (f) => `${f.minus2}명` },
     { label: '리더', format: (f) => `${f.leader}명` },
+    { label: '합계', title: '리더를 포함한 생활지도 점수의 합입니다. 대략 보는 참고 값입니다.', format: (f) => String(f.guidanceTotal) },
 ];
 
 function BeforeAfter({ before, after }: { before: string; after: string }) {
@@ -96,7 +97,7 @@ function ComparisonCard({ student, partner, preview, onConfirm, onCancel }: {
                 <tbody>
                     {FIGURE_ROWS.map((row) => (
                         <tr key={row.label} className="border-b border-line" data-preview-row={row.label}>
-                            <th scope="row" className="py-1 pr-1 text-left font-medium whitespace-nowrap text-ink">{row.label}</th>
+                            <th scope="row" title={row.title} className="py-1 pr-1 text-left font-medium whitespace-nowrap text-ink">{row.label}</th>
                             <td className="py-1 pr-1"><BeforeAfter before={row.format(first.before)} after={row.format(first.after)} /></td>
                             <td className="py-1"><BeforeAfter before={row.format(second.before)} after={row.format(second.after)} /></td>
                         </tr>
@@ -137,7 +138,7 @@ function RelationList({ kind, student, partnerIds, byId }: {
         <>
             <Heading>
                 {isAvoid ? <Prohibit size={14} className="text-danger" /> : <Handshake size={14} className="text-ink" />}
-                {isAvoid ? '떼어 놓기' : '함께 두기'}
+                {isAvoid ? '분리 배정' : '함께 배정'}
             </Heading>
             <ul className="space-y-1">
                 {partnerIds.map((id) => {
@@ -209,14 +210,14 @@ function SelectedDetail({
                 <Row label="전학년도">{previous ? `${previous}반` : '없음'}</Row>
                 <Row label="생활지도">{behavior ? behavior.label : '해당 없음'}</Row>
                 {student.fixed_class && (
-                    <Row label="고정 반">
-                        {student.fixed_class}
+                    <Row label="고정 배정">
+                        {student.fixed_class} 고정
                         {student.fixed_class_memo && <p className="text-caption text-soft">{student.fixed_class_memo}</p>}
                     </Row>
                 )}
                 {student.is_pre_transfer && <Row label="전출">전출 예정</Row>}
                 {studentGroups.length > 0 && (
-                    <Row label="그룹">
+                    <Row label="그룹 분산">
                         <span className="flex flex-wrap gap-1">
                             {studentGroups.map((g) => (
                                 <Mark key={g.id} className={g.color}>{g.name}</Mark>

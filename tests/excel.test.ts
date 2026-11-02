@@ -94,7 +94,7 @@ describe('결과 엑셀', () => {
         const text = allText(false);
         expect(text).toContain('가상가');
         expect(text).not.toContain('행동(');
-        expect(text).not.toContain('(피함)');
+        expect(text).not.toContain('(분리)');
         expect(text).not.toContain('고정');
         expect(text).not.toContain('특이사항');
     });
@@ -102,7 +102,7 @@ describe('결과 엑셀', () => {
     it('상세 정보를 고르면 함께 나갑니다', () => {
         const text = allText(true);
         expect(text).toContain('행동(-3)');
-        expect(text).toContain('가상나(피함)');
+        expect(text).toContain('가상나(분리)');
     });
 
     const scoreList = [
@@ -131,7 +131,7 @@ describe('결과 엑셀', () => {
         const text = allText(false);
         expect(text).toContain('성적');
         expect(text).not.toContain('행동(');
-        expect(text).not.toContain('(피함)');
+        expect(text).not.toContain('(분리)');
         expect(text).not.toContain('고정');
     });
 

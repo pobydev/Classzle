@@ -47,9 +47,9 @@ export function StudentMarks({ student, groups, hasAvoid, hasKeep }: {
     return (
         <>
             {behavior && <Mark tone={behavior.tone} title={behavior.label}>{behavior.text}</Mark>}
-            {student.fixed_class && <Mark title={`고정 반 ${student.fixed_class}`}>고</Mark>}
-            {hasAvoid && <Mark title="떼어 놓기 있음">떼</Mark>}
-            {hasKeep && <Mark title="함께 두기 있음">함</Mark>}
+            {student.fixed_class && <Mark title={`${student.fixed_class} 고정`}>고</Mark>}
+            {hasAvoid && <Mark title="분리 배정 있음">분</Mark>}
+            {hasKeep && <Mark title="함께 배정 있음">함</Mark>}
             {student.is_pre_transfer && <Mark title="전출 예정">전</Mark>}
             {groupsOf(student, groups).map((g) => (
                 <Mark key={g.id} className={g.color} title={g.name}>{g.name.slice(0, 1)}</Mark>
@@ -86,7 +86,7 @@ function stateClass({ selected, rank, relation, found, emphasized, partner }: St
     if (partner) return 'border-dashed border-accent bg-tint ring-1 ring-accent';
     const recommended = rank !== null;
     const emphasis = emphasized ? ' ring-2 ring-accent' : '';
-    // 상대 표시는 점선 여부, 테두리 색, 아이콘이 따로 움직입니다. 추천이면서 떼어 놓기 상대일 수 있습니다.
+    // 상대 표시는 점선 여부, 테두리 색, 아이콘이 따로 움직입니다. 추천이면서 분리 배정 상대일 수 있습니다.
     const line = recommended ? 'border-dashed' : 'border-solid';
     if (relation === 'avoid') return `${line} border-danger bg-danger-wash${emphasis}`;
     if (relation === 'keep') return `${line} border-ink bg-surface-hover${emphasis}`;
@@ -101,7 +101,7 @@ export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
         partner, wide, showScore, attendanceNumber, onSelect,
     } = props;
     const gender = student.gender === 'M' ? '남' : '여';
-    const relationLabel = relation === 'avoid' ? '떼어 놓기 상대' : relation === 'keep' ? '함께 두기 상대' : null;
+    const relationLabel = relation === 'avoid' ? '분리 배정 상대' : relation === 'keep' ? '함께 배정 상대' : null;
     const title = [
         student.name,
         gender,
@@ -111,9 +111,9 @@ export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
     ].filter(Boolean).join(' · ');
     // 순위와 관계 아이콘은 글자 줄 밖에 겹쳐 놓습니다. 고를 때마다 칩 높이가 달라져 명단이 밀리지 않게 합니다.
     const relationIcon = relation === 'avoid'
-        ? <Prohibit size={13} className="text-danger" aria-label="떼어 놓기 상대" />
+        ? <Prohibit size={13} className="text-danger" aria-label="분리 배정 상대" />
         : relation === 'keep'
-            ? <Handshake size={13} className="text-ink" aria-label="함께 두기 상대" />
+            ? <Handshake size={13} className="text-ink" aria-label="함께 배정 상대" />
             : null;
 
     return (
