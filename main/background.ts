@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { pathToFileURL } from 'url';
 import { isSafeExternalUrl } from './externalUrl';
+import { createFolderApproval } from './folderApproval';
 import { cleanOldPrintFiles, isPrintSource, PRINT_FOLDER } from './printFiles';
 import { setupUpdates } from './updater';
 import { projectFilePath, writeFileSafely } from './projectFiles';
@@ -139,9 +140,14 @@ ipcMain.on('window-action', (_event, action: 'minimize' | 'maximize' | 'close') 
 });
 
 // 반별 입력표를 고른 폴더에 저장합니다. 같은 이름이 있으면 묻도록 알리고, 확인을 받으면 folder를 넘겨받습니다.
+// 쓰는 폴더는 메인에서 띄운 창으로 고른 곳뿐입니다. 화면이 넘긴 경로는 그 폴더와 같을 때만 받습니다.
+const sheetFolder = createFolderApproval();
+
 ipcMain.handle('save-class-sheets', async (_event, files: { name: string; data: Uint8Array }[], folder?: string) => {
     let target = folder;
-    if (!target) {
+    if (target) {
+        if (!sheetFolder.take(target)) return { status: 'failed' };
+    } else {
         const options: Electron.OpenDialogOptions = {
             title: '입력표를 저장할 폴더',
             properties: ['openDirectory', 'createDirectory'],
@@ -157,7 +163,10 @@ ipcMain.handle('save-class-sheets', async (_event, files: { name: string; data: 
             const exists = await fs.access(path.join(target, path.basename(file.name))).then(() => true, () => false);
             if (exists) existing.push(path.basename(file.name));
         }
-        if (existing.length > 0) return { status: 'exists', folder: target, existing };
+        if (existing.length > 0) {
+            sheetFolder.approve(target);
+            return { status: 'exists', folder: target, existing };
+        }
     }
     try {
         for (const file of files) {

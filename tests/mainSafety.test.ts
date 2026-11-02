@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isSafeExternalUrl } from '../main/externalUrl';
+import { createFolderApproval } from '../main/folderApproval';
 import { cleanOldPrintFiles, PRINT_FOLDER } from '../main/printFiles';
 
 describe('27. 기본 브라우저로 넘기는 주소', () => {
@@ -60,5 +61,21 @@ describe('28. 인쇄 임시 파일 청소', () => {
 
     it('폴더가 없어도 멈추지 않습니다', async () => {
         await expect(cleanOldPrintFiles(path.join(temp, '없는 폴더'))).resolves.toBeUndefined();
+    });
+});
+
+describe('29. 입력표 폴더', () => {
+    it('고른 폴더가 아니면 받지 않습니다', () => {
+        const approval = createFolderApproval();
+        expect(approval.take('C:\\가상')).toBe(false);
+        approval.approve('C:\\고른 폴더');
+        expect(approval.take('C:\\다른 폴더')).toBe(false);
+    });
+
+    it('고른 폴더는 한 번만 받습니다', () => {
+        const approval = createFolderApproval();
+        approval.approve('C:\\고른 폴더');
+        expect(approval.take('C:\\고른 폴더')).toBe(true);
+        expect(approval.take('C:\\고른 폴더')).toBe(false);
     });
 });
