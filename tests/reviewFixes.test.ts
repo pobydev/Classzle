@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import { FULL_WEIGHTS } from '@/lib/assignment';
 import { calculateBalanceTable, flagColumn } from '@/lib/balanceTable';
-import { buildResultWorkbook } from '@/lib/excel';
+import { buildResultWorkbook, parseRosterRows } from '@/lib/excel';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { RECOMMEND_WEIGHTS, recommendSwaps } from '@/lib/recommend';
 import { groupStudentsByClass } from '@/components/step3/boardModel';
@@ -152,5 +152,32 @@ describe('20. 계 줄', () => {
     it('전출 학생만 있는 반의 평균이 NaN이 되지 않습니다', async () => {
         const rows = await rowsOf(buildResultWorkbook([list[2]], 2).worksheets[0]);
         expect(rows.flat().join()).not.toContain('NaN');
+    });
+});
+
+describe('21. 글자로 나가는 undefined, NaN', () => {
+    it('양식 B에서 이전 학년이 비어도 undefined가 들어가지 않습니다', () => {
+        const { students } = parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 1, 반: 1, 반_1: 2 }]);
+        expect(students[0].prev_info).toBe('-2-');
+    });
+
+    it('양식 A에서 번호가 비어도 undefined가 들어가지 않습니다', () => {
+        const { students } = parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 1, 학년: 2, 반: 1 }]);
+        expect(students[0].prev_info).toBe('2-1-');
+    });
+
+    it('이전 학년이 숫자가 아니면 배정 학년을 비웁니다', async () => {
+        const list = [makeStudent({ name: '가상', assigned_class: '1반', prev_info: '가-1-1' })];
+        for (const sheet of buildResultWorkbook(list, 2).worksheets) {
+            const text = (await rowsOf(sheet)).flat().join();
+            expect(text).not.toContain('NaN');
+        }
+    });
+
+    it('예전 파일의 undefined도 결과 파일에 나가지 않습니다', async () => {
+        const list = [makeStudent({ name: '가상', assigned_class: '1반', prev_info: 'undefined-2-undefined' })];
+        for (const sheet of buildResultWorkbook(list, 2).worksheets) {
+            expect((await rowsOf(sheet)).flat().join()).not.toContain('undefined');
+        }
     });
 });

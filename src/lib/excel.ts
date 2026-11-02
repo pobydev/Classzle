@@ -50,6 +50,22 @@ export function requireStudents(roster: ParsedRoster): ParsedRoster {
     return roster;
 }
 
+// 학년, 반, 번호를 이전 학적 글자로 잇습니다. 비어 있는 칸이 undefined로 나가지 않게 합니다.
+const joinPrevInfo = (grade: unknown, classNum: unknown, number: unknown) =>
+    `${grade ?? ''}-${classNum ?? ''}-${number ?? ''}`;
+
+// 이전 학적을 나눕니다. 예전 저장 파일에 남은 undefined는 빈 칸으로 봅니다.
+function prevParts(info: string) {
+    const [grade = '', classNum = '', number = ''] = String(info ?? '').split('-').map((part) => (part === 'undefined' ? '' : part));
+    return { grade, classNum, number };
+}
+
+// 배정 학년은 이전 학년 + 1입니다. 숫자가 아니면 비웁니다.
+function nextGradeOf(prevGrade: string): string {
+    const grade = parseInt(prevGrade);
+    return Number.isFinite(grade) ? String(grade + 1) : '';
+}
+
 // 비어 있지 않은 첫 값을 고릅니다. 0도 값으로 봅니다.
 function firstValue(row: any, keys: string[]): any {
     for (const key of keys) {
@@ -108,11 +124,11 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
                     if (prevClass !== undefined) {
                         // 서식 일치: 앞쪽 '반'은 배정반, 뒤쪽 '반_1'은 이전반
                         finalAssignedClass = parseAssignedClass(assignedClass);
-                        finalPrevInfoForLogic = `${prevGrade}-${prevClass}-${prevNumber || ''}`;
+                        finalPrevInfoForLogic = joinPrevInfo(prevGrade, prevClass, prevNumber);
                     } else {
                         // 중복 헤더 없음: 기존 서식 (학년/반/번호 -> 이전 정보로 간주)
                         // 단, 명시적 '반(배정)' 컬럼이 있으면 그걸 배정반으로 씀
-                        finalPrevInfoForLogic = assignedGrade && assignedClass ? `${assignedGrade}-${assignedClass}-${assignedNumber}` : (row['이전학년정보'] || row['prev_info'] || '');
+                        finalPrevInfoForLogic = assignedGrade && assignedClass ? joinPrevInfo(assignedGrade, assignedClass, assignedNumber) : (row['이전학년정보'] || row['prev_info'] || '');
 
                         finalAssignedClass = parseAssignedClass(row['반(배정)'] || row['assigned_class'] || row['배정반'] || row['새로운반'] || row['new_class']);
                     }
@@ -496,13 +512,10 @@ export function buildResultWorkbook(
         currentClass = assignedClass;
 
         // 이전 학년 정보 파싱 (예: "2-1-15")
-        const prevParts = s.prev_info.split('-');
-        const prevGrade = prevParts.length > 0 ? prevParts[0] : '';
-        const prevClass = prevParts.length > 1 ? prevParts[1] : '';
-        const prevNumber = prevParts.length > 2 ? prevParts[2] : '';
+        const { grade: prevGrade, classNum: prevClass, number: prevNumber } = prevParts(s.prev_info);
 
         // 배정 학년 추론 (이전학년 + 1)
-        const newGrade = prevGrade ? String(parseInt(prevGrade) + 1) : '';
+        const newGrade = nextGradeOf(prevGrade);
 
         // 데이터 행 추가
         const row = sheet1.addRow({
@@ -619,9 +632,9 @@ export function buildResultWorkbook(
         const parsePrev = (info: string) => {
             const parts = info.split('-');
             return {
-                grade: parseInt(parts[0] || '0'),
-                classNum: parseInt(parts[1] || '0'),
-                studentNum: parseInt(parts[2] || '0')
+                grade: parseInt(parts[0]) || 0,
+                classNum: parseInt(parts[1]) || 0,
+                studentNum: parseInt(parts[2]) || 0
             };
         };
 
@@ -655,10 +668,7 @@ export function buildResultWorkbook(
     classStats = emptyTally();
 
     sortedByPrevClass.forEach((s, index) => {
-        const prevParts = s.prev_info.split('-');
-        const prevGrade = prevParts[0] || '';
-        const prevClass = prevParts[1] || '';
-        const prevNumber = prevParts[2] || '';
+        const { grade: prevGrade, classNum: prevClass, number: prevNumber } = prevParts(s.prev_info);
         const prevClassFull = `${prevGrade}-${prevClass}`;
 
         if (currentPrevClassFull && currentPrevClassFull !== prevClassFull) {
@@ -705,7 +715,7 @@ export function buildResultWorkbook(
 
         currentPrevClassFull = prevClassFull;
 
-        const newGrade = prevGrade ? String(parseInt(prevGrade) + 1) : '';
+        const newGrade = nextGradeOf(prevGrade);
         const assignedClassNum = s.assigned_class?.replace('반', '') || '';
 
         const row = sheet2.addRow({
