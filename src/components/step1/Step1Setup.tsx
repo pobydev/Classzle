@@ -770,7 +770,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                 <TableHead className="text-center">이전학년</TableHead>
                                                 <TableHead className="text-center">성별</TableHead>
                                                 <TableHead className="text-center">성적</TableHead>
-                                                <TableHead className="text-center">생활지도 점수</TableHead>
+                                                <TableHead className="text-center">생활지도</TableHead>
                                                 <TableHead className="w-[140px] text-center">생활지도 유형</TableHead>
                                                 <TableHead className="text-center">배정반</TableHead>
                                                 <TableHead className="w-[80px] text-center">액션</TableHead>

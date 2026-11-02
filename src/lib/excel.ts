@@ -47,6 +47,7 @@ function firstValue(row: any, keys: string[]): any {
 export function parseRosterRows(rows: any[]): ParsedRoster {
     const blankGender: string[] = [];
     const blankScore: string[] = [];
+    const unreadableBehavior: string[] = [];
     let blankNameRows = 0;
 
     const students: Student[] = rows.map((row: any) => {
@@ -68,9 +69,10 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
                     }
 
                     // 생활지도 드롭다운 파싱
-                    const { behaviorType, behaviorScore } = parseBehaviorDropdown(
+                    const { behaviorType, behaviorScore, isUnreadable } = parseBehaviorDropdown(
                         row['생활지도'] || row['behavior'] || ''
                     );
+                    if (isUnreadable && rowName.trim() !== '') unreadableBehavior.push(rowName);
 
                     // 1. NEIS/기배정 서식 처리 (중복 헤더 발생: 반 vs 반_1)
                     // 순서: 학년(New), 반(New), 번호(New) ... 학년(Old), 반(Old), 번호(Old)
@@ -129,6 +131,9 @@ export function parseRosterRows(rows: any[]): ParsedRoster {
     if (blankScore.length > 0) {
         warnings.push(`성적이 비어 있거나 숫자가 아니어서 500점으로 넣었습니다: ${listNames(blankScore)}`);
     }
+    if (unreadableBehavior.length > 0) {
+        warnings.push(`생활지도 값을 읽지 못해 해당없음으로 넣었습니다: ${listNames(unreadableBehavior)}. 행동(-2)처럼 적어 주세요.`);
+    }
 
     return { students: students.filter((s) => s.name.trim() !== ''), warnings };
 }
@@ -141,39 +146,36 @@ function parseGender(value: any): Gender | null {
     return null;
 }
 
+// 생활지도 값의 유형과 등급 범위
+const BEHAVIOR_KINDS: { type: BehaviorType; words: string[]; sign: 1 | -1; maxLevel: number }[] = [
+    { type: 'LEADER', words: ['리더', 'LEADER'], sign: 1, maxLevel: 2 },
+    { type: 'BEHAVIOR', words: ['행동', 'BEHAVIOR'], sign: -1, maxLevel: 3 },
+    { type: 'EMOTIONAL', words: ['정서', 'EMOTIONAL'], sign: -1, maxLevel: 3 },
+];
+
+const NO_BEHAVIOR_VALUES = ['', '해당없음', '없음', '-', 'NONE'];
+
 // 생활지도 드롭다운 파싱
-// 옵션: 해당없음, 리더(-2), 리더(-1), 행동(+1), 행동(+2), 행동(+3), 정서(+1), 정서(+2), 정서(+3)
-function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number } {
-    const str = String(value).trim();
-
-    if (!str || str === '해당없음' || str === 'NONE') {
-        return { behaviorType: 'NONE', behaviorScore: 0 };
+// 옵션: 해당없음, 리더(+2), 리더(+1), 행동(-1), 행동(-2), 행동(-3), 정서(-1), 정서(-2), 정서(-3)
+// 유형 낱말 바로 뒤의 숫자만 등급으로 봅니다. 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
+function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number; isUnreadable: boolean } {
+    const str = String(value).replace(/\s/g, '').toUpperCase();
+    if (NO_BEHAVIOR_VALUES.includes(str)) {
+        return { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: false };
     }
 
-    // 리더형 파싱
-    if (str.includes('리더') || str.toUpperCase().includes('LEADER')) {
-        if (str.includes('+2') || str.includes('2')) return { behaviorType: 'LEADER', behaviorScore: 2 };
-        if (str.includes('+1') || str.includes('1')) return { behaviorType: 'LEADER', behaviorScore: 1 };
-        return { behaviorType: 'LEADER', behaviorScore: 1 }; // 기본값
+    for (const kind of BEHAVIOR_KINDS) {
+        const word = kind.words.find((w) => str.includes(w));
+        if (!word) continue;
+        const digits = str.slice(str.indexOf(word) + word.length).match(/^\D*(\d+)/);
+        const level = digits ? Number(digits[1]) : 0;
+        if (level >= 1 && level <= kind.maxLevel) {
+            return { behaviorType: kind.type, behaviorScore: kind.sign * level, isUnreadable: false };
+        }
+        break;
     }
 
-    // 행동형 파싱
-    if (str.includes('행동') || str.toUpperCase().includes('BEHAVIOR')) {
-        if (str.includes('-3') || str.includes('3')) return { behaviorType: 'BEHAVIOR', behaviorScore: -3 };
-        if (str.includes('-2') || str.includes('2')) return { behaviorType: 'BEHAVIOR', behaviorScore: -2 };
-        if (str.includes('-1') || str.includes('1')) return { behaviorType: 'BEHAVIOR', behaviorScore: -1 };
-        return { behaviorType: 'BEHAVIOR', behaviorScore: -1 }; // 기본값
-    }
-
-    // 정서형 파싱
-    if (str.includes('정서') || str.toUpperCase().includes('EMOTIONAL')) {
-        if (str.includes('-3') || str.includes('3')) return { behaviorType: 'EMOTIONAL', behaviorScore: -3 };
-        if (str.includes('-2') || str.includes('2')) return { behaviorType: 'EMOTIONAL', behaviorScore: -2 };
-        if (str.includes('-1') || str.includes('1')) return { behaviorType: 'EMOTIONAL', behaviorScore: -1 };
-        return { behaviorType: 'EMOTIONAL', behaviorScore: -1 }; // 기본값
-    }
-
-    return { behaviorType: 'NONE', behaviorScore: 0 };
+    return { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: true };
 }
 
 // 배정된 반 정보 정규화 (예: 1 -> "1반", "1반" -> "1반")
@@ -767,8 +769,36 @@ function formatStudentDetails(student: Student, groups: CustomGroup[], allStuden
 
 import ExcelJS from 'exceljs';
 
+// 양식의 드롭다운과 색을 적용할 마지막 행. 학년 전체 명단도 들어가도록 넉넉하게 둡니다.
+export const TEMPLATE_LAST_ROW = 1000;
+
+function addBehaviorDropdown(sheet: ExcelJS.Worksheet, column: string) {
+    for (let i = 2; i <= TEMPLATE_LAST_ROW; i++) {
+        sheet.getCell(`${column}${i}`).dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: ['"해당없음,리더(+2),리더(+1),행동(-1),행동(-2),행동(-3),정서(-1),정서(-2),정서(-3)"']
+        };
+    }
+}
+
+async function saveWorkbook(workbook: ExcelJS.Workbook, filename: string) {
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+}
+
 // 샘플 엑셀 다운로드
 export async function downloadSampleExcel() {
+    await saveWorkbook(buildSampleWorkbook(), 'classzle-template.xlsx');
+}
+
+export function buildSampleWorkbook(): ExcelJS.Workbook {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('학생명단');
 
@@ -824,9 +854,8 @@ export async function downloadSampleExcel() {
         sheet.addRow(row);
     });
 
-    // 조건부 서식 적용 (2행부터 100행까지, A~G열 전체 배경색 변경)
-    const MAX_ROW = 100;
-    const RANGE = `A2:G${MAX_ROW}`;
+    // 조건부 서식 적용 (A~G열 전체 배경색 변경)
+    const RANGE = `A2:G${TEMPLATE_LAST_ROW}`;
 
     // Helper to create rule
     const createRule = (searchText: string, argb: string, priority: number): ExcelJS.ConditionalFormattingRule => ({
@@ -879,7 +908,7 @@ export async function downloadSampleExcel() {
         '1. 학년, 반, 번호, 이름, 성별은 필수 입력 항목입니다.',
         '2. 성적은 숫자(점수)로 입력해주세요. (입력하지 않으면 기본값 500점)',
         '3. 생활지도는 드롭다운 목록에서 선택하실 수 있습니다.',
-        '4. 생활지도 점수와 유형을 포함한 모든 학생 정보는 앱 내',
+        '4. 생활지도를 포함한 모든 학생 정보는 앱 내',
         '   [기초정보 > 학생관리] 표에서 언제든지 수정하실 수 있습니다.'
     ];
 
@@ -906,28 +935,17 @@ export async function downloadSampleExcel() {
     });
 
     // 드롭다운 옵션 (생활지도 - G열)
-    // 데이터가 있는 행부터 100행까지 적용
-    for (let i = 2; i <= 100; i++) {
-        sheet.getCell(`G${i}`).dataValidation = {
-            type: 'list',
-            allowBlank: true,
-            formulae: ['"해당없음,리더(+2),리더(+1),행동(-1),행동(-2),행동(-3),정서(-1),정서(-2),정서(-3)"']
-        };
-    }
+    addBehaviorDropdown(sheet, 'G');
 
-    // 파일 다운로드 트리거
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'classzle-template.xlsx';
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+    return workbook;
 }
 
 // 기배정 데이터용 샘플 엑셀 다운로드 (서식 2: NEIS형)
 export async function downloadPreAssignedSampleExcel() {
+    await saveWorkbook(buildPreAssignedSampleWorkbook(), 'classzle-template-preassigned.xlsx');
+}
+
+export function buildPreAssignedSampleWorkbook(): ExcelJS.Workbook {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('기배정명단');
 
@@ -996,10 +1014,9 @@ export async function downloadPreAssignedSampleExcel() {
         });
     });
 
-    // 조건부 서식 적용 (2행부터 100행까지, A~K열 전체 배경색 변경)
+    // 조건부 서식 적용 (A~K열 전체 배경색 변경)
     // Behavior column is H (8th column)
-    const MAX_ROW = 100;
-    const RANGE = `A2:K${MAX_ROW}`;
+    const RANGE = `A2:K${TEMPLATE_LAST_ROW}`;
 
     // Helper to create rule (Same logic as Form A, but checking $H2)
     const createRule = (searchText: string, argb: string, priority: number): ExcelJS.ConditionalFormattingRule => ({
@@ -1032,13 +1049,7 @@ export async function downloadPreAssignedSampleExcel() {
     });
 
     // 드롭다운 옵션 (생활지도 - H열)
-    for (let i = 2; i <= 100; i++) {
-        sheet.getCell(`H${i}`).dataValidation = {
-            type: 'list',
-            allowBlank: true,
-            formulae: ['"해당없음,리더(+2),리더(+1),행동(-1),행동(-2),행동(-3),정서(-1),정서(-2),정서(-3)"']
-        };
-    }
+    addBehaviorDropdown(sheet, 'H');
 
     // 안내 문구
     const guideColIndex = 13; // M열
@@ -1052,7 +1063,7 @@ export async function downloadPreAssignedSampleExcel() {
         '2. 뒤쪽 [학년, 반, 번호]는 "이전(작년)" 정보입니다.',
         '   예: 2 (학년), 1 (반), 15 (번호)',
         '3. 입력된 반 배정 정보는 초기 배정 상태로 불러와집니다.',
-        '   (반 편성 탭에서 [기존 배정 유지] 또는 [전체 초기화] 선택 가능)',
+        '   (반 편성에서 [현재 배정 수정] 또는 [신규 배정] 선택 가능)',
         '4. 성명, 성별, 기준성적 등은 기존과 동일합니다.',
         '5. 생활지도는 H열 드롭다운을 통해 선택 가능합니다.'
     ];
@@ -1063,14 +1074,6 @@ export async function downloadPreAssignedSampleExcel() {
         cell.font = { name: 'Pretendard', size: 10 };
     });
 
-    // 다운로드 트리거
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'classzle-template-preassigned.xlsx';
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+    return workbook;
 }
 
