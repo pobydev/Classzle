@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs/promises';
 import { pathToFileURL } from 'url';
 import { isSafeExternalUrl } from './externalUrl';
-import { isPrintSource } from './printFiles';
+import { cleanOldPrintFiles, isPrintSource, PRINT_FOLDER } from './printFiles';
 import { setupUpdates } from './updater';
 import { projectFilePath, writeFileSafely } from './projectFiles';
 import { projectNameFromFile, projectNameProblem } from './projectName';
@@ -171,15 +171,22 @@ ipcMain.handle('save-class-sheets', async (_event, files: { name: string; data: 
 });
 
 // 인쇄 미리보기 핸들러
-ipcMain.handle('print-preview', async (event, htmlContent: string) => {
+ipcMain.handle('print-preview', async (_event, htmlContent: string) => {
+    const printDir = path.join(app.getPath('temp'), PRINT_FOLDER);
+    const stamp = Date.now();
+    const htmlPath = path.join(printDir, `report-${stamp}.html`);
+    const pdfPath = path.join(printDir, `report-${stamp}.pdf`);
+    let conversionWindow: BrowserWindow | null = null;
+    let previewShown = false;
+
     try {
         // 1. HTML을 임시 파일로 저장 (UTF-8)
-        const htmlPath = path.join(app.getPath('temp'), `report-${Date.now()}.html`);
+        await fs.mkdir(printDir, { recursive: true });
         await fs.writeFile(htmlPath, htmlContent, 'utf-8');
 
         // 2. 변환용 히든 윈도우 생성
         // 리포트에는 학생 정보가 있습니다. 스크립트를 끄고 리포트 파일 말고는 아무것도 읽지 못하게 합니다.
-        const conversionWindow = new BrowserWindow({
+        conversionWindow = new BrowserWindow({
             show: false,
             webPreferences: {
                 nodeIntegration: false,
@@ -209,14 +216,9 @@ ipcMain.handle('print-preview', async (event, htmlContent: string) => {
         });
 
         // 4. PDF 저장
-        const pdfPath = path.join(app.getPath('temp'), `report-${Date.now()}.pdf`);
         await fs.writeFile(pdfPath, pdfData);
 
-        // 5. 히든 윈도우 및 HTML 파일 정리
-        conversionWindow.close();
-        fs.unlink(htmlPath).catch(err => console.error('Failed to cleanup html:', err));
-
-        // 6. 미리보기 창 생성
+        // 5. 미리보기 창 생성
         const previewWindow = new BrowserWindow({
             width: 1000,
             height: 800,
@@ -228,16 +230,23 @@ ipcMain.handle('print-preview', async (event, htmlContent: string) => {
         });
 
         previewWindow.setMenu(null);
-        await previewWindow.loadURL(`file://${pdfPath}`);
-
+        previewWindow.webContents.setWindowOpenHandler(openLinkOutside);
         previewWindow.on('closed', () => {
             fs.unlink(pdfPath).catch(err => console.error('Failed to delete temp pdf:', err));
         });
+        // 창을 띄운 뒤로는 창을 닫을 때 PDF를 지웁니다.
+        previewShown = true;
+        await previewWindow.loadURL(pathToFileURL(pdfPath).href);
 
         return true;
     } catch (error) {
         console.error('Print preview failed:', error);
+        if (!previewShown) await fs.unlink(pdfPath).catch(() => {});
         return false;
+    } finally {
+        // 성공해도 실패해도 HTML과 변환 창은 남기지 않습니다.
+        conversionWindow?.destroy();
+        await fs.unlink(htmlPath).catch(() => {});
     }
 });
 
@@ -293,6 +302,8 @@ function createWindow() {
 
 app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
+
+    void cleanOldPrintFiles(app.getPath('temp'));
 
     setupUpdates((status) => mainWindow?.webContents.send('update-status', status));
 
