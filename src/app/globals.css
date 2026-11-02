@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* 프리텐다드: 앱에 함께 넣어 인터넷 없이 씁니다. 파일은 public/fonts/ */
 @font-face {
   font-family: 'Pretendard';
   src: url('/fonts/PretendardVariable.woff2') format('woff2-variations');
@@ -9,42 +10,77 @@
   font-display: swap;
 }
 
-@custom-variant dark (&:is(.dark *));
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  --font-sans: "Pretendard", "Malgun Gothic", sans-serif;
   --font-mono: var(--font-geist-mono);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
+
+  /* 그니랩 공통 이름 (brand/DESIGN.md). ScoreShow와 같은 이름입니다. */
+  --color-canvas: var(--canvas);
   --color-card: var(--card);
+  --color-surface-hover: var(--surface-hover);
+  --color-ink: var(--ink);
+  --color-soft: var(--soft);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-hairline: var(--hairline);
+  --color-control: var(--control);
+  --color-brand: var(--brand);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-tint: var(--tint);
+  --color-wash: var(--wash);
+  --color-ring: var(--ring);
+  --color-board: var(--board);
+  --color-celebrate: var(--celebrate);
+  --color-danger: var(--danger);
+  --color-danger-wash: var(--danger-wash);
+  --color-overlay: var(--overlay);
+
+  /* 화면 글자 8단계 */
+  --text-micro: 11px;
+  --text-micro--line-height: 16px;
+  --text-caption: 12px;
+  --text-caption--line-height: 18px;
+  --text-small: 13px;
+  --text-small--line-height: 20px;
+  --text-body: 14px;
+  --text-body--line-height: 22px;
+  --text-emph: 16px;
+  --text-emph--line-height: 24px;
+  --text-title-sm: 18px;
+  --text-title-sm--line-height: 26px;
+  --text-title: 24px;
+  --text-title--line-height: 32px;
+  --text-display: 32px;
+  --text-display--line-height: 40px;
+
+  --radius-input: 8px;
+  --radius-button: 10px;
+  --radius-card: 12px;
+  --radius-window: 14px;
+
+  --shadow-card: 0 0 0 1px var(--line), 0 1px 3px rgba(30, 42, 74, 0.05);
+  --shadow-lift: 0 4px 16px rgba(30, 42, 74, 0.08);
+  --shadow-float: 0 12px 32px rgba(3, 105, 161, 0.2);
+
+  /* 옛 화면 코드가 쓰는 shadcn 이름은 같은 값을 가리킵니다. 새 코드는 위의 이름을 씁니다.
+     --color-accent만 뜻이 다릅니다. 아래 '옛 화면 호환'을 봅니다. */
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--card);
+  --color-secondary: var(--surface-hover);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-hover);
+  --color-muted-foreground: var(--soft);
+  --color-destructive: var(--danger);
+  --color-border: var(--line);
+  --color-input: var(--control);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -55,38 +91,30 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.98 0.005 250);
-  --foreground: oklch(0.145 0.02 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.511 0.262 276.97);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.95 0.02 250);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.92 0.03 250);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.9 0.02 250);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.511 0.262 276.97);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.511 0.262 276.97);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* 그니랩 공통 디자인 (brand/DESIGN.md). 앱마다 값을 바꾸지 않습니다. */
+  --canvas: #f3f6fa;
+  --card: #ffffff;
+  --surface-hover: #edf1f6;
+  --ink: #1e2a4a;
+  --soft: #5b6478;
+  --faint: #98a0b0;
+  --line: #e3e8f0;
+  --hairline: #d5dce6;
+  --control: #7f8a9c;
+  --brand: #0ea5e9;
+  --accent: #0369a1;
+  --accent-hover: #075985;
+  --accent-ink: #075985;
+  --tint: #e0f2fe;
+  --wash: #f0f9ff;
+  --ring: #7dd3fc;
+  --board: #22305a;
+  --celebrate: #f2a93b;
+  --danger: #c42b31;
+  --danger-wash: #fdeeee;
+  --overlay: rgba(30, 42, 74, 0.36);
+
+  --radius: 10px;
 
   /* 생활지도 유형별 색상 */
   --behavior-none: oklch(0.95 0 0);
@@ -100,59 +128,30 @@
   --behavior-emotional-3: oklch(0.7 0.2 250);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
-@layer utilities {
-  .divider-gradient-indigo {
-    height: 1px;
-    width: 100%;
-    background: linear-gradient(to right, transparent, oklch(0.5 0.15 265 / 0.3), transparent);
-  }
-  .divider-gradient-mint {
-    height: 1px;
-    width: 100%;
-    background: linear-gradient(to right, transparent, oklch(0.7 0.15 160 / 0.3), transparent);
-  }
-}
-
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-line outline-accent;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-canvas text-ink text-body;
+    letter-spacing: -0.01em;
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
+
+  ::selection {
+    background: var(--tint);
+    color: var(--ink);
+  }
+}
+
+/* 옛 화면 호환: Step2Constraints, PreTransferSettings의 hover:bg-accent와 bg-accent/50은
+   shadcn의 '옅은 바탕'이라는 뜻으로 쓴 것입니다. --accent가 진한 파랑이 되었으므로 옅은 바탕으로 둡니다.
+   두 파일을 고칠 때 hover:bg-wash, bg-wash로 바꾸고 이 묶음을 지웁니다. 새 코드는 쓰지 않습니다.
+   채운 버튼은 bg-accent hover:bg-accent-hover이므로 영향이 없습니다. */
+.hover\:bg-accent:hover,
+.hover\:bg-accent\/50:hover,
+.bg-accent\/50 {
+  background-color: var(--wash);
 }
