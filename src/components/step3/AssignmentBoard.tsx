@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLineDown } from '@phosphor-icons/react';
+import { sameClass } from '@/lib/assignment/problem';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { recommendSwaps } from '@/lib/recommend';
 import type { calculateClassStats } from '@/lib/stats';
@@ -254,7 +255,7 @@ export function AssignmentBoard({
 
     const moveHint = (className: string) => {
         if (!selected) return null;
-        return selected.assigned_class === className ? '지금 이 반에 있습니다' : `${selected.name} 학생을 이 반으로 옮기기`;
+        return sameClass(selected.assigned_class, className) ? '지금 이 반에 있습니다' : `${selected.name} 학생을 이 반으로 옮기기`;
     };
     const columnClass = (className: string) =>
         `@container min-w-0 rounded-card bg-card shadow-card ${previewClass === className ? 'ring-2 ring-accent' : ''}`;
@@ -303,7 +304,7 @@ export function AssignmentBoard({
                                             <span className="flex items-center gap-1">
                                                 <b className="text-[length:var(--chip-head,14px)] text-ink">{name}</b>
                                                 <HeadCount stat={stat} />
-                                                {selected && selected.assigned_class !== name && (
+                                                {selected && !sameClass(selected.assigned_class, name) && (
                                                     <ArrowLineDown size={13} className="ml-auto shrink-0 text-accent" aria-hidden />
                                                 )}
                                             </span>
@@ -354,7 +355,7 @@ export function AssignmentBoard({
                                             >
                                                 <HeadCount stat={stat} />
                                                 <HeadFigures stat={stat} />
-                                                {canMove && selected.assigned_class !== name && (
+                                                {canMove && !sameClass(selected.assigned_class, name) && (
                                                     <span className="ml-auto flex shrink-0 items-center gap-1 text-caption font-semibold text-accent-ink">
                                                         <ArrowLineDown size={13} aria-hidden />이 반으로 옮기기
                                                     </span>

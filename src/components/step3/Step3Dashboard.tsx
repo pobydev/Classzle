@@ -24,7 +24,7 @@ import { assignmentNotices } from '@/lib/assignment/messages';
 import { calculateClassStats } from '@/lib/stats';
 import { validateMove, validateSwap } from '@/lib/validation';
 import { exportToExcel, studentsLeftOutOfExport } from '@/lib/excel';
-import { resolveClassIndex } from '@/lib/assignment/problem';
+import { resolveClassIndex, sameClass } from '@/lib/assignment/problem';
 import type { AssignmentChange, NumberingMethod, Student, Violation } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -173,7 +173,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
             const batchId = String(Date.now());
             result.students.forEach(newStudent => {
                 const oldStudent = beforeStudents.find(s => s.id === newStudent.id);
-                if (oldStudent && oldStudent.assigned_class !== newStudent.assigned_class) {
+                if (oldStudent && !sameClass(oldStudent.assigned_class, newStudent.assigned_class)) {
                     rawChanges.push({
                         studentId: newStudent.id,
                         studentName: newStudent.name,
@@ -318,7 +318,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
         const selected = selectedStudentId ? students.find((s) => s.id === selectedStudentId) : null;
         if (selected) {
             // 지금 있는 반을 누르면 아무 일도 하지 않습니다. 같은 반으로 옮긴 이력을 남기지 않습니다.
-            if (selected.assigned_class !== className) moveSelectedTo(className);
+            if (!sameClass(selected.assigned_class, className)) moveSelectedTo(className);
             return;
         }
         if (view === 'compact') openInTwoClassView(className);

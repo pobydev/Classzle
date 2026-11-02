@@ -1,5 +1,5 @@
 import type { CustomGroup, Student, Violation } from '@/types';
-import { compileProblem, makeClassNames, resolveClassIndex, type Problem, type Weights } from './problem';
+import { compileProblem, makeClassNames, resolveClassIndex, sameClass, type Problem, type Weights } from './problem';
 import { createRng, randomSeed, shuffled, type Rng } from './rng';
 import { solve } from './solver';
 import { collectViolations } from './violations';
@@ -200,7 +200,7 @@ export function assignStudents(
     let moved = 0;
     copy.forEach((s, i) => {
         const next = classNames[result.classes[i]];
-        if (s.assigned_class !== next) moved++;
+        if (!sameClass(s.assigned_class, next)) moved++;
         s.assigned_class = next;
     });
 

@@ -180,7 +180,7 @@ export function AssignmentReportDialog({
         const movements = students.filter(s => {
             if (!s.assigned_class) return false;
             const initialClass = studentFirstChangeMap.get(s.id);
-            return initialClass !== undefined && initialClass !== s.assigned_class && initialClass !== null;
+            return initialClass !== undefined && initialClass !== null && !sameClass(initialClass, s.assigned_class);
         }).map(s => ({
             id: s.id,
             name: s.name,
