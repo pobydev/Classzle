@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { projectNameProblem } from '../../../main/projectName';
 import { useClasszleStore } from '@/lib/store';
 import { useConfirm } from './ConfirmProvider';
 
@@ -63,8 +64,9 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
     /** 저장에 성공하면 true입니다. */
     const save = async (rawName: string): Promise<boolean> => {
         const name = rawName.trim();
-        if (!name) {
-            toast.error('작업 이름을 입력해 주세요.');
+        const problem = projectNameProblem(name);
+        if (problem) {
+            toast.error(problem);
             return false;
         }
         // 지금 연 작업을 다시 저장할 때는 묻지 않습니다.

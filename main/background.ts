@@ -2,6 +2,8 @@ import { app, BrowserWindow, shell, protocol, net, Menu, ipcMain, dialog } from 
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { setupUpdates } from './updater';
+import { projectFilePath } from './projectFiles';
+import { projectNameFromFile, projectNameProblem } from './projectName';
 
 
 const isDev = process.env.NODE_ENV === 'development';
@@ -72,8 +74,10 @@ ipcMain.handle('load-project', async () => {
 // --- Named Save/Load IPC ---
 ipcMain.handle('save-named-project', async (event, name: string, data: string) => {
     try {
+        if (projectNameProblem(name)) return false;
         await ensureProjectsDir();
-        const filePath = path.join(getProjectsDir(), `${name}.json`);
+        const filePath = projectFilePath(getProjectsDir(), name);
+        if (!filePath) return false;
         await fs.writeFile(filePath, data, 'utf-8');
         return true;
     } catch (e) {
@@ -84,7 +88,8 @@ ipcMain.handle('save-named-project', async (event, name: string, data: string) =
 
 ipcMain.handle('load-named-project', async (event, name: string) => {
     try {
-        const filePath = path.join(getProjectsDir(), `${name}.json`);
+        const filePath = projectFilePath(getProjectsDir(), name);
+        if (!filePath) return null;
         const data = await fs.readFile(filePath, 'utf-8');
         return data;
     } catch (e) {
@@ -100,7 +105,7 @@ ipcMain.handle('get-project-list', async () => {
         const files = await fs.readdir(dir);
         return files
             .filter(f => f.endsWith('.json'))
-            .map(f => f.replace('.json', ''));
+            .map(projectNameFromFile);
     } catch (e) {
         console.error('Failed to get project list:', e);
         return [];
@@ -109,7 +114,8 @@ ipcMain.handle('get-project-list', async () => {
 
 ipcMain.handle('delete-project', async (event, name: string) => {
     try {
-        const filePath = path.join(getProjectsDir(), `${name}.json`);
+        const filePath = projectFilePath(getProjectsDir(), name);
+        if (!filePath) return false;
         await fs.unlink(filePath);
         return true;
     } catch (e) {
