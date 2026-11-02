@@ -105,6 +105,11 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
 
     const hasAssignments = students.some((s) => s.assigned_class);
 
+    // 수정과 균형 조정은 배정이 있어야 고를 수 있습니다. 배정이 모두 사라지면 신규로 돌립니다.
+    useEffect(() => {
+        if (!hasAssignments) setAssignmentMode('new');
+    }, [hasAssignments]);
+
     const classNames = useMemo(
         () => Array.from({ length: settings.classCount }, (_, i) => `${i + 1}반`),
         [settings.classCount]
