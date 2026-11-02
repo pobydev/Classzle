@@ -591,7 +591,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                             onClick={() => confirmExport(false)}
                         >
                             <span className="text-body font-bold text-ink">기본 정보만 출력</span>
-                            <span className="text-caption font-normal text-soft">배정 결과(학년, 반, 번호), 성적, 기본 인적 사항</span>
+                            <span className="text-caption font-normal text-soft">배정 학년, 반, 번호와 이름, 성별, 이전 반과 번호, 성적, 반 평균, 전출 표시</span>
                         </Button>
                         <Button
                             variant="outline"
@@ -599,7 +599,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                             onClick={() => confirmExport(true)}
                         >
                             <span className="text-body font-bold text-ink">상세 정보 포함</span>
-                            <span className="text-caption font-normal text-soft">배정 결과(학년, 반, 번호), 성적, 기본 인적 사항, 생활지도, 그룹 분산, 분리 배정, 함께 배정, 고정 배정</span>
+                            <span className="text-caption font-normal text-soft">기본 내용에 더해 생활지도, 그룹 분산, 분리 배정, 함께 배정, 고정 배정, 비고</span>
                         </Button>
                     </div>
                     <div className="flex justify-end pt-2">
