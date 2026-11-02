@@ -60,9 +60,9 @@ describe('엑셀 명단 읽기', () => {
         expect(warnings[0]).toContain('이름이 비어 있는 행 1개');
     });
 
-    it('학생이 많으면 이름을 다 늘어놓지 않습니다', () => {
+    it('학생이 많아도 이름을 모두 적습니다', () => {
         const rows = Array.from({ length: 6 }, (_, i) => ({ 이름: `가상${i}`, 성적: 1 }));
-        expect(parseRosterRows(rows).warnings[0]).toContain('외 3명');
+        expect(parseRosterRows(rows).warnings[0]).toContain('가상5');
     });
 
     it('고정 반 표기를 맞춥니다', () => {

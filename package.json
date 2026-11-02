@@ -42,7 +42,8 @@
     "electron:build": "npm run electron:build-main && npm run build && electron-builder --win",
     "test:update": "node scripts/update-smoke.mjs",
     "test:shell": "node scripts/shell-smoke.mjs",
-    "test:review": "node scripts/review-smoke.mjs"
+    "test:review": "node scripts/review-smoke.mjs",
+    "test:startup": "node scripts/startup-smoke.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
