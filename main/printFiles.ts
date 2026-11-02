@@ -25,7 +25,8 @@ async function removeOld(dir: string, matches: (name: string) => boolean, now: n
     const names = await fs.readdir(dir).catch(() => [] as string[]);
     await Promise.all(names.filter(matches).map(async (name) => {
         const file = path.join(dir, name);
-        const info = await fs.stat(file).catch(() => null);
+        // 링크나 정션을 따라가지 않습니다.
+        const info = await fs.lstat(file).catch(() => null);
         if (info?.isFile() && now - info.mtimeMs > OLD_AFTER_MS) await fs.unlink(file).catch(() => {});
     }));
 }
@@ -35,6 +36,9 @@ async function removeOld(dir: string, matches: (name: string) => boolean, now: n
  * 켤 때 부릅니다. 지우지 못해도 앱은 그대로 켭니다.
  */
 export async function cleanOldPrintFiles(tempDir: string, now = Date.now()): Promise<void> {
-    await removeOld(path.join(tempDir, PRINT_FOLDER), () => true, now);
+    // 인쇄 폴더가 정션이나 링크이면 다른 곳의 파일이므로 건드리지 않습니다.
+    const folder = path.join(tempDir, PRINT_FOLDER);
+    const folderInfo = await fs.lstat(folder).catch(() => null);
+    if (folderInfo?.isDirectory()) await removeOld(folder, () => true, now);
     await removeOld(tempDir, (name) => LEGACY_NAME.test(name), now);
 }
