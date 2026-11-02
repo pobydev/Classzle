@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { ONE_VALUE_RULE } from '@/lib/classSheets';
 import { privacyNote } from '@/lib/updates';
 import { UpdateSection } from './Updates';
 import type { Updates } from './useUpdates';
@@ -67,7 +68,25 @@ export function GuideDialog({
                     </p>
                 </Step>
 
-                <Step number="02" title="조건 정하기">
+                <Step number="02" title="생활지도 입력하기">
+                    <p>학생 표에서 바로 넣거나, 담임에게 반별 입력표를 받습니다. 엑셀로 이미 넣었다면 건너뜁니다.</p>
+                    <ul className="ml-4 list-disc">
+                        <li>
+                            바로 넣기: 값을 한 번 누릅니다. 키보드로는 숫자를 누르면 값이 들어가고 다음 학생으로 넘어갑니다. 탭에서 반마다
+                            입력 인원을 볼 수 있습니다.
+                        </li>
+                        <li>
+                            반별 입력표: <strong className={STRONG}>반별 입력표 내보내기</strong>로 반마다 파일을 만들어 담임에게 보내고, 돌아온
+                            파일을 <strong className={STRONG}>입력표 받기</strong>로 한꺼번에 넣습니다. 반영하기 전에 요약을 보여 줍니다.
+                        </li>
+                    </ul>
+                    <p>
+                        <strong className={STRONG}>{ONE_VALUE_RULE}</strong> 입력표에는 그 반 학생의 번호, 이름, 성별만 들어갑니다. 암호는 걸리지 않으니
+                        학교 메신저처럼 정해진 경로로 주고받고, 끝나면 파일을 지워 주세요.
+                    </p>
+                </Step>
+
+                <Step number="03" title="조건 정하기">
                     <p>왼쪽 <strong className={STRONG}>조건 설정</strong>에서 필요한 것만 정합니다.</p>
                     <ul className="ml-4 list-disc">
                         <li>그룹 분산: 그룹 학생을 모든 반에 고르게 나눕니다.</li>
@@ -78,7 +97,7 @@ export function GuideDialog({
                     </ul>
                 </Step>
 
-                <Step number="03" title="반 편성하기">
+                <Step number="04" title="반 편성하기">
                     <p>왼쪽 <strong className={STRONG}>반 편성</strong>에서 방식을 고르고 실행합니다.</p>
                     <ul className="ml-4 list-disc">
                         <li>신규 배정: 처음부터 새로 편성합니다.</li>
@@ -88,14 +107,14 @@ export function GuideDialog({
                     <p>조건을 다 지키지 못하면 어긴 것을 보여 줍니다. 조건을 바꿔 가며 다시 실행해도 됩니다.</p>
                 </Step>
 
-                <Step number="04" title="결과 다듬기">
+                <Step number="05" title="결과 다듬기">
                     <p>
                         <strong className={STRONG}>상세 배치 조정</strong>에서 학생을 누르면 바꿀 만한 학생을 추천합니다. 그 학생을 눌러
                         교환하거나 반을 눌러 옮깁니다. 잘못 바꾸었으면 <strong className={STRONG}>되돌리기</strong>를 누릅니다.
                     </p>
                 </Step>
 
-                <Step number="05" title="저장하고 내보내기">
+                <Step number="06" title="저장하고 내보내기">
                     <p>
                         왼쪽 <strong className={STRONG}>작업 저장</strong>으로 이름을 정해 저장하면 다음에 이어서 할 수 있습니다.{' '}
                         <strong className={STRONG}>배정 리포트</strong>에서 이행 현황과 이동 명단을 보고,{' '}

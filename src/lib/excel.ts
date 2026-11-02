@@ -158,7 +158,7 @@ const NO_BEHAVIOR_VALUES = ['', '해당없음', '없음', '-', 'NONE'];
 // 생활지도 드롭다운 파싱
 // 옵션: 해당없음, 리더(+2), 리더(+1), 행동(-1), 행동(-2), 행동(-3), 정서(-1), 정서(-2), 정서(-3)
 // 유형 낱말 바로 뒤의 숫자만 등급으로 봅니다. 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
-function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number; isUnreadable: boolean } {
+export function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number; isUnreadable: boolean } {
     const str = String(value).replace(/\s/g, '').toUpperCase();
     if (NO_BEHAVIOR_VALUES.includes(str)) {
         return { behaviorType: 'NONE', behaviorScore: 0, isUnreadable: false };
@@ -782,7 +782,7 @@ function addBehaviorDropdown(sheet: ExcelJS.Worksheet, column: string) {
     }
 }
 
-async function saveWorkbook(workbook: ExcelJS.Workbook, filename: string) {
+export async function saveWorkbook(workbook: ExcelJS.Workbook, filename: string) {
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = window.URL.createObjectURL(blob);

@@ -129,6 +129,38 @@ ipcMain.on('window-action', (_event, action: 'minimize' | 'maximize' | 'close') 
     if (action === 'close') mainWindow.close();
 });
 
+// 반별 입력표를 고른 폴더에 저장합니다. 같은 이름이 있으면 묻도록 알리고, 확인을 받으면 folder를 넘겨받습니다.
+ipcMain.handle('save-class-sheets', async (_event, files: { name: string; data: Uint8Array }[], folder?: string) => {
+    let target = folder;
+    if (!target) {
+        const options: Electron.OpenDialogOptions = {
+            title: '입력표를 저장할 폴더',
+            properties: ['openDirectory', 'createDirectory'],
+        };
+        const { canceled, filePaths } = mainWindow
+            ? await dialog.showOpenDialog(mainWindow, options)
+            : await dialog.showOpenDialog(options);
+        if (canceled || filePaths.length === 0) return { status: 'canceled' };
+        target = filePaths[0];
+
+        const existing: string[] = [];
+        for (const file of files) {
+            const exists = await fs.access(path.join(target, path.basename(file.name))).then(() => true, () => false);
+            if (exists) existing.push(path.basename(file.name));
+        }
+        if (existing.length > 0) return { status: 'exists', folder: target, existing };
+    }
+    try {
+        for (const file of files) {
+            await fs.writeFile(path.join(target, path.basename(file.name)), Buffer.from(file.data));
+        }
+        return { status: 'saved', folder: target };
+    } catch (e) {
+        console.error('Failed to save class sheets:', e);
+        return { status: 'failed' };
+    }
+});
+
 // 인쇄 미리보기 핸들러
 ipcMain.handle('print-preview', async (event, htmlContent: string) => {
     try {

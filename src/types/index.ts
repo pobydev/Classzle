@@ -128,6 +128,14 @@ export interface ElectronAPI {
     getProjectList: () => Promise<string[]>;
     deleteProject: (name: string) => Promise<boolean>;
     printPreview: (html: string) => Promise<boolean>;
+    saveClassSheets: (
+        files: { name: string; data: Uint8Array }[],
+        folder?: string,
+    ) => Promise<
+        | { status: 'canceled' | 'failed' }
+        | { status: 'saved'; folder: string }
+        | { status: 'exists'; folder: string; existing: string[] }
+    >;
     windowAction: (action: 'minimize' | 'maximize' | 'close') => void;
     getUpdateInfo: () => Promise<{ updates: 'on' | 'off'; status: UpdateStatus }>;
     checkForUpdates: () => Promise<void>;

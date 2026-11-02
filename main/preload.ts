@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getProjectList: () => ipcRenderer.invoke('get-project-list'),
     deleteProject: (name: string) => ipcRenderer.invoke('delete-project', name),
     printPreview: (html: string) => ipcRenderer.invoke('print-preview', html),
+    saveClassSheets: (files: { name: string; data: Uint8Array }[], folder?: string) =>
+        ipcRenderer.invoke('save-class-sheets', files, folder),
     windowAction: (action: string) => ipcRenderer.send('window-action', action),
     getUpdateInfo: () => ipcRenderer.invoke('update-info'),
     checkForUpdates: () => ipcRenderer.invoke('update-check'),

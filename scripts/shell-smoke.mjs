@@ -151,7 +151,7 @@ try {
     await expect(guide).toContainText('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.');
     await expect(guide).toContainText(`버전 ${version}`);
     await expect(guide.locator('[data-made-by] img')).toBeVisible();
-    for (const number of ['01', '02', '03', '04', '05']) await expect(guide).toContainText(number);
+    for (const number of ['01', '02', '03', '04', '05', '06']) await expect(guide).toContainText(number);
     await shot('5-guide');
     await guide.getByRole('button', { name: '확인' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);

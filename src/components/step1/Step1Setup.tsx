@@ -33,13 +33,17 @@ import {
     DownloadSimple,
     Minus,
     NotePencil,
-    PencilSimple,
     Plus,
     Question,
     Trash,
     UploadSimple,
+    WarningCircle,
 } from '@phosphor-icons/react';
-import { BehaviorChip, BehaviorIcon } from '@/components/BehaviorChip';
+import { BehaviorIcon } from '@/components/BehaviorChip';
+import { Switch } from '@/components/ui/switch';
+import { BehaviorPickerHeader, KEY_HINT } from './BehaviorPicker';
+import { ClassSheetPanel } from './ClassSheetPanel';
+import { StudentTableRow } from './StudentTableRow';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
 import {
     Dialog,
@@ -68,6 +72,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
     const [selectedTab, setSelectedTab] = useState('all');
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [isGuideOpen, setIsGuideOpen] = useState(false);
+    const [onlyWithBehavior, setOnlyWithBehavior] = useState(false);
     const [newStudent, setNewStudent] = useState<Partial<Student>>({
         name: '',
         prev_info: '',
@@ -109,8 +114,37 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             }
         }
 
+        if (onlyWithBehavior) {
+            filtered = filtered.filter((s) => s.behavior_type !== 'NONE');
+        }
+
         return filtered.sort((a, b) => a.prev_info.localeCompare(b.prev_info, undefined, { numeric: true }));
-    }, [students, searchTerm, selectedTab]);
+    }, [students, searchTerm, selectedTab, onlyWithBehavior]);
+
+    // 줄을 memo로 두므로 함수가 바뀌지 않아야 바뀐 줄만 다시 그립니다.
+    const handleBehaviorChange = useCallback(
+        (id: string, type: BehaviorType, score: number) => updateStudent(id, { behavior_type: type, behavior_score: score }),
+        [updateStudent],
+    );
+
+    // 전학년도 반별 인원과 생활지도 입력 인원. 빠뜨린 반을 알아채는 데 씁니다.
+    const prevClassSummary = useMemo(() => {
+        const map = new Map<string, { grade: string; classNum: string; count: number; withBehavior: number }>();
+        students.forEach((s) => {
+            const parts = s.prev_info.split('-');
+            if (parts.length < 2) return;
+            const key = `${parts[0]}-${parts[1]}`;
+            if (!map.has(key)) map.set(key, { grade: parts[0], classNum: parts[1], count: 0, withBehavior: 0 });
+            const item = map.get(key)!;
+            item.count++;
+            if (s.behavior_type !== 'NONE') item.withBehavior++;
+        });
+        return [...map.values()].sort(
+            (a, b) => parseInt(a.grade) - parseInt(b.grade) || parseInt(a.classNum) - parseInt(b.classNum),
+        );
+    }, [students]);
+    const totalWithBehavior = prevClassSummary.reduce((sum, item) => sum + item.withBehavior, 0);
+    const classesWithoutBehavior = prevClassSummary.filter((item) => item.withBehavior === 0);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles.length > 0) {
@@ -384,6 +418,8 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                     둘 중 하나에 학생 정보를 붙여넣고 업로드해 주세요.
                                 </p>
                             </div>
+
+                            <ClassSheetPanel />
 
                             <Dialog open={isGuideOpen} onOpenChange={setIsGuideOpen}>
                                 <DialogContent className="sm:max-w-[60vw] max-h-[80vh] overflow-y-auto">
@@ -726,40 +762,33 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                     <TabsTrigger value="all">
                                         전체 ({students.length})
                                     </TabsTrigger>
-                                    {/* 배정된 학생이 있으면 반별 탭 표시 */}
-                                    {(() => {
-                                        // 학년-반 조합 추출 및 정렬
-                                        const gradeClassMap = new Map<string, { grade: string; classNum: string; count: number }>();
-                                        students.forEach(s => {
-                                            const parts = s.prev_info.split('-');
-                                            if (parts.length >= 2) {
-                                                const grade = parts[0];
-                                                const classNum = parts[1];
-                                                const key = `${grade}-${classNum}`;
-                                                if (!gradeClassMap.has(key)) {
-                                                    gradeClassMap.set(key, { grade, classNum, count: 0 });
-                                                }
-                                                gradeClassMap.get(key)!.count++;
-                                            }
-                                        });
-
-                                        // 학년→반 순서로 정렬
-                                        const sortedClasses = [...gradeClassMap.values()].sort((a, b) => {
-                                            const gradeCompare = parseInt(a.grade) - parseInt(b.grade);
-                                            if (gradeCompare !== 0) return gradeCompare;
-                                            return parseInt(a.classNum) - parseInt(b.classNum);
-                                        });
-
-                                        return sortedClasses.map(({ grade, classNum, count }) => {
-                                            const tabValue = `${grade}학년${classNum}반`;
-                                            return (
-                                                <TabsTrigger key={tabValue} value={tabValue}>
-                                                    {grade}학년 {classNum}반 ({count})
-                                                </TabsTrigger>
-                                            );
-                                        });
-                                    })()}
+                                    {prevClassSummary.map(({ grade, classNum, count, withBehavior }) => {
+                                        const tabValue = `${grade}학년${classNum}반`;
+                                        return (
+                                            <TabsTrigger key={tabValue} value={tabValue} title={`생활지도 입력 ${withBehavior}명`}>
+                                                {grade}학년 {classNum}반 ({count})
+                                                <span className={`text-caption ${withBehavior > 0 ? 'text-accent-ink' : totalWithBehavior > 0 ? 'text-danger' : 'text-soft'}`}>
+                                                    입력 {withBehavior}
+                                                </span>
+                                            </TabsTrigger>
+                                        );
+                                    })}
                                 </TabsList>
+
+                                <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-small text-soft">
+                                    <label className="flex items-center gap-2 text-ink">
+                                        <Switch checked={onlyWithBehavior} onCheckedChange={setOnlyWithBehavior} aria-label="생활지도 있는 학생만" />
+                                        생활지도 있는 학생만
+                                    </label>
+                                    <span data-behavior-total>생활지도 입력 {totalWithBehavior}명 / 전체 {students.length}명</span>
+                                    {totalWithBehavior > 0 && classesWithoutBehavior.length > 0 && (
+                                        <span className="flex items-center gap-1 text-danger" data-behavior-missing>
+                                            <WarningCircle size={14} aria-hidden="true" />
+                                            입력이 없는 반: {classesWithoutBehavior.map((item) => `${item.classNum}반`).join(', ')}
+                                        </span>
+                                    )}
+                                    <span className="basis-full text-caption">{KEY_HINT}</span>
+                                </div>
 
                                 <div className="rounded-input border overflow-auto max-h-[500px]">
                                     <Table>
@@ -770,164 +799,25 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                 <TableHead className="text-center">이전학년</TableHead>
                                                 <TableHead className="text-center">성별</TableHead>
                                                 <TableHead className="text-center">성적</TableHead>
-                                                <TableHead className="text-center">생활지도</TableHead>
-                                                <TableHead className="w-[140px] text-center">생활지도 유형</TableHead>
+                                                <TableHead className="text-center">
+                                                    <BehaviorPickerHeader />
+                                                </TableHead>
                                                 <TableHead className="text-center">배정반</TableHead>
                                                 <TableHead className="w-[80px] text-center">액션</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {filteredStudents.map((student, index) => (
-                                                <TableRow key={student.id}>
-                                                    <TableCell className="text-soft text-center">{index + 1}</TableCell>
-                                                    <TableCell className="text-center">
-                                                        {editingId === student.id ? (
-                                                            <Input
-                                                                value={student.name}
-                                                                onChange={(e) =>
-                                                                    updateStudent(student.id, { name: e.target.value })
-                                                                }
-                                                                className="w-20 h-8 mx-auto text-center"
-                                                            />
-                                                        ) : (
-                                                            <span className="font-medium">{student.name}</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        {editingId === student.id ? (
-                                                            <Input
-                                                                value={student.prev_info}
-                                                                onChange={(e) =>
-                                                                    updateStudent(student.id, { prev_info: e.target.value })
-                                                                }
-                                                                className="w-20 h-8 mx-auto text-center"
-                                                            />
-                                                        ) : (
-                                                            student.prev_info
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        {editingId === student.id ? (
-                                                            <Select
-                                                                value={student.gender}
-                                                                onValueChange={(v) =>
-                                                                    updateStudent(student.id, { gender: v as Gender })
-                                                                }
-                                                            >
-                                                                <SelectTrigger className="w-14 h-8 mx-auto">
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="M">남</SelectItem>
-                                                                    <SelectItem value="F">여</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        ) : (
-                                                            student.gender === 'M' ? '남' : '여'
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        {editingId === student.id ? (
-                                                            <Input
-                                                                type="number"
-                                                                value={student.academic_score}
-                                                                onChange={(e) =>
-                                                                    updateStudent(student.id, {
-                                                                        academic_score: parseInt(e.target.value) || 0,
-                                                                    })
-                                                                }
-                                                                className="w-16 h-8 mx-auto text-center"
-                                                            />
-                                                        ) : (
-                                                            student.academic_score
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        {editingId === student.id ? (
-                                                            <span className="text-body font-medium">{student.behavior_score}</span>
-                                                        ) : (
-                                                            student.behavior_score
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        {editingId === student.id ? (
-                                                            <Select
-                                                                value={
-                                                                    student.behavior_type === 'NONE'
-                                                                        ? 'NONE'
-                                                                        : `${student.behavior_type}:${student.behavior_score}`
-                                                                }
-                                                                onValueChange={(v) => {
-                                                                    if (v === 'NONE') {
-                                                                        updateStudent(student.id, {
-                                                                            behavior_type: 'NONE',
-                                                                            behavior_score: 0,
-                                                                        });
-                                                                    } else {
-                                                                        const [type, scoreStr] = v.split(':');
-                                                                        updateStudent(student.id, {
-                                                                            behavior_type: type as BehaviorType,
-                                                                            behavior_score: parseInt(scoreStr),
-                                                                        });
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <SelectTrigger className="w-32 h-8 mx-auto">
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="NONE">-</SelectItem>
-                                                                    <SelectItem value="LEADER:1"><BehaviorChip type="LEADER" score={1} /></SelectItem>
-                                                                    <SelectItem value="LEADER:2"><BehaviorChip type="LEADER" score={2} /></SelectItem>
-                                                                    <SelectItem value="BEHAVIOR:-1"><BehaviorChip type="BEHAVIOR" score={-1} /></SelectItem>
-                                                                    <SelectItem value="BEHAVIOR:-2"><BehaviorChip type="BEHAVIOR" score={-2} /></SelectItem>
-                                                                    <SelectItem value="BEHAVIOR:-3"><BehaviorChip type="BEHAVIOR" score={-3} /></SelectItem>
-                                                                    <SelectItem value="EMOTIONAL:-1"><BehaviorChip type="EMOTIONAL" score={-1} /></SelectItem>
-                                                                    <SelectItem value="EMOTIONAL:-2"><BehaviorChip type="EMOTIONAL" score={-2} /></SelectItem>
-                                                                    <SelectItem value="EMOTIONAL:-3"><BehaviorChip type="EMOTIONAL" score={-3} /></SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        ) : (
-                                                            <BehaviorChip type={student.behavior_type} score={student.behavior_score} />
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        {student.assigned_class || '-'}
-                                                    </TableCell>
-                                                    <TableCell className="text-center">
-                                                        <div className="flex gap-1 justify-center">
-                                                            {editingId === student.id ? (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    className="h-7 px-2"
-                                                                    onClick={() => setEditingId(null)}
-                                                                >
-                                                                    완료
-                                                                </Button>
-                                                            ) : (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="h-7 px-2"
-                                                                    aria-label={`${student.name} 수정`}
-                                                                    onClick={() => setEditingId(student.id)}
-                                                                >
-                                                                    <PencilSimple size={16} />
-                                                                </Button>
-                                                            )}
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                className="h-7 px-2 text-danger hover:text-danger hover:bg-danger-wash"
-                                                                aria-label={`${student.name} 삭제`}
-                                                                onClick={() => deleteStudent(student.id)}
-                                                            >
-                                                                <Trash size={16} />
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
+                                                <StudentTableRow
+                                                    key={student.id}
+                                                    student={student}
+                                                    index={index}
+                                                    isEditing={editingId === student.id}
+                                                    onEditingChange={setEditingId}
+                                                    onUpdate={updateStudent}
+                                                    onBehaviorChange={handleBehaviorChange}
+                                                    onDelete={deleteStudent}
+                                                />
                                             ))}
                                         </TableBody>
                                     </Table>
