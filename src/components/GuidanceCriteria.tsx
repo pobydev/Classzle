@@ -10,18 +10,18 @@ export const GUIDANCE_CRITERIA: { type: Exclude<BehaviorType, 'NONE'>; title: st
         type: 'BEHAVIOR',
         title: '행동 (생활지도 소요)',
         items: [
-            { level: '-1', text: '가벼운 딴짓, 관심 필요' },
-            { level: '-2', text: '잦은 방해, 지속적 지도 필요' },
             { level: '-3', text: '심각한 방해, 학교폭력 등 집중 관리 필요' },
+            { level: '-2', text: '잦은 방해, 지속적 지도 필요' },
+            { level: '-1', text: '가벼운 딴짓, 관심 필요' },
         ],
     },
     {
         type: 'EMOTIONAL',
         title: '정서 (세심한 배려)',
         items: [
-            { level: '-1', text: '다소 예민함, 배려 필요' },
-            { level: '-2', text: '교우관계/정서 지원 필요' },
             { level: '-3', text: '특별한 케어/전문가 개입 필요' },
+            { level: '-2', text: '교우관계/정서 지원 필요' },
+            { level: '-1', text: '다소 예민함, 배려 필요' },
         ],
     },
     {

@@ -275,7 +275,7 @@ const BEHAVIOR_VALUE = new RegExp(
 const ANY_BEHAVIOR_WORD = new RegExp(BEHAVIOR_WORDS, 'g');
 
 // 생활지도 드롭다운 파싱
-// 옵션: 해당없음, 리더(+2), 리더(+1), 행동(-1), 행동(-2), 행동(-3), 정서(-1), 정서(-2), 정서(-3)
+// 옵션은 어려운 학생부터: 행동(-3), 행동(-2), 행동(-1), 정서(-3), 정서(-2), 정서(-1), 리더(+1), 리더(+2), 해당없음
 // 전각 문자를 먼저 맞춥니다. 예전 파일의 리더(-2), 행동(+1)처럼 부호가 반대여도 등급은 같습니다.
 // 앞뒤에 메모가 있어도 읽되, 유형 낱말이 둘 이상이거나 애매하면 짐작하지 않고 읽지 못한 값으로 알립니다.
 export function parseBehaviorDropdown(value: any): { behaviorType: BehaviorType; behaviorScore: number; isUnreadable: boolean } {
@@ -912,7 +912,7 @@ function addBehaviorDropdown(sheet: ExcelJS.Worksheet, column: string) {
         sheet.getCell(`${column}${i}`).dataValidation = {
             type: 'list',
             allowBlank: true,
-            formulae: ['"해당없음,리더(+2),리더(+1),행동(-1),행동(-2),행동(-3),정서(-1),정서(-2),정서(-3)"']
+            formulae: ['"행동(-3),행동(-2),행동(-1),정서(-3),정서(-2),정서(-1),리더(+1),리더(+2),해당없음"']
         };
     }
 }
@@ -1041,10 +1041,10 @@ export function buildSampleWorkbook(): ExcelJS.Workbook {
 
     const guides = [
         '1. 학년, 반, 번호, 이름, 성별은 필수 입력 항목입니다.',
-        '2. 성적은 숫자(점수)로 입력해주세요. (입력하지 않으면 기본값 500점)',
+        '2. 성적은 숫자(점수)로 입력해 주세요. (입력하지 않으면 기본값 500점)',
         '3. 생활지도는 드롭다운 목록에서 선택하실 수 있습니다.',
-        '4. 생활지도를 포함한 모든 학생 정보는 앱 내',
-        '   [기초정보 > 학생관리] 표에서 언제든지 수정하실 수 있습니다.'
+        '4. 생활지도를 포함한 모든 학생 정보는 앱의',
+        '   [기초 정보] 학생 표에서 언제든지 고칠 수 있습니다.'
     ];
 
     guides.forEach((text, index) => {

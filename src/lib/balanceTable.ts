@@ -97,7 +97,7 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
 
     type Stat = (typeof stats)[number];
     const specs: (BalanceColumn & { read: (stat: Stat) => number; flagBy?: (stat: Stat) => number; noneBy?: (stat: Stat) => number })[] = [
-        { key: 'count', label: '인원', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.studentCount },
+        { key: 'count', label: '인원(전출 뒤)', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.studentCount },
         { key: 'male', label: '남', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.maleCount },
         { key: 'female', label: '여', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.femaleCount },
         { key: 'average', label: '평균', limit: null, flag: 'none', read: (s) => s.averageScore },
@@ -108,9 +108,9 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
         { key: 'emotional3', label: '-3', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus3 },
         { key: 'emotional2', label: '-2', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus2 },
         { key: 'emotional1', label: '-1', section: '정서', limit: null, flag: 'none', read: (s) => s.emotionalPlus1 },
-        // 리더는 +2와 +1을 나눠 보여 줍니다. +2는 몰리는 쪽만, +1은 몰리는 쪽과 리더가 한 명도 없는 반을 표시합니다.
-        { key: 'leader2', label: '+2', section: '리더', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.scorePlus2 },
+        // 리더는 +1과 +2를 나눠 보여 줍니다(왼쪽부터 어려운 학생 → 괜찮은 학생). +2는 몰리는 쪽만, +1은 몰리는 쪽과 리더가 한 명도 없는 반을 표시합니다.
         { key: 'leader1', label: '+1', section: '리더', limit: LEVEL_LIMIT, flag: 'aboveOrNone', read: (s) => s.scorePlus1, noneBy: (s) => s.leaderCount },
+        { key: 'leader2', label: '+2', section: '리더', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.scorePlus2 },
         // -합계와 +합계는 합계 안을 나눠 보여 주는 숫자입니다. 표시는 합계에만 합니다.
         { key: 'minusTotal', label: '-합계', title: MINUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.minusTotal },
         { key: 'plusTotal', label: '+합계', title: PLUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.plusTotal },
@@ -270,7 +270,7 @@ export function calculatePreviousClassMatrix(students: Student[], classCount: nu
 }
 
 // 보드 반 머리의 '-3', '-2', '★'에 '!'를 붙일지 정합니다. 통계표의 표시를 그대로 묶습니다.
-// -3은 행동 -3이나 정서 -3, -2는 행동 -2나 정서 -2, ★는 리더 +2나 +1 칸에 '!'가 있으면 붙습니다.
+// -3은 행동 -3이나 정서 -3, -2는 행동 -2나 정서 -2, ★는 리더 +1이나 +2 칸에 '!'가 있으면 붙습니다.
 export interface HeadFlags {
     minus3: boolean;
     minus2: boolean;

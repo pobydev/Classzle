@@ -129,12 +129,10 @@ function HeadCount({ stat }: { stat?: ClassStat }) {
     if (!stat) return null;
     return (
         <>
-            <span className="text-caption text-soft">{stat.stayCount}명</span>
-            {stat.preTransferCount > 0 && (
-                <span className="text-caption text-soft" title={`전출 예정 ${stat.preTransferCount}명은 뺀 인원입니다. 전출 전 ${stat.studentCount}명`}>
-                    +전{stat.preTransferCount}
-                </span>
-            )}
+            <span className="text-caption text-soft" title={stat.preTransferCount > 0 ? `전출 예정 ${stat.preTransferCount}명을 뺀 인원입니다.` : undefined}>
+                {stat.stayCount}명
+                {stat.preTransferCount > 0 && <span className="whitespace-nowrap"> (전출 전 {stat.studentCount})</span>}
+            </span>
         </>
     );
 }

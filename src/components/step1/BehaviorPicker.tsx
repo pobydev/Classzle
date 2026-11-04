@@ -9,10 +9,11 @@ import type { BehaviorType } from '@/types';
 
 type Kind = Exclude<BehaviorType, 'NONE'>;
 
-const GROUPS: { type: Kind; label: string; options: { score: number; key: string }[] }[] = [
-    { type: 'LEADER', label: '리더', options: [{ score: 2, key: '1' }, { score: 1, key: '2' }] },
-    { type: 'BEHAVIOR', label: '행동', options: [{ score: -1, key: '3' }, { score: -2, key: '4' }, { score: -3, key: '5' }] },
-    { type: 'EMOTIONAL', label: '정서', options: [{ score: -1, key: '6' }, { score: -2, key: '7' }, { score: -3, key: '8' }] },
+// 앱 전체에서 왼쪽부터 어려운 학생 → 괜찮은 학생 순서입니다. 키 숫자도 이 순서입니다. 0은 해당 없음입니다.
+export const GROUPS: { type: Kind; label: string; options: { score: number; key: string }[] }[] = [
+    { type: 'BEHAVIOR', label: '행동', options: [{ score: -3, key: '1' }, { score: -2, key: '2' }, { score: -1, key: '3' }] },
+    { type: 'EMOTIONAL', label: '정서', options: [{ score: -3, key: '4' }, { score: -2, key: '5' }, { score: -1, key: '6' }] },
+    { type: 'LEADER', label: '리더', options: [{ score: 1, key: '7' }, { score: 2, key: '8' }] },
 ];
 
 // 고른 값의 색은 3단계 보드와 같은 뜻으로 씁니다(StudentChip.tsx).
@@ -35,9 +36,9 @@ const KEY = 'inline-flex min-w-5 justify-center rounded-[4px] border border-hair
 export function KeyboardHint() {
     const rows: [string, string][] = [
         ['↑ ↓', '학생 옮기기'],
-        ['1  2', '리더 +2, +1'],
-        ['3  4  5', '행동 -1, -2, -3'],
-        ['6  7  8', '정서 -1, -2, -3'],
+        ['1  2  3', '행동 -3, -2, -1'],
+        ['4  5  6', '정서 -3, -2, -1'],
+        ['7  8', '리더 +1, +2'],
         ['0', '해당 없음'],
     ];
     return (

@@ -24,6 +24,7 @@ import {
     TOTAL_TITLE,
     type BalanceCell,
     type BalanceColumn,
+    type BalanceRow,
     type BandCounts,
 } from '@/lib/balanceTable';
 import { calculatePreviousClassLevels } from '@/lib/stats';
@@ -43,7 +44,7 @@ export function FlagMark() {
     return <span className="mr-0.5 text-caption font-bold text-danger" aria-label="기준 넘음">!</span>;
 }
 
-function Flagged({ cell, text, bold, className = '', tint = false }: { cell: BalanceCell; text?: string; bold?: boolean; className?: string; tint?: boolean }) {
+function Flagged({ cell, text, before, bold, className = '', tint = false }: { cell: BalanceCell; text?: string; before?: number; bold?: boolean; className?: string; tint?: boolean }) {
     // 0은 옅은 글자(--soft)로 둡니다. 읽어야 하는 값이라 장식용 --faint는 쓰지 않습니다. 차이 줄의 0도 같습니다.
     const zero = !cell.flagged && cell.value === 0;
     return (
@@ -54,8 +55,16 @@ function Flagged({ cell, text, bold, className = '', tint = false }: { cell: Bal
         >
             {cell.flagged && <FlagMark />}
             {text ?? cell.value}
+            {/* 전출 예정 학생이 있는 반은 전출 전 인원을 옆에 적습니다. 값은 전출 뒤 기준입니다. */}
+            {before !== undefined && <span className="ml-1 font-normal whitespace-nowrap text-caption text-soft">(전출 전 {before})</span>}
         </td>
     );
+}
+
+// 인원, 남, 여 칸에 붙이는 전출 전 인원입니다. 전출 예정 학생이 없으면 붙이지 않습니다.
+function beforeTransfer(row: BalanceRow, key: string): number | undefined {
+    const transfer = key === 'count' ? row.transferMale + row.transferFemale : key === 'male' ? row.transferMale : key === 'female' ? row.transferFemale : 0;
+    return transfer > 0 ? row.cells[key].value + transfer : undefined;
 }
 
 // 등급 칸 뒤에 오는 칸입니다.
@@ -65,7 +74,7 @@ function DifferenceHelp() {
     return (
         <HelpTip label="차이" width={360}>
             <p><strong>차이</strong>는 가장 많은 반과 가장 적은 반의 차이입니다. 모두 전출 뒤 기준입니다.</p>
-            <p>인원, 남, 여, 그룹, -3, -2, 리더 +2, +1은 2명, 합계는 3 차이부터 차이 줄을 빨갛게 칠합니다. 대부분의 반이 모인 범위에서 벗어난 반의 칸도 칠합니다.</p>
+            <p>인원, 남, 여, 그룹, -3, -2, 리더 +1, +2는 2명, 합계는 3 차이부터 차이 줄을 빨갛게 칠합니다. 대부분의 반이 모인 범위에서 벗어난 반의 칸도 칠합니다.</p>
             <p>생활지도는 많은 쪽, 합계는 어려움이 큰 쪽만 칠하고, 리더가 한 명도 없는 반은 +1 칸을 칠합니다.</p>
             <p>배정은 -3, -2가 몰리지 않게 먼저 맞추고, 그다음 합계를 맞춥니다. -1 인원은 합계에 맞춰 달라질 수 있습니다.</p>
         </HelpTip>
@@ -194,7 +203,15 @@ export function BalanceTable({ students, groups, classCount, hasAssignments, onO
                                         {row.className}
                                     </button>
                                 </th>
-                                {ordered.map((c) => <Flagged key={c.key} cell={row.cells[c.key]} className={starts.has(c.key) ? GROUP_START : ''} tint={tinted.has(c.key)} />)}
+                                {ordered.map((c) => (
+                                    <Flagged
+                                        key={c.key}
+                                        cell={row.cells[c.key]}
+                                        before={beforeTransfer(row, c.key)}
+                                        className={starts.has(c.key) ? GROUP_START : ''}
+                                        tint={tinted.has(c.key)}
+                                    />
+                                ))}
                                 <td className={`${TD} ${GROUP_START} ${row.transferMale + row.transferFemale > 0 ? 'text-ink' : 'text-soft'}`}>
                                     {row.transferMale + row.transferFemale > 0 ? `${row.transferMale}/${row.transferFemale}` : '-'}
                                 </td>

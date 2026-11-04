@@ -175,19 +175,19 @@ try {
     await page.getByRole('tab', { name: /^전출 예정/ }).click();
     await page.locator('[data-pick-student]').first().click();
     await page.getByRole('tab', { name: '1단계 기초 정보' }).click();
-    await expect(dialog).toContainText('저장하지 않은 변경 사항이 있습니다');
+    await expect(dialog).toContainText('적용하지 않은 변경 사항이 있습니다');
     await dialog.getByRole('button', { name: '이 화면에 머무르기' }).click();
     await expect(page.getByRole('tab', { name: '2단계 조건 설정' })).toHaveAttribute('data-state', 'active');
     // 2단계 안에서 탭을 옮길 때도 같은 창으로 묻고, 머무르면 고르던 것이 그대로입니다.
     await page.getByRole('tab', { name: /^함께 배정/ }).click();
-    await expect(dialog).toContainText('저장하지 않은 변경 사항이 있습니다');
+    await expect(dialog).toContainText('적용하지 않은 변경 사항이 있습니다');
     await dialog.getByRole('button', { name: '이 화면에 머무르기' }).click();
     await expect(page.getByRole('tab', { name: /^전출 예정/ })).toHaveAttribute('data-state', 'active');
     await expect(page.locator('[data-pick-student]').first()).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('tab', { name: '3단계 반 편성' }).click();
     await dialog.getByRole('button', { name: '버리고 이동' }).click();
     await expect(page.getByRole('tab', { name: '3단계 반 편성' })).toHaveAttribute('data-state', 'active');
-    checks.push('8 사이드바로 옮길 때와 2단계 탭을 옮길 때 저장하지 않은 변경을 묻고 머무를 수 있음');
+    checks.push('8 사이드바로 옮길 때와 2단계 탭을 옮길 때 적용하지 않은 변경을 묻고 머무를 수 있음');
 
     // 14. 배정이 사라지면 신규 탭
     await page.getByRole('button', { name: '배정 실행' }).click();

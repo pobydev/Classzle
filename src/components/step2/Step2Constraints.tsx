@@ -59,7 +59,7 @@ const TAB_HINTS: Record<Mode, { line: string; help: React.ReactNode }> = {
         line: '같은 반이 되면 안 되는 학생을 정합니다.',
         help: (
             <>
-                <p>기준 학생을 고른 뒤 상대를 고르고 저장합니다. 고른 학생들은 다른 반에 배정합니다.</p>
+                <p>기준 학생을 고른 뒤 상대를 고르고 적용합니다. 고른 학생들은 다른 반에 배정합니다.</p>
                 <p>예: 학교폭력 사안으로 떼어 놓아야 하는 경우, 사이가 좋지 않은 경우</p>
             </>
         ),
@@ -75,7 +75,7 @@ const TAB_HINTS: Record<Mode, { line: string; help: React.ReactNode }> = {
     },
     fixed: {
         line: '학생을 정한 반에 꼭 배정합니다.',
-        help: <p>왼쪽에서 학생을 고르고, 오른쪽에서 반을 고른 뒤 저장합니다. 고정 안 함을 고르면 풀립니다.</p>,
+        help: <p>왼쪽에서 학생을 고르고, 오른쪽에서 반을 고른 뒤 적용합니다. 고정 안 함을 고르면 풀립니다.</p>,
     },
     pretransfer: {
         line: '방학 중 전출할 학생을 고릅니다.',
@@ -300,7 +300,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
     const confirmDiscard = async () => {
         if (!hasAnyUnsavedChanges()) return true;
         return confirm({
-            title: '저장하지 않은 변경 사항이 있습니다.',
+            title: '적용하지 않은 변경 사항이 있습니다.',
             description: '변경 사항을 버리고 이동할까요?',
             confirmLabel: '버리고 이동',
             cancelLabel: '이 화면에 머무르기',
@@ -321,7 +321,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
         if (selectedStudent && selectedStudent.id !== student.id) {
             if (hasUnsavedRelationChanges() || hasUnsavedFixedChanges()) {
                 const confirmed = await confirm({
-                    title: '저장하지 않은 변경 사항이 있습니다.',
+                    title: '적용하지 않은 변경 사항이 있습니다.',
                     description: '변경 사항을 버리고 다른 학생을 고를까요?',
                     confirmLabel: '버리고 선택',
                     cancelLabel: '이 학생 계속 편집',
@@ -342,7 +342,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
     };
 
     // 같은 쌍에는 분리 배정과 함께 배정 중 하나만 둡니다. 반대 조건이 이미 있으면 바꿀지 묻습니다.
-    // 바꾸기로 하면 저장할 때 반대 조건을 지웁니다(store의 linkPair).
+    // 바꾸기로 하면 적용할 때 반대 조건을 지웁니다(store의 linkPair).
     const pickRelationTarget = async (target: Student) => {
         if (!selectedStudent || (relationMode !== 'avoid' && relationMode !== 'keep')) return;
         const opposite = relationMode === 'avoid' ? relations.keep : relations.avoid;
@@ -351,7 +351,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
             const next = relationMode === 'avoid' ? '분리 배정' : '함께 배정';
             const ok = await confirm({
                 title: `이미 ${was}인 학생입니다. ${next}으로 바꿀까요?`,
-                description: `${selectedStudent.name} 학생과 ${target.name} 학생은 ${was}으로 정해 두었습니다. 한 쌍에는 한 가지 조건만 둘 수 있어, 바꾸면 저장할 때 ${was}은 지웁니다.`,
+                description: `${selectedStudent.name} 학생과 ${target.name} 학생은 ${was}으로 정해 두었습니다. 한 쌍에는 한 가지 조건만 둘 수 있어, 바꾸면 적용할 때 ${was}은 지웁니다.`,
                 confirmLabel: `${next}으로 바꾸기`,
                 cancelLabel: `${was} 그대로 두기`,
             });
@@ -544,7 +544,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
     const handleSelectGroup = async (groupId: string | null) => {
         if (groupId !== selectedGroupId && hasUnsavedGroupChanges()) {
             const confirmed = await confirm({
-                title: '저장하지 않은 변경 사항이 있습니다.',
+                title: '적용하지 않은 변경 사항이 있습니다.',
                 description: '변경 사항을 버리고 다른 그룹을 고를까요?',
                 confirmLabel: '버리고 선택',
                 cancelLabel: '이 그룹 계속 편집',
@@ -559,7 +559,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
     const handleClearBase = async () => {
         if (hasUnsavedRelationChanges() || hasUnsavedFixedChanges()) {
             const confirmed = await confirm({
-                title: '저장하지 않은 변경 사항이 있습니다.',
+                title: '적용하지 않은 변경 사항이 있습니다.',
                 description: '변경 사항을 버리고 다른 학생을 고를까요?',
                 confirmLabel: '버리고 선택',
                 cancelLabel: '이 학생 계속 편집',
@@ -913,7 +913,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                 전출 예정 {preTransferStudents.length}명
                 {!unsaved && preTransferStudents.length > 0 && (
                     <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-caption font-medium text-accent-ink">
-                        <CheckCircle size={14} aria-hidden="true" />저장됨
+                        <CheckCircle size={14} aria-hidden="true" />적용됨
                     </span>
                 )}
             </span>
@@ -961,8 +961,9 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                     <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-3 pl-4">
                         <h3 className="min-w-0 flex-1 truncate text-body font-bold text-ink">{rightTitle}</h3>
                         {rightTools}
+                        {/* 작업 파일 저장(사이드바)과 헷갈리지 않게 '적용'이라고 씁니다. */}
                         <Button size="sm" onClick={save.onClick} disabled={save.disabled} data-step2-save>
-                            저장
+                            적용
                         </Button>
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto">{rightBody}</div>
