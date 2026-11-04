@@ -20,8 +20,7 @@ import {
     type BalanceColumn,
     type BandCounts,
 } from '@/lib/balanceTable';
-import { calculateClassStats, calculatePreviousClassLevels } from '@/lib/stats';
-import { isStaying } from '@/lib/assignment/problem';
+import { calculatePreviousClassLevels } from '@/lib/stats';
 import type { CustomGroup, Student, Violation } from '@/types';
 import { Mark } from './StudentChip';
 
@@ -43,7 +42,7 @@ function Flagged({ cell, text, bold }: { cell: BalanceCell; text?: string; bold?
 }
 
 // 등급 칸 뒤에 오는 칸입니다.
-const AFTER_LEVELS = ['leader', 'minusTotal', 'plusTotal', 'guidanceTotal'];
+const AFTER_LEVELS = ['minusTotal', 'plusTotal', 'guidanceTotal'];
 
 export function BalanceTable({ students, groups, classCount, onOpenClass }: {
     students: Student[];
@@ -54,11 +53,12 @@ export function BalanceTable({ students, groups, classCount, onOpenClass }: {
     const table = useMemo(() => calculateBalanceTable(students, classCount, groups), [students, classCount, groups]);
     const single = (section: BalanceColumn['section']) => table.columns.filter((c) => c.section === section);
     const before = table.columns.filter((c) => !c.section && !AFTER_LEVELS.includes(c.key));
-    const leader = table.columns.filter((c) => AFTER_LEVELS.includes(c.key));
+    const totals = table.columns.filter((c) => AFTER_LEVELS.includes(c.key));
     const behavior = single('행동');
     const emotional = single('정서');
+    const leader = single('리더');
     const groupColumns = single('그룹 분산');
-    const ordered = [...before, ...behavior, ...emotional, ...leader, ...groupColumns];
+    const ordered = [...before, ...behavior, ...emotional, ...leader, ...totals, ...groupColumns];
 
     return (
         <div className="rounded-card bg-card shadow-card" data-balance-table>
@@ -69,13 +69,15 @@ export function BalanceTable({ students, groups, classCount, onOpenClass }: {
                         {before.map((c) => <th key={c.key} rowSpan={2} className={TH}>{c.label}</th>)}
                         <th colSpan={behavior.length} className={TH}>행동</th>
                         <th colSpan={emotional.length} className={TH}>정서</th>
-                        {leader.map((c) => <th key={c.key} rowSpan={2} title={c.title} className={TH}>{c.label}</th>)}
+                        <th colSpan={leader.length} className={TH}>리더</th>
+                        {totals.map((c) => <th key={c.key} rowSpan={2} title={c.title} className={TH}>{c.label}</th>)}
                         {groupColumns.length > 0 && <th colSpan={groupColumns.length} className={TH}>그룹 분산</th>}
                         <th rowSpan={2} className={`${TH} rounded-tr-card`}>전출<span className="block font-normal">남/여</span></th>
                     </tr>
                     <tr>
                         {behavior.map((c) => <th key={c.key} className={TH}>{c.label}</th>)}
                         {emotional.map((c) => <th key={c.key} className={TH}>{c.label}</th>)}
+                        {leader.map((c) => <th key={c.key} className={TH}>{c.label}</th>)}
                         {groupColumns.map((c) => (
                             <th key={c.key} title={c.label} className={`${TH} max-w-[88px] truncate`}>{c.label}</th>
                         ))}
@@ -116,7 +118,7 @@ export function BalanceTable({ students, groups, classCount, onOpenClass }: {
                 </tbody>
             </table>
             <p className="px-3 py-2 text-caption text-soft">
-                생활지도는 -3, -2가 몰리지 않게 먼저 맞추고, 그다음 합계를 맞춥니다. 합계는 어려운 학생과 리더의 점수를 모두 더한 값입니다. -1 인원은 합계에 맞춰 달라질 수 있습니다. 모두 전출 뒤 기준입니다. 인원, 남, 여, 그룹, -3, -2, 리더는 2명, 합계는 3 차이부터 차이 줄에 ▲를 붙이고, 대부분의 반이 모인 범위에서 벗어난 반에도 붙입니다. 생활지도는 많은 쪽, 합계는 어려움이 큰 쪽만 표시하고, 리더는 없는 반도 표시합니다.
+                생활지도는 -3, -2가 몰리지 않게 먼저 맞추고, 그다음 합계를 맞춥니다. 합계는 어려운 학생과 리더의 점수를 모두 더한 값입니다. -1 인원은 합계에 맞춰 달라질 수 있습니다. 모두 전출 뒤 기준입니다. 인원, 남, 여, 그룹, -3, -2, 리더 +2, +1은 2명, 합계는 3 차이부터 차이 줄에 ▲를 붙이고, 대부분의 반이 모인 범위에서 벗어난 반에도 붙입니다. 생활지도는 많은 쪽, 합계는 어려움이 큰 쪽만 표시하고, 리더가 한 명도 없는 반은 +1 칸에 표시합니다.
             </p>
         </div>
     );
@@ -138,10 +140,6 @@ function DetailContent({ students, groups, classCount }: { students: Student[]; 
     const bands = useMemo(() => calculateScoreBands(students, classCount, groups), [students, classCount, groups]);
     const matrix = useMemo(() => calculatePreviousClassMatrix(students, classCount), [students, classCount]);
     const levels = useMemo(() => calculatePreviousClassLevels(students), [students]);
-    const leaders = useMemo(
-        () => calculateClassStats(students.filter(isStaying), classCount, groups),
-        [students, classCount, groups],
-    );
 
     return (
         <div className="space-y-6" data-balance-detail>
@@ -239,28 +237,6 @@ function DetailContent({ students, groups, classCount }: { students: Student[]; 
                     </table>
                 </section>
             )}
-
-            <section>
-                <SectionTitle>리더 +1, +2</SectionTitle>
-                <table className="w-full max-w-sm border-collapse text-small" data-leader-split>
-                    <thead>
-                        <tr>
-                            <th className={`${TH} text-left`}>반</th>
-                            <th className={TH}>+1</th>
-                            <th className={TH}>+2</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {leaders.map((stat) => (
-                            <tr key={stat.className} className="hover:bg-wash">
-                                <th scope="row" className={`${TD} text-left font-bold text-ink`}>{stat.className}</th>
-                                <td className={TD}>{stat.scorePlus1}</td>
-                                <td className={TD}>{stat.scorePlus2}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </section>
         </div>
     );
 }

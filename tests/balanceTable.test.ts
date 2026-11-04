@@ -84,7 +84,9 @@ describe('학급별 균형 표', () => {
         expect(second.cells.count.value).toBe(1);
         expect(second.cells.male.value).toBe(0);
         expect(second.cells['group:g'].value).toBe(0);
-        expect(second.cells.leader.value).toBe(1);
+        // 리더는 +2와 +1을 나눠 셉니다.
+        expect(second.cells.leader2.value).toBe(1);
+        expect(second.cells.leader1.value).toBe(0);
     });
 
     it('전출은 남/여를 따로 보여 줍니다', () => {
@@ -188,8 +190,9 @@ describe('학급별 균형 표', () => {
     });
 
     it('차이가 기준 안이면 표시하지 않습니다', () => {
-        expect(table.difference.leader.flagged).toBe(false);
-        expect(second.cells.leader.flagged).toBe(false);
+        expect(table.difference.leader2.flagged).toBe(false);
+        expect(table.difference.leader1.flagged).toBe(false);
+        expect(second.cells.leader1.flagged).toBe(false);
         expect(table.difference.emotional3.flagged).toBe(false);
     });
 

@@ -10,7 +10,7 @@ export interface BalanceColumn {
     key: string;
     label: string;
     // 두 줄 머리글의 윗줄입니다. 없으면 한 칸으로 합칩니다.
-    section?: '행동' | '정서' | '그룹 분산';
+    section?: '행동' | '정서' | '리더' | '그룹 분산';
     // 반별 차이가 이 값을 넘으면 표시합니다.
     limit: number | null;
     flag: FlagMode;
@@ -42,7 +42,13 @@ export interface BalanceTable {
  * 차이가 기준을 넘으면, 너비가 기준(limit)인 범위 중 반이 가장 많이 들어가는 범위를 찾아 거기서 벗어난 칸만 표시합니다.
  * 한 반만 어긋났을 때 그 반만 표시하기 위해서입니다. 범위가 여럿이면 낮은 쪽을 고릅니다.
  */
-export function flagColumn(values: number[], limit: number | null, flag: FlagMode): { difference: BalanceCell; cells: BalanceCell[] } {
+export function flagColumn(
+    values: number[],
+    limit: number | null,
+    flag: FlagMode,
+    // 'aboveOrNone'에서 '하나도 없음'을 따로 볼 값입니다. 리더 +1 칸은 +1과 +2를 합친 리더 수로 봅니다.
+    noneValues: number[] = values,
+): { difference: BalanceCell; cells: BalanceCell[] } {
     if (values.length === 0) return { difference: { value: 0, flagged: false }, cells: [] };
     const difference = Math.max(...values) - Math.min(...values);
     if (limit === null || flag === 'none' || difference <= limit) {
@@ -65,9 +71,9 @@ export function flagColumn(values: number[], limit: number | null, flag: FlagMod
     const high = low + limit;
     return {
         difference: { value: difference, flagged: true },
-        cells: values.map((value) => ({
+        cells: values.map((value, i) => ({
             value,
-            flagged: value > high || (flag === 'outside' && value < low) || (flag === 'aboveOrNone' && value === 0 && value < low),
+            flagged: value > high || (flag === 'outside' && value < low) || (flag === 'aboveOrNone' && noneValues[i] === 0 && value < low),
         })),
     };
 }
@@ -88,7 +94,7 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
     const withTransfer = calculateClassStats(students, classNames, groups);
 
     type Stat = (typeof stats)[number];
-    const specs: (BalanceColumn & { read: (stat: Stat) => number; flagBy?: (stat: Stat) => number })[] = [
+    const specs: (BalanceColumn & { read: (stat: Stat) => number; flagBy?: (stat: Stat) => number; noneBy?: (stat: Stat) => number })[] = [
         { key: 'count', label: '인원', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.studentCount },
         { key: 'male', label: '남', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.maleCount },
         { key: 'female', label: '여', limit: COUNT_LIMIT, flag: 'outside', read: (s) => s.femaleCount },
@@ -100,7 +106,9 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
         { key: 'emotional3', label: '-3', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus3 },
         { key: 'emotional2', label: '-2', section: '정서', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.emotionalPlus2 },
         { key: 'emotional1', label: '-1', section: '정서', limit: null, flag: 'none', read: (s) => s.emotionalPlus1 },
-        { key: 'leader', label: '리더', limit: LEVEL_LIMIT, flag: 'aboveOrNone', read: (s) => s.leaderCount },
+        // 리더는 +2와 +1을 나눠 보여 줍니다. +2는 몰리는 쪽만, +1은 몰리는 쪽과 리더가 한 명도 없는 반을 표시합니다.
+        { key: 'leader2', label: '+2', section: '리더', limit: LEVEL_LIMIT, flag: 'above', read: (s) => s.scorePlus2 },
+        { key: 'leader1', label: '+1', section: '리더', limit: LEVEL_LIMIT, flag: 'aboveOrNone', read: (s) => s.scorePlus1, noneBy: (s) => s.leaderCount },
         // -합계와 +합계는 합계 안을 나눠 보여 주는 숫자입니다. 표시는 합계에만 합니다.
         { key: 'minusTotal', label: '-합계', title: MINUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.minusTotal },
         { key: 'plusTotal', label: '+합계', title: PLUS_TOTAL_TITLE, limit: null, flag: 'none', read: (s) => s.plusTotal },
@@ -132,7 +140,8 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
     }));
     const difference: Record<string, BalanceCell> = {};
     for (const spec of specs) {
-        const { difference: diff, cells } = flagColumn(stats.map(spec.flagBy ?? spec.read), spec.limit, spec.flag);
+        const values = stats.map(spec.flagBy ?? spec.read);
+        const { difference: diff, cells } = flagColumn(values, spec.limit, spec.flag, spec.noneBy ? stats.map(spec.noneBy) : values);
         difference[spec.key] = diff;
         cells.forEach((cell, i) => {
             rows[i].cells[spec.key] = { ...cell, value: spec.read(stats[i]) };

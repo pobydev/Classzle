@@ -94,6 +94,33 @@ describe('13. 새 어김이 있는 교환', () => {
 });
 
 describe('17. 리더 칸', () => {
+    const leader = (id: string, cn: string, score: number) =>
+        makeStudent({ id, assigned_class: cn, behavior_type: 'LEADER', behavior_score: score });
+
+    it('리더를 +2와 +1 두 칸으로 나눠 보여 줍니다', () => {
+        const table = calculateBalanceTable([leader('a', '1반', 2), leader('b', '1반', 1), leader('c', '2반', 1)], 2);
+        expect(table.columns.filter((c) => c.section === '리더').map((c) => c.label)).toEqual(['+2', '+1']);
+        expect(table.rows.map((r) => [r.cells.leader2.value, r.cells.leader1.value])).toEqual([[1, 1], [0, 1]]);
+    });
+
+    it('+2가 한 반에 몰리면 그 반의 +2 칸을 표시합니다', () => {
+        const table = calculateBalanceTable(
+            [leader('a', '1반', 2), leader('b', '1반', 2), leader('c', '1반', 2), leader('d', '2반', 1), leader('e', '3반', 1)],
+            3,
+        );
+        expect(table.difference.leader2.flagged).toBe(true);
+        expect(table.rows.map((r) => r.cells.leader2.flagged)).toEqual([true, false, false]);
+    });
+
+    it('+1이 없어도 +2 리더가 있는 반은 리더가 없는 반으로 보지 않습니다', () => {
+        const ones = (cn: string) => [leader(`${cn}x`, cn, 1), leader(`${cn}y`, cn, 1)];
+        const table = calculateBalanceTable(
+            [leader('a', '1반', 2), ...ones('2반'), ...ones('3반'), ...ones('4반'), makeStudent({ id: 'z', assigned_class: '5반' })],
+            5,
+        );
+        expect(table.rows.map((r) => r.cells.leader1.flagged)).toEqual([false, false, false, false, true]);
+    });
+
     it('다른 반에 다 있는데 리더가 없는 반을 표시합니다', () => {
         expect(flagColumn([0, 2, 2, 2], 1, 'aboveOrNone').cells.map((c) => c.flagged)).toEqual([true, false, false, false]);
     });
@@ -105,7 +132,7 @@ describe('17. 리더 칸', () => {
             [...leaders('2반', 2), ...leaders('3반', 2), ...leaders('4반', 2), makeStudent({ id: 'z', assigned_class: '1반' })],
             4,
         );
-        expect(table.rows.map((r) => r.cells.leader.flagged)).toEqual([true, false, false, false]);
+        expect(table.rows.map((r) => r.cells.leader1.flagged)).toEqual([true, false, false, false]);
     });
 
     it('많은 쪽도 그대로 표시하고 리더가 있는 적은 반은 표시하지 않습니다', () => {
