@@ -57,14 +57,14 @@ export function GuideDialog({
                 </section>
 
                 <Step number="01" title="기초 정보 넣기">
-                    <p>왼쪽 <strong className={STRONG}>기초 정보</strong>에서 편성할 학급 수를 정하고, 양식을 받아 학생 정보를 붙여 넣습니다.</p>
+                    <p>왼쪽 <strong className={STRONG}>기초 정보</strong>에서 양식을 받아 학생 정보를 붙여 넣고 파일을 넣습니다. 학급 수는 파일에 맞춰 정해지고, 맨 위 요약 줄의 바꾸기로 고칩니다.</p>
                     <ul className="ml-4 list-disc">
                         <li>양식 A: 새로 반을 편성할 때 씁니다. 이전 학년도 반과 번호가 있으면 됩니다.</li>
                         <li>양식 B: 이미 나눈 배정안을 고칠 때 씁니다. 신학년 배정 결과를 함께 넣습니다.</li>
                     </ul>
                     <p>
                         채운 파일을 끌어다 놓거나 <strong className={STRONG}>파일 선택</strong>으로 넣습니다. 열 이름은{' '}
-                        <strong className={STRONG}>엑셀 작성 가이드</strong>에 있습니다. 넣은 뒤에는 표에서 고치거나 학생을 추가할 수 있습니다.
+                        <strong className={STRONG}>작성 방법</strong>에 있습니다. 넣은 뒤에는 표에서 고치거나 학생을 추가할 수 있습니다.
                     </p>
                 </Step>
 
@@ -76,7 +76,7 @@ export function GuideDialog({
                             입력 인원을 볼 수 있습니다.
                         </li>
                         <li>
-                            반별 입력표: <strong className={STRONG}>반별 입력표 내보내기</strong>로 반마다 파일을 만들어 담임에게 보내고, 돌아온
+                            반별 입력표: 학생 표 위의 <strong className={STRONG}>담임에게 받기</strong>에서 <strong className={STRONG}>반별 입력표 내보내기</strong>로 반마다 파일을 만들어 담임에게 보내고, 돌아온
                             파일을 <strong className={STRONG}>입력표 받기</strong>로 한꺼번에 넣습니다. 반영하기 전에 요약을 보여 줍니다.
                         </li>
                     </ul>

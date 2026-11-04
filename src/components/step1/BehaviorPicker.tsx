@@ -22,7 +22,32 @@ const groupWidth = (count: number) => count * BUTTON_WIDTH + (count - 1) * BUTTO
 
 const signed = (score: number) => (score > 0 ? `+${score}` : String(score));
 
-export const KEY_HINT = '↑ ↓ 학생 이동, 1 리더+2, 2 리더+1, 3~5 행동-1~-3, 6~8 정서-1~-3, 0 해당없음';
+const KEY = 'inline-flex min-w-5 justify-center rounded-[4px] border border-hairline bg-canvas px-1 text-caption font-semibold text-ink';
+
+/** 머리글 ? 에 넣는 키보드 안내입니다. */
+export function KeyboardHint() {
+    const rows: [string, string][] = [
+        ['↑ ↓', '학생 옮기기'],
+        ['1  2', '리더 +2, +1'],
+        ['3  4  5', '행동 -1, -2, -3'],
+        ['6  7  8', '정서 -1, -2, -3'],
+        ['0', '해당 없음'],
+    ];
+    return (
+        <div data-key-hint>
+            <p className="mb-1 font-semibold text-ink">키보드로 넣기</p>
+            <p className="mb-1.5 text-soft">표의 생활지도 칸을 한 번 누른 뒤 숫자 하나를 누르면 값이 들어가고 다음 학생으로 넘어갑니다.</p>
+            <ul className="space-y-1">
+                {rows.map(([keys, text]) => (
+                    <li key={keys} className="flex items-center gap-2">
+                        <span className="flex w-20 gap-1">{keys.split(/\s+/).map((k) => <kbd key={k} className={KEY}>{k}</kbd>)}</span>
+                        {text}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
 /** 표 머리글. 줄의 단추와 칸을 맞춥니다. */
 export function BehaviorPickerHeader() {
@@ -126,10 +151,11 @@ function BehaviorPickerBase({
                                         ? `var(--behavior-${CSS_KEY[group.type]}-${Math.abs(option.score)})`
                                         : undefined,
                                 }}
-                                className={`h-7 rounded-input border text-small transition-colors ${
+                                // 고르지 않은 값은 테두리 없이 흐린 글자로 두고, 고른 값만 색을 칠합니다.
+                                className={`h-7 cursor-pointer rounded-input border text-small tabular-nums transition-colors ${
                                     isOn
                                         ? 'border-accent font-bold text-ink'
-                                        : 'border-line bg-card text-soft hover:bg-surface-hover hover:text-ink'
+                                        : 'border-transparent text-soft hover:bg-surface-hover hover:text-ink'
                                 }`}
                             >
                                 {signed(option.score)}

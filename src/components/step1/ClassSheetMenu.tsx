@@ -1,12 +1,15 @@
 'use client';
 
 // 반별 입력표: 담임에게 그 반 파일만 보내고, 돌아온 파일에서 생활지도 값만 받습니다. 쓰지 않아도 됩니다.
+// 1단계 도구 줄의 '담임에게 받기' 메뉴입니다. 개인정보 안내는 내보내기 창 안에 둡니다.
 
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { DownloadSimple, ShieldCheck, UploadSimple } from '@phosphor-icons/react';
+import { CaretDown, DownloadSimple, ShieldCheck, UploadSimple } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
 import {
     applyBehaviorUpdates,
@@ -71,11 +74,12 @@ function PlanSummary({ plan }: { plan: ClassSheetPlan }) {
     );
 }
 
-export function ClassSheetPanel() {
+export function ClassSheetMenu() {
     const students = useClasszleStore((state) => state.students);
     const confirm = useConfirm();
     const inputRef = useRef<HTMLInputElement>(null);
     const [isBusy, setIsBusy] = useState(false);
+    const [isExportOpen, setIsExportOpen] = useState(false);
 
     const exportSheets = async () => {
         const { groups, skipped } = groupByPrevClass(students);
@@ -165,33 +169,59 @@ export function ClassSheetPanel() {
     if (students.length === 0) return null;
 
     return (
-        <div className="rounded-card border border-line p-3 flex flex-col gap-2" data-class-sheet-panel>
-            <div className="flex flex-wrap items-center gap-2">
-                <strong className="text-body text-ink mr-1">담임에게 생활지도 받기 (선택)</strong>
-                <Button variant="outline" size="sm" onClick={exportSheets} disabled={isBusy}>
-                    <DownloadSimple size={16} aria-hidden="true" />
-                    반별 입력표 내보내기
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={isBusy}>
-                    <UploadSimple size={16} aria-hidden="true" />
-                    입력표 받기
-                </Button>
-                <input
-                    ref={inputRef}
-                    type="file"
-                    multiple
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    data-class-sheet-input
-                    onChange={(e) => e.target.files && e.target.files.length > 0 && importSheets(e.target.files)}
-                />
-            </div>
-            <p className="text-caption text-soft flex gap-1.5">
-                <ShieldCheck size={14} className="flex-shrink-0 mt-0.5 text-accent" aria-hidden="true" />
-                <span>
-                    파일에는 그 반 학생의 번호, 이름, 성별만 들어갑니다. 암호는 걸리지 않으니 학교 메신저처럼 정해진 경로로 주고받고, 끝나면 파일을 지워 주세요.
-                </span>
-            </p>
-        </div>
+        <>
+            <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isBusy} data-class-sheet-menu>
+                        담임에게 받기
+                        <CaretDown aria-hidden="true" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setIsExportOpen(true)}>
+                        <DownloadSimple aria-hidden="true" />반별 입력표 내보내기
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => inputRef.current?.click()}>
+                        <UploadSimple aria-hidden="true" />입력표 받기
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <input
+                ref={inputRef}
+                type="file"
+                multiple
+                accept=".xlsx,.xls"
+                className="hidden"
+                data-class-sheet-input
+                onChange={(e) => e.target.files && e.target.files.length > 0 && importSheets(e.target.files)}
+            />
+            <Dialog open={isExportOpen} onOpenChange={setIsExportOpen}>
+                <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                        <DialogTitle>반별 입력표 내보내기</DialogTitle>
+                        <DialogDescription>
+                            전학년도 반마다 엑셀 파일을 하나씩 만듭니다. 담임 선생님이 생활지도 칸을 채워 돌려주면 입력표 받기로 넣습니다.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <p className="flex gap-2 rounded-button bg-wash p-3 text-small text-accent-ink" data-class-sheet-privacy>
+                        <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+                        <span>
+                            파일에는 그 반 학생의 번호, 이름, 성별만 들어갑니다. 암호는 걸리지 않으니 학교 메신저처럼 정해진 경로로 주고받고, 끝나면 파일을 지워 주세요.
+                        </span>
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setIsExportOpen(false)}>취소</Button>
+                        <Button
+                            onClick={() => {
+                                setIsExportOpen(false);
+                                void exportSheets();
+                            }}
+                        >
+                            <DownloadSimple aria-hidden="true" />내보내기
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

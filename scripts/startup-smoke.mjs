@@ -90,7 +90,7 @@ try {
         const userData = await newProfile({ 시험: data });
         const first = await launch(userData);
         await first.page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
-        await first.page.getByText('학생 330명을 불러왔습니다').waitFor({ timeout: 30000 });
+        await expect(first.page.locator('[data-roster-summary]')).toContainText('330명', { timeout: 30000 });
         await sidebar(first.page).getByText('시험', { exact: true }).click();
         await first.page.getByRole('dialog').getByRole('button', { name: '불러오기' }).click();
         await expect(first.page.getByText('올바르지 않은 작업 파일입니다.').first()).toBeVisible();

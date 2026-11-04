@@ -12,6 +12,10 @@ interface ClasszleStore {
     notices: string[];
     setNotices: (notices: string[]) => void;
 
+    // 지금 명단을 읽은 엑셀 파일 이름입니다. 1단계 요약 줄에 보여 줍니다. 저장하지 않습니다.
+    sourceName: string | null;
+    setSourceName: (name: string | null) => void;
+
     // 데이터
     students: Student[];
     groups: CustomGroup[];
@@ -134,6 +138,8 @@ export const useClasszleStore = create<ClasszleStore>()(
             workId: 0,
             notices: [],
             setNotices: (notices) => set({ notices }),
+            sourceName: null,
+            setSourceName: (sourceName) => set({ sourceName }),
             students: [],
             groups: [],
             settings: defaultSettings,
@@ -436,6 +442,7 @@ export const useClasszleStore = create<ClasszleStore>()(
             resetAll: () => set((state) => ({
                 workId: state.workId + 1,
                 notices: [],
+                sourceName: null,
                 students: [],
                 groups: [],
                 settings: defaultSettings,
@@ -445,6 +452,7 @@ export const useClasszleStore = create<ClasszleStore>()(
 
             loadProject: (data) => set({
                 notices: [],
+                sourceName: null,
                 students: data.students || [],
                 groups: data.groups || [],
                 settings: data.settings || defaultSettings,

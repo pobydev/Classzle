@@ -56,8 +56,16 @@ try {
     };
 
     await page.getByRole('tab', { name: '1단계 기초 정보' }).waitFor({ timeout: 60000 });
+    // 반별 입력표 내보내기: 담임에게 받기 메뉴 → 내보내기 창(개인정보 안내) → 내보내기
+    const exportSheets = async () => {
+        await page.getByRole('button', { name: '담임에게 받기' }).click();
+        await page.getByRole('menuitem', { name: '반별 입력표 내보내기' }).click();
+        await expect(page.getByRole('dialog')).toContainText('번호, 이름, 성별만 들어갑니다');
+        await page.getByRole('dialog').getByRole('button', { name: '내보내기' }).click();
+        await expect(page.getByRole('dialog').filter({ hasText: '번호, 이름, 성별만 들어갑니다' })).toHaveCount(0);
+    };
     await page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
-    await page.getByText('학생 330명을 불러왔습니다').waitFor({ timeout: 30000 });
+    await expect(page.locator('[data-roster-summary]')).toContainText('330명', { timeout: 30000 });
 
     // ---- 빠른 입력: 표본의 값을 모두 지운 채로 시작합니다. ----
     await page.evaluate(() => {
@@ -67,10 +75,10 @@ try {
     });
     await page.reload();
     await page.getByRole('tab', { name: '1단계 기초 정보' }).waitFor({ timeout: 60000 });
-    await page.getByText('학생 관리').waitFor();
-    await expect(page.locator('[data-behavior-total]')).toContainText('입력 0명 / 전체 330명');
+    await page.locator('[data-student-table]').waitFor();
+    await expect(page.locator('[data-behavior-total]')).toContainText('생활지도 0/330');
 
-    await page.getByRole('tab', { name: /2학년 1반 \(/ }).click();
+    await page.getByRole('tab', { name: /^1반 / }).click();
     const pickers = page.locator('[data-behavior-picker]');
     const count = await pickers.count();
     expect(count).toBeGreaterThanOrEqual(28);
@@ -85,7 +93,7 @@ try {
         keyPresses++;
     }
     // 다음 반 2명까지 이어서 입력합니다: 탭 누르기 1번, 첫 칸으로 가기 1번, 키 2번입니다.
-    await page.getByRole('tab', { name: /2학년 2반 \(/ }).click();
+    await page.getByRole('tab', { name: /^2반 / }).click();
     await page.locator('[data-behavior-picker]').first().focus();
     await page.keyboard.press('4');
     await page.keyboard.press('ArrowDown');
@@ -94,7 +102,7 @@ try {
     const typed = count + 2;
     expect(typed).toBe(30);
     const keyboardMs = Date.now() - started;
-    await page.getByRole('tab', { name: /2학년 1반 \(/ }).click();
+    await page.getByRole('tab', { name: /^1반 / }).click();
     let state = await stored(page);
     const firstClass = state.students.filter((s) => s.prev_info.startsWith('2-1-'));
     const entered = firstClass.filter((s) => s.behavior_type !== 'NONE').length;
@@ -115,7 +123,7 @@ try {
     checks.push('마우스: 값을 한 번 누르면 들어가고, 다시 누르면 해제됨');
 
     // 전체 탭 330명에서도 한 번 누르는 데 걸리는 시간
-    await page.getByRole('tab', { name: /전체 \(330\)/ }).click();
+    await page.getByRole('tab', { name: /^전체 330명/ }).click();
     await page.locator('[data-behavior-picker]').nth(329).waitFor({ state: 'attached' });
     const clickMs = await page.evaluate(async () => {
         const button = document.querySelector('[data-behavior-picker] [role=radio]');
@@ -149,7 +157,7 @@ try {
     await app.evaluate(({ dialog }, folder) => {
         dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
     }, sheetsDir);
-    await page.getByRole('button', { name: '반별 입력표 내보내기' }).click();
+    await exportSheets();
     await page.getByText('입력표 12개를 저장했습니다.').waitFor({ timeout: 30000 });
     let names = (await fs.readdir(sheetsDir)).sort();
     expect(names).toHaveLength(12);
@@ -173,7 +181,7 @@ try {
     checks.push('각 파일에 그 반 학생만 있고 성적이 없음');
 
     // 같은 폴더에 다시 내보내면 먼저 묻습니다.
-    await page.getByRole('button', { name: '반별 입력표 내보내기' }).click();
+    await exportSheets();
     await expect(page.getByRole('dialog')).toContainText('이미 있습니다');
     await page.getByRole('dialog').getByRole('button', { name: '취소' }).click();
     checks.push('같은 이름의 입력표가 있으면 덮어쓰기 전에 물음');
