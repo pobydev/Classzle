@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState, useMemo, useEffect } from 'react';
-import { toast } from 'sonner';
 import { useClasszleStore } from '@/lib/store';
 import { parseExcelFile, downloadSampleExcel, downloadPreAssignedSampleExcel } from '@/lib/excel';
 import { Student, BehaviorType, Gender } from '@/types';
@@ -25,7 +24,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import {
-    ArrowRight,
     ChartBar,
     CheckCircle,
     CircleNotch,
@@ -43,6 +41,7 @@ import { BehaviorIcon } from '@/components/BehaviorChip';
 import { Switch } from '@/components/ui/switch';
 import { BehaviorPickerHeader, KEY_HINT } from './BehaviorPicker';
 import { ClassSheetPanel } from './ClassSheetPanel';
+import { MoreMenu, MoreMenuItem } from '@/components/common/MoreMenu';
 import { StudentTableRow } from './StudentTableRow';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
 import { removalConsequences } from '@/lib/studentRemoval';
@@ -56,11 +55,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 
-interface Step1SetupProps {
-    onNext: () => void;
-}
-
-export default function Step1Setup({ onNext }: Step1SetupProps) {
+export default function Step1Setup() {
     const {
         students, setStudents, settings, setClassCount, resetAll,
         updateStudent, addStudent, deleteStudent, clearMovements, setGroups,
@@ -195,7 +190,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
     const handleFileUpload = useCallback(async (file: File) => {
         if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
             setUploadStatus('error');
-            setErrorMessage('엑셀 파일(.xlsx, .xls)만 업로드 가능합니다.');
+            setErrorMessage('엑셀 파일(.xlsx, .xls)만 넣을 수 있습니다.');
             return;
         }
 
@@ -215,7 +210,6 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             }
 
             setStudents(parsedStudents);
-            setNotices([formLine, ...warnings]);
             setGroups([]); // 새 파일 로드 시 그룹 초기화
             clearMovements(); // 새 파일 로드 시 히스토리 초기화
 
@@ -246,12 +240,13 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
             }
 
             // 최소 2개 반, 최대 20개 반으로 제한
+            // 학급 수를 바꾼 일은 알림 대신 불러온 뒤 안내와 요약 줄에 남깁니다.
+            const classLine: string[] = [];
             if (detectedClassCount >= 2 && detectedClassCount <= 20) {
-                if (detectedClassCount !== useClasszleStore.getState().settings.classCount) {
-                    toast.info(`파일에 맞춰 학급 수를 ${detectedClassCount}개로 바꿨습니다. 다르면 학급 수를 고쳐 주세요.`, { duration: 10000 });
-                }
+                classLine.push(`파일에 맞춰 학급 수를 ${detectedClassCount}개로 정했습니다. 새 학년도 학급 수와 다르면 학급 수를 바꿔 주세요.`);
                 setClassCount(detectedClassCount);
             }
+            setNotices([formLine, ...classLine, ...warnings]);
 
             setUploadStatus('success');
             setErrorMessage('');
@@ -335,7 +330,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                         기초 정보 입력
                     </CardTitle>
                     <CardDescription>
-                        학급 수를 설정하고 학생 명단 엑셀 파일을 업로드해 주세요.
+                        학생 명단 엑셀 파일을 넣고 학급 수를 확인합니다.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -397,7 +392,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                     <div className="space-y-1">
                                         <CheckCircle size={28} className="mx-auto text-accent" aria-hidden="true" />
                                         <p className="text-accent-ink font-medium text-body">
-                                            {students.length}명의 학생 데이터 로드 완료
+                                            학생 {students.length}명을 불러왔습니다
                                         </p>
                                     </div>
                                 ) : (
@@ -441,16 +436,17 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                         양식 B (신학년 기배정안)
                                     </Button>
                                     {students.length > 0 && (
-                                        <Button variant="destructive" size="sm" onClick={handleResetAll}>
-                                            <Trash size={16} aria-hidden="true" />
-                                            전체 초기화
-                                        </Button>
+                                        <MoreMenu label="기초 정보 메뉴">
+                                            <MoreMenuItem danger onSelect={handleResetAll}>
+                                                <Trash aria-hidden="true" />전체 초기화
+                                            </MoreMenuItem>
+                                        </MoreMenu>
                                     )}
                                 </div>
                                 <p className="text-caption text-soft break-keep">
                                     <strong>양식 A</strong>: 새로 반을 편성할 때 (이전 학년도 반/번호 정보만 필요) &nbsp;|&nbsp;
                                     <strong>양식 B</strong>: 기존 배정안을 수정할 때 (신학년 배정 결과 포함) -
-                                    둘 중 하나에 학생 정보를 붙여넣고 업로드해 주세요.
+                                    둘 중 하나에 학생 정보를 붙여 넣고 넣어 주세요.
                                 </p>
                             </div>
 
@@ -463,7 +459,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                             <ChartBar size={20} className="text-accent" aria-hidden="true" />
                                             엑셀 파일 작성 가이드
                                         </DialogTitle>
-                                        <DialogDescription>학생 데이터 엑셀 파일 작성 방법을 안내합니다.</DialogDescription>
+                                        <DialogDescription>학생 명단 엑셀 파일을 만드는 방법입니다.</DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-6 pt-4">
                                         <Tabs defaultValue="form-a" className="w-full">
@@ -818,7 +814,7 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                                                     <BehaviorPickerHeader />
                                                 </TableHead>
                                                 <TableHead className="text-center">배정반</TableHead>
-                                                <TableHead className="w-[80px] text-center">액션</TableHead>
+                                                <TableHead className="w-[80px] text-center"><span className="sr-only">수정, 삭제</span></TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -843,17 +839,6 @@ export default function Step1Setup({ onNext }: Step1SetupProps) {
                 )
             }
 
-            {/* 다음 단계 버튼 */}
-            <div className="flex justify-end mt-8 border-t pt-6">
-                <Button
-                    size="lg"
-                    onClick={onNext}
-                    disabled={students.length === 0}
-                >
-                    다음: 조건 설정
-                    <ArrowRight size={16} aria-hidden="true" />
-                </Button>
-            </div>
         </div >
     );
 }

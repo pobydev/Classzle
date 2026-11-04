@@ -18,7 +18,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { AppSidebar } from '@/components/shell/AppSidebar';
 import { GuideDialog } from '@/components/shell/GuideDialog';
+import { StepFooter } from '@/components/shell/StepFooter';
 import { TitleBar } from '@/components/shell/TitleBar';
+import { useClasszleStore } from '@/lib/store';
 import { useSavedProjects } from '@/components/shell/useSavedProjects';
 import { useUpdates } from '@/components/shell/useUpdates';
 
@@ -33,6 +35,7 @@ export default function Home() {
   const projects = useSavedProjects({ onLoaded: () => setActiveTab('step1') });
   const leaveStep2 = useRef<(() => Promise<boolean>) | null>(null);
   const updates = useUpdates();
+  const hasStudents = useClasszleStore((state) => state.students.length > 0);
 
   useEffect(() => {
     setMounted(true);
@@ -84,24 +87,37 @@ export default function Home() {
           onOpenGuide={() => setIsGuideOpen(true)}
         />
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-auto">
-          <TabsContent value="step1" className="p-5">
-            <Step1Setup onNext={() => setActiveTab('step2')} />
-          </TabsContent>
+        <div className="flex min-w-0 min-h-0 flex-1 flex-col">
+          <main className="flex-1 min-h-0 overflow-auto">
+            {/* 1단계는 학생 표가 화면 나머지를 차지하고 표 안에서만 스크롤합니다. */}
+            <TabsContent value="step1" className="h-full p-5">
+              <Step1Setup />
+            </TabsContent>
 
-          <TabsContent value="step2" className="p-5">
-            <Step2Constraints
-              onBack={() => changeStep('step1')}
-              onNext={() => changeStep('step3')}
-              leaveGuard={leaveStep2}
+            <TabsContent value="step2" className="p-5">
+              <Step2Constraints leaveGuard={leaveStep2} />
+            </TabsContent>
+
+            {/* 3단계는 도구 줄을 위에 붙이고 보드 높이를 창에 맞추므로 여백을 스스로 둡니다. */}
+            <TabsContent value="step3" className="h-full">
+              <Step3Dashboard onBoardActiveChange={setBoardActive} />
+            </TabsContent>
+          </main>
+
+          {activeTab === 'step1' && (
+            <StepFooter
+              next={{ label: '조건 설정', onClick: () => changeStep('step2'), disabled: !hasStudents }}
+              hint={hasStudents ? undefined : '학생 명단 파일을 넣으면 다음으로 갈 수 있습니다.'}
             />
-          </TabsContent>
-
-          {/* 3단계는 도구 줄을 위에 붙이고 보드 높이를 창에 맞추므로 여백을 스스로 둡니다. */}
-          <TabsContent value="step3">
-            <Step3Dashboard onBack={() => setActiveTab('step2')} onBoardActiveChange={setBoardActive} />
-          </TabsContent>
-        </main>
+          )}
+          {activeTab === 'step2' && (
+            <StepFooter
+              back={{ label: '기초 정보', onClick: () => changeStep('step1') }}
+              next={{ label: '반 편성', onClick: () => changeStep('step3') }}
+            />
+          )}
+          {activeTab === 'step3' && <StepFooter back={{ label: '조건 설정', onClick: () => changeStep('step2') }} />}
+        </div>
       </Tabs>
 
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>

@@ -80,7 +80,7 @@ try {
 
     // 단계 이동
     await page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
-    await page.getByText('330명의 학생 데이터 로드 완료').waitFor({ timeout: 30000 });
+    await page.getByText('학생 330명을 불러왔습니다').waitFor({ timeout: 30000 });
     await page.getByRole('tab', { name: '2단계 조건 설정' }).click();
     await page.getByRole('button', { name: '분리 배정' }).waitFor();
     await shot('2-step2');

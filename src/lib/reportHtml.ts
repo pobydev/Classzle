@@ -203,13 +203,13 @@ export function buildReportHtml({ history, groupStats, relationStats, movementSt
                     ${specialHtml}
                 </div>
 
-                <h2>2. 조건 이행 요약</h2>
+                <h2>2. 지킨 조건 요약</h2>
                 <table class="summary-table">
                     <thead>
                         <tr>
                             <th>구분 (조건)</th>
-                            <th>이행수 / 전체수</th>
-                            <th>이행률(%)</th>
+                            <th>지킨 조건 / 전체</th>
+                            <th>지킨 비율(%)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -224,7 +224,7 @@ export function buildReportHtml({ history, groupStats, relationStats, movementSt
                             <td>${relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</td>
                         </tr>
                         <tr>
-                            <td>고정 배정 학생 이행</td>
+                            <td>고정 배정</td>
                             <td>${specialStats.fixed.filter(s => s.isMet).length} / ${specialStats.fixed.length}</td>
                             <td>${specialStats.fixed.length > 0 ? Math.round((specialStats.fixed.filter(s => s.isMet).length / specialStats.fixed.length) * 100) : 100}%</td>
                         </tr>

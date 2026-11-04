@@ -80,7 +80,7 @@ try {
     checks.push('11 형식이 다른 저장 파일을 알리고 화면이 그대로임');
 
     await page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
-    await page.getByText('330명의 학생 데이터 로드 완료').waitFor({ timeout: 30000 });
+    await page.getByText('학생 330명을 불러왔습니다').waitFor({ timeout: 30000 });
 
     // 1. 저장 이름
     for (const name of ['14:30 저장', '../밖으로']) {
@@ -110,7 +110,8 @@ try {
     await saveAs('Test');
     await dialog.getByRole('button', { name: '덮어쓰기' }).click();
     await page.waitForTimeout(300);
-    await page.getByRole('button', { name: '전체 초기화' }).click();
+    await page.getByRole('button', { name: '기초 정보 메뉴' }).click();
+    await page.getByRole('menuitem', { name: '전체 초기화' }).click();
     await dialog.getByRole('button', { name: '전체 초기화' }).click();
     await page.waitForTimeout(300);
     await expect(page.locator('.titlebar')).not.toContainText('Test');
@@ -123,7 +124,7 @@ try {
     checks.push('2 대소문자만 다른 이름과 초기화 뒤 옛 이름에 덮어쓸지 물음');
 
     await page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
-    await page.getByText('330명의 학생 데이터 로드 완료').waitFor({ timeout: 30000 });
+    await page.getByText('학생 330명을 불러왔습니다').waitFor({ timeout: 30000 });
 
     // 4. 이름 열이 없는 엑셀
     const noName = path.join(profile, '이름없음.xlsx');
@@ -174,7 +175,8 @@ try {
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
     await page.getByRole('tab', { name: /균형 조정/ }).click();
-    await page.getByRole('button', { name: '배정 초기화' }).click();
+    await page.getByRole('button', { name: '반 편성 메뉴' }).click();
+    await page.getByRole('menuitem', { name: '배정 초기화' }).click();
     await dialog.getByRole('button', { name: /초기화/ }).last().click();
     await expect(page.getByRole('tab', { name: /신규 배정/ })).toHaveAttribute('data-state', 'active');
     checks.push('14 배정이 모두 사라지면 탭이 신규로 돌아감');

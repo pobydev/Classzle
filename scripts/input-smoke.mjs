@@ -57,7 +57,7 @@ try {
 
     await page.getByRole('tab', { name: '1단계 기초 정보' }).waitFor({ timeout: 60000 });
     await page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
-    await page.getByText('330명의 학생 데이터 로드 완료').waitFor({ timeout: 30000 });
+    await page.getByText('학생 330명을 불러왔습니다').waitFor({ timeout: 30000 });
 
     // ---- 빠른 입력: 표본의 값을 모두 지운 채로 시작합니다. ----
     await page.evaluate(() => {

@@ -22,14 +22,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, ArrowRight, ArrowsLeftRight, Handshake, Lightbulb, PencilSimple, Plus, Trash } from '@phosphor-icons/react';
+import { ArrowsLeftRight, Handshake, Lightbulb, PencilSimple, Plus, Trash } from '@phosphor-icons/react';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
 
 
 interface Step2ConstraintsProps {
-    onBack: () => void;
-    onNext: () => void;
     // 앱 틀이 이 단계를 떠나기 전에 부릅니다. 머무르기로 하면 false입니다.
     leaveGuard: MutableRefObject<(() => Promise<boolean>) | null>;
 }
@@ -45,7 +43,7 @@ const GROUP_COLORS = [
     { name: '청록', value: 'bg-cyan-200 text-cyan-800' },
 ];
 
-export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2ConstraintsProps) {
+export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) {
     const {
         students,
         groups,
@@ -570,7 +568,7 @@ export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2Co
                                                     </div>
                                                 </div>
                                                 <div className="text-caption text-soft">
-                                                    멤버 {group.member_ids.length}명
+                                                    학생 {group.member_ids.length}명
                                                 </div>
                                                 <div className="text-caption text-soft mt-1 flex flex-wrap gap-1">
                                                     {students
@@ -585,7 +583,7 @@ export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2Co
                                         ))}
                                         {groups.length === 0 && (
                                             <div className="text-center text-soft py-8">
-                                                생성된 그룹이 없습니다.
+                                                만든 그룹이 없습니다.
                                             </div>
                                         )}
                                     </div>
@@ -597,14 +595,14 @@ export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2Co
                                         <div>
                                             <h3 className="font-bold text-emph">
                                                 {selectedGroupId
-                                                    ? `${groups.find(g => g.id === selectedGroupId)?.name} 멤버 관리`
-                                                    : '그룹 멤버 관리'
+                                                    ? `${groups.find(g => g.id === selectedGroupId)?.name} 학생 고르기`
+                                                    : '그룹 학생 고르기'
                                                 }
                                             </h3>
                                             <p className="text-body text-soft">
                                                 {selectedGroupId
                                                     ? '왼쪽 목록에서 학생을 선택하여 추가/제거하고 저장을 눌러 주세요.'
-                                                    : '왼쪽에서 그룹을 선택하면 멤버를 관리할 수 있습니다.'
+                                                    : '왼쪽에서 그룹을 고르면 학생을 넣고 뺄 수 있습니다.'
                                                 }
                                             </p>
                                         </div>
@@ -698,7 +696,7 @@ export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2Co
                                             </div>
                                             {/* 그룹 멤버 목록 */}
                                             <div className="border rounded-input p-2 flex flex-col h-full overflow-hidden">
-                                                <div className="mb-2 font-bold text-body">그룹 멤버 ({tempMemberIds.length}명)</div>
+                                                <div className="mb-2 font-bold text-body">그룹 학생 ({tempMemberIds.length}명)</div>
                                                 <div className="flex-1 overflow-y-auto space-y-1 bg-canvas rounded-card p-2 border">
                                                     {students
                                                         .filter(s => tempMemberIds.includes(s.id))
@@ -1431,23 +1429,6 @@ export default function Step2Constraints({ onBack, onNext, leaveGuard }: Step2Co
                 </DialogContent>
             </Dialog>
 
-            <div className="flex justify-between mt-8 border-t pt-6">
-                <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={onBack}
-                >
-                    <ArrowLeft size={16} aria-hidden="true" />
-                    이전: 기초 정보
-                </Button>
-                <Button
-                    size="lg"
-                    onClick={onNext}
-                >
-                    다음: 반편성 실행
-                    <ArrowRight size={16} aria-hidden="true" />
-                </Button>
-            </div>
         </div >
     );
 }

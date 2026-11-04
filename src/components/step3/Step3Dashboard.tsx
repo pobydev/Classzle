@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
     ArrowClockwise,
     ArrowCounterClockwise,
-    ArrowLeft,
     ChartBar,
     CheckCircle,
     DownloadSimple,
@@ -44,12 +43,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { MoreMenu, MoreMenuItem } from '@/components/common/MoreMenu';
 import { AssignmentReportDialog } from './AssignmentReportDialog';
 import { AssignmentBoard, type BoardSize, type BoardView } from './AssignmentBoard';
 import { BalanceDetailBar, BalanceTable, CriteriaAndStatus } from './BalanceStats';
 
 interface Step3DashboardProps {
-    onBack: () => void;
     // 상세 배치 조정 탭이 열리고 닫힐 때 알립니다. 앱 틀이 사이드바를 접는 데 씁니다.
     onBoardActiveChange?: (active: boolean) => void;
 }
@@ -75,7 +74,7 @@ function useStableCallback<Args extends unknown[], Result>(callback: (...args: A
     return useCallback((...args: Args) => latest.current(...args), []);
 }
 
-export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3DashboardProps) {
+export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardProps) {
     const {
         students, groups, settings,
         applyAssignment, undoLastChange, undoStack,
@@ -235,8 +234,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
             applyAssignment(result.students, assignmentMode === 'new' ? [] : changes, assignmentMode === 'new');
             setIsAssigning(false);
 
-            setIsReportOpen(true); // 결과 리포트 열기
-
+            // 리포트는 교사가 누를 때만 엽니다.
             assignmentNotices(result.moved, result.violations.length).forEach((notice) => toast[notice.kind](notice.text));
         }, 100);
     };
@@ -375,7 +373,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
     const shownView: BoardView = comparePartnerId ? 'two' : view;
 
     return (
-        <div>
+        <div className="h-full">
             <AssignmentReportDialog
                 open={isReportOpen}
                 onOpenChange={setIsReportOpen}
@@ -387,7 +385,7 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
             <Tabs
                 value={tab}
                 onValueChange={handleTabChange}
-                className={`gap-0 ${boardActive ? 'h-[calc(100vh-var(--shell-top,0px))]' : ''}`}
+                className={`gap-0 ${boardActive ? 'h-full' : ''}`}
             >
                 <div data-step3-toolbar className="sticky top-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line bg-card px-3 py-2">
                     <TabsList className="h-8">
@@ -504,9 +502,6 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                                     {hasAssignments ? <ArrowClockwise /> : <Rocket />}
                                     {isAssigning ? '배정 중...' : hasAssignments ? '배정 실행' : '반편성 시작'}
                                 </Button>
-                                <Button variant="destructive" onClick={() => setIsResetConfirmOpen(true)} disabled={!hasAssignments}>
-                                    <Trash />배정 초기화
-                                </Button>
                                 <Button variant="outline" onClick={handleUndo} disabled={undoStack.length === 0}>
                                     <ArrowCounterClockwise />되돌리기
                                 </Button>
@@ -517,13 +512,18 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                                 <Button variant="outline" onClick={() => setIsExportDialogOpen(true)} disabled={!hasAssignments}>
                                     <DownloadSimple />배정 결과 엑셀
                                 </Button>
+                                <MoreMenu label="반 편성 메뉴" size="icon">
+                                    <MoreMenuItem danger disabled={!hasAssignments} onSelect={() => setIsResetConfirmOpen(true)}>
+                                        <Trash aria-hidden="true" />배정 초기화
+                                    </MoreMenuItem>
+                                </MoreMenu>
                             </div>
                         </div>
 
                         <div className="mt-3 flex items-start gap-2 rounded-button bg-wash px-3 py-2 text-small text-accent-ink">
                             <Lightbulb size={16} className="mt-0.5 shrink-0" />
                             {assignmentMode === 'new' ? (
-                                <p><strong>신규 배정:</strong> 남녀 각각 성적순(S자)으로 나눈 뒤 모든 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀, 생활지도, 성적)을 맞춰 처음부터 새로 편성합니다.</p>
+                                <p><strong>신규 배정:</strong> 남녀 각각 성적순으로 한 명씩 돌아가며 나눈 뒤 모든 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀, 생활지도, 성적)을 맞춰 처음부터 새로 편성합니다.</p>
                             ) : assignmentMode === 'optimize' ? (
                                 <p><strong>현재 배정 수정:</strong> 지금 배정을 유지하고 어긴 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀)만 고칩니다. 옮기는 학생을 가장 적게 합니다.</p>
                             ) : (
@@ -536,11 +536,6 @@ export default function Step3Dashboard({ onBack, onBoardActiveChange }: Step3Das
                     <BalanceTable students={students} groups={groups} classCount={settings.classCount} onOpenClass={handleOpenClassFromStats} />
                     <CriteriaAndStatus hasAssignments={hasAssignments} violations={violations} />
 
-                    <div className="border-t border-line pt-4">
-                        <Button variant="outline" onClick={onBack}>
-                            <ArrowLeft />이전: 조건 설정
-                        </Button>
-                    </div>
                 </TabsContent>
             </Tabs>
 

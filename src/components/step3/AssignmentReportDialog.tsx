@@ -300,7 +300,7 @@ export function AssignmentReportDialog({
                                 value="fulfillment"
                                 className="flex-none h-full border-0 border-b-2 border-transparent data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none px-2"
                             >
-                                이행 현황
+                                조건 현황
                             </TabsTrigger>
                             <TabsTrigger
                                 value="movements"
@@ -328,14 +328,14 @@ export function AssignmentReportDialog({
                                     <div className="text-title font-bold">
                                         {relationStats.keepMet} / {relationStats.keepTotal}
                                     </div>
-                                    <p className="text-caption text-soft">쌍별 이행률: {relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</p>
+                                    <p className="text-caption text-soft">지킨 조건 / 전체 조건</p>
                                 </Card>
                                 <Card className="items-center justify-center text-center py-4 gap-1">
                                     <div className="text-body font-medium flex items-center gap-1.5"><ArrowsLeftRight size={16} className="text-danger" aria-hidden="true" />분리 배정</div>
                                     <div className="text-title font-bold">
                                         {relationStats.avoidMet} / {relationStats.avoidTotal}
                                     </div>
-                                    <p className="text-caption text-soft">쌍별 이행률: {relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</p>
+                                    <p className="text-caption text-soft">지킨 조건 / 전체 조건</p>
                                 </Card>
                             </div>
 
