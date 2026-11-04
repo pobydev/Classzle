@@ -79,13 +79,13 @@ describe('교환 추천', () => {
         expect(ids(recommendSwaps('a', students, 2))).not.toContain('b');
     });
 
-    // 남학생 21명을 10점 간격으로 둡니다(r0 100점 ~ r20 300점). 순위가 한 명 차이면 5%p입니다.
-    // 성적 범위가 200점이라 점수 차이 상한은 20점(10%)입니다. 따로 적지 않은 학생은 3반에 둡니다.
+    // 남학생 21명을 10점 간격으로 둡니다(r0 100점 ~ r20 300점).
+    // 성적 범위가 200점이라 점수 차이 상한은 20점(10%), 생활지도 한 칸은 6점(3%)입니다. 따로 적지 않은 학생은 3반에 둡니다.
     const ladder = (placed: Record<number, Partial<Student>>) =>
         Array.from({ length: 21 }, (_, r) =>
             makeStudent({ id: `r${r}`, gender: 'M', academic_score: 100 + r * 10, assigned_class: '3반', ...placed[r] }),
         );
-    // 순위만 따로 보려고 점수를 촘촘히 둡니다. r0~r19는 1점 간격(600~619점)이고 r20만 1000점입니다.
+    // 점수를 촘촘히 둡니다. r0~r19는 1점 간격(600~619점)이고 r20만 1000점입니다.
     // 성적 범위가 400점이라 점수 차이 상한(40점)에 걸리는 학생은 r20뿐입니다.
     const denseLadder = (placed: Record<number, Partial<Student>>) =>
         Array.from({ length: 21 }, (_, r) =>
@@ -129,23 +129,25 @@ describe('교환 추천', () => {
         expect(describeRecommendation(only)).toBe('성적 차이 800점 · 생활지도 다름(없음 → 행-3)');
     });
 
-    it('성적 순위가 가장 비슷한 학생이 1번입니다', () => {
+    it('성적 차이가 가장 작은 학생이 1번입니다', () => {
         const students = ladder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 13: { assigned_class: '2반' } });
         const result = recommendSwaps('r10', students, 3);
         expect(result[0].studentId).toBe('r11');
-        expect(result[0].rankDifference).toBeCloseTo(5);
+        expect(result[0].order).toBeCloseTo(10);
         expect(describeRecommendation(result[0])).toBe('성적 차이 10점 · 생활지도 같음');
     });
 
-    it('생활지도가 같아도 성적 순위가 15%p 넘게 차이 나면 뺍니다', () => {
+    it('성적 순위로는 빼지 않고, 생활지도가 같으면 화면의 성적 차이 순서와 같습니다', () => {
         const students = denseLadder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 14: { assigned_class: '2반' } });
-        const result = recommendSwaps('r10', students, 3);
-        // r7과 r13은 15%p, r6과 r14는 20%p 차이입니다. 점수 차이는 모두 40점 안입니다.
-        expect(ids(result).sort()).toEqual(['r11', 'r12', 'r13', 'r7', 'r8']);
-        result.forEach((r) => expect(r.rankDifference).toBeLessThanOrEqual(15 + 1e-9));
+        const result = recommendSwaps('r10', students, 3, [], 20);
+        // 예전에는 순위 20%p 차이라 빠지던 r6과 r14도 점수 차이 4점이라 나옵니다. r20(390점 차이)만 빠집니다.
+        expect(ids(result)).toEqual(expect.arrayContaining(['r6', 'r14', 'r0', 'r19']));
+        expect(ids(result)).not.toContain('r20');
+        const gaps = result.map((r) => r.scoreDifference);
+        expect(gaps).toEqual([...gaps].sort((a, b) => a - b));
     });
 
-    it('순위가 15%p 안이어도 점수 차이가 같은 성별 성적 범위의 10%를 넘으면 뺍니다', () => {
+    it('점수 차이가 같은 성별 성적 범위의 10%를 넘으면 뺍니다', () => {
         const students = ladder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 13: { assigned_class: '2반' } });
         const result = recommendSwaps('r10', students, 3);
         // 범위 200점의 10%는 20점입니다. r12, r8은 20점이라 남고, r13, r7은 15%p지만 30점이라 빠집니다.
@@ -155,20 +157,20 @@ describe('교환 추천', () => {
         expect(ids(recommendSwaps('r10', students, 3, [], 10, 'score'))).toContain('r13');
     });
 
-    it('생활지도가 한 칸 다르고 성적이 아주 가까운 학생이 생활지도가 같고 성적이 먼 학생보다 앞섭니다', () => {
-        const students = denseLadder({
+    it('생활지도 한 칸은 같은 성별 성적 범위의 3%만큼 점수 차이로 칩니다', () => {
+        const students = ladder({
             10: { assigned_class: '1반' },
             11: { assigned_class: '2반', behavior_type: 'EMOTIONAL', behavior_score: -1 },
-            13: { assigned_class: '2반' },
+            12: { assigned_class: '2반' },
         });
         const result = recommendSwaps('r10', students, 3);
         const order = ids(result);
-        // r11: 한 칸(5) + 5%p = 10. r13: 0칸 + 15%p = 15.
-        expect(order.indexOf('r11')).toBeGreaterThanOrEqual(0);
-        expect(order.indexOf('r11')).toBeLessThan(order.indexOf('r13'));
+        // 범위 200점의 3%는 6점입니다. r9: 10점. r11: 10점 + 6점 = 16. r12: 20점.
+        expect(order.indexOf('r9')).toBeLessThan(order.indexOf('r11'));
+        expect(order.indexOf('r11')).toBeLessThan(order.indexOf('r12'));
         const near = result.find((r) => r.studentId === 'r11')!;
-        expect(near.order).toBeCloseTo(10);
-        expect(describeRecommendation(near)).toBe('성적 차이 1점 · 생활지도 한 칸 차이(없음 → 정-1)');
+        expect(near.order).toBeCloseTo(16);
+        expect(describeRecommendation(near)).toBe('성적 차이 10점 · 생활지도 한 칸 차이(없음 → 정-1)');
     });
 
     it('생활지도가 두 칸 이상 다르면 뺍니다', () => {

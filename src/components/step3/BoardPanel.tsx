@@ -5,7 +5,7 @@ import { CaretRight, CheckCircle, Handshake, Prohibit, WarningCircle, X } from '
 import { Button } from '@/components/ui/button';
 import { HelpTip } from '@/components/common/HelpTip';
 import { MINUS_TOTAL_TITLE, PLUS_TOTAL_TITLE, TOTAL_TITLE } from '@/lib/balanceTable';
-import { describeRecommendation, type RecommendMode, type SwapRecommendation } from '@/lib/recommend';
+import { describeRecommendation, GUIDANCE_STEP_PERCENT, MAX_SCORE_GAP_PERCENT, type RecommendMode, type SwapRecommendation } from '@/lib/recommend';
 import { previousClassOf, sameClass } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
 import type { CustomGroup, Student, Violation } from '@/types';
@@ -278,7 +278,8 @@ function SelectedDetail({
             <div className="mb-1.5 flex items-center gap-1.5">
                 <RecommendModeSwitch mode={recommendMode} onChange={onRecommendModeChange} />
                 <HelpTip label="추천 방식" width={300}>
-                    <p><strong>생활지도까지</strong>: 성적과 생활지도가 닮은 학생만 보여 줍니다. 성적은 같은 성별 안 순위가 15%p 안이고, 점수 차이가 같은 성별 최고점과 최저점 차이의 10% 안이어야 닮은 것으로 봅니다. 바꿔도 -3, -2, 리더가 몰리지 않습니다.</p>
+                    <p><strong>생활지도까지</strong>: 성적과 생활지도가 닮은 학생만 보여 줍니다. 점수 차이가 같은 성별 최고점과 최저점 차이의 {MAX_SCORE_GAP_PERCENT}% 안이고 생활지도가 한 칸 이하로 달라야 합니다. 바꿔도 -3, -2, 리더가 몰리지 않습니다.</p>
+                    <p>순서는 성적 차이가 작은 순입니다. 생활지도가 한 칸 다르면 그 범위의 {GUIDANCE_STEP_PERCENT}%만큼 성적 차이가 더 나는 것으로 칩니다.</p>
                     <p><strong>성적만</strong>: 필수 조건만 지키고 성적이 가까운 순서로 보여 줍니다. 생활지도가 다르거나 몰림이 생기면 줄에 빨간 글로 알려 드리니, 알고 고릅니다.</p>
                 </HelpTip>
             </div>

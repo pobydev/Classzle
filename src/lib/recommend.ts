@@ -2,14 +2,13 @@ import type { CustomGroup, Student } from '@/types';
 import { FULL_WEIGHTS } from './assignment';
 import { compileProblem, resolveClassIndex } from './assignment/problem';
 
-// '생활지도까지'에서 닮은 성적의 기준입니다. 두 가지를 모두 지켜야 닮은 학생입니다.
-// 1. 같은 성별 안 성적 순위(백분위) 차이가 이 값(%p) 이하입니다. 학교마다 점수 단위가 달라 순위로 봅니다.
-export const MAX_RANK_GAP = 15;
-// 2. 점수 차이가 같은 성별 성적 범위(최고 - 최저)의 이 비율(%) 이하입니다.
-//    점수가 드문드문한 끝자리에서는 순위가 가까워도 점수가 크게 벌어지므로 점수로도 막습니다.
+// 추천 순서와 거르는 기준입니다. 모두 같은 성별 성적 범위(최고점 - 최저점)에 대한 비율(%)입니다.
+// 학교마다 점수 단위가 달라 범위에 대한 비율로 정합니다.
+// 1. '생활지도까지'는 점수 차이가 이 비율을 넘는 학생을 뺍니다. 너무 먼 학생을 빼는 기준은 이것 하나입니다.
 export const MAX_SCORE_GAP_PERCENT = 10;
-// 생활지도가 한 칸 다르면 순위 차이 이만큼(%p)으로 칩니다. 두 칸 이상 다르면 추천하지 않습니다.
-export const GUIDANCE_STEP_COST = 5;
+// 2. 생활지도가 한 칸 다르면 순서를 정할 때 이 비율만큼의 점수를 더합니다. 두 칸 이상 다르면 추천하지 않습니다.
+//    예: 범위가 800점이면 한 칸은 24점 차이로 칩니다. 화면의 '성적 차이 n점'과 순서가 어긋나지 않게 점수로 셉니다.
+export const GUIDANCE_STEP_PERCENT = 3;
 
 export interface GuidanceChange {
     from: string;
@@ -23,10 +22,8 @@ export type RecommendMode = 'guidance' | 'score';
 
 export interface SwapRecommendation {
     studentId: string;
-    // 추천 순서 값입니다. 생활지도 칸 수 x GUIDANCE_STEP_COST + 성적 순위 차이(%p). 작을수록 닮은 학생입니다.
+    // 추천 순서 값(점수)입니다. 성적 차이 + 생활지도 한 칸이면 같은 성별 성적 범위의 GUIDANCE_STEP_PERCENT%. 작을수록 닮은 학생입니다.
     order: number;
-    // 같은 성별 안 성적 순위(백분위) 차이입니다. 화면에는 쓰지 않습니다.
-    rankDifference: number;
     // 생활지도 차이. 0칸이면 null, 한 칸이면 고른 학생 → 상대 표시입니다.
     guidanceChange: GuidanceChange | null;
     // 고른 학생과 상대의 성적 차이(점수, 절댓값)입니다. 순서 값이 같을 때 먼저 봅니다.
@@ -144,19 +141,6 @@ export function guidanceSteps(
     return 2;
 }
 
-// 같은 성별 학생 안에서의 성적 순위를 0(가장 낮음)~100(가장 높음)으로 매깁니다. 같은 점수는 같은 순위입니다.
-function percentileRanks(indices: number[], score: Float64Array, out: Float64Array) {
-    const sorted = [...indices].sort((a, b) => score[a] - score[b]);
-    const top = Math.max(1, sorted.length - 1);
-    for (let start = 0; start < sorted.length;) {
-        let end = start;
-        while (end + 1 < sorted.length && score[sorted[end + 1]] === score[sorted[start]]) end++;
-        const value = (((start + end) / 2) / top) * 100;
-        for (let k = start; k <= end; k++) out[sorted[k]] = value;
-        start = end + 1;
-    }
-}
-
 // 배정과 같은 잣대로 추천합니다.
 export const RECOMMEND_WEIGHTS = FULL_WEIGHTS;
 
@@ -166,13 +150,12 @@ export const RECOMMEND_WEIGHTS = FULL_WEIGHTS;
  * - 다른 반, 같은 성별, 같은 전출 예정 여부. 1:1로 바꾸므로 인원과 남녀가 틀어지지 않습니다.
  * - 고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀를 새로 어기지 않습니다.
  * - -3, -2(행동, 정서 유형별 포함)와 리더(+2, 리더 전체)가 고르게 나뉜 범위를 새로 벗어나는 반을 만들지 않습니다.
- * - 같은 성별 안 성적 순위 차이가 MAX_RANK_GAP 이하이고, 점수 차이가 같은 성별 성적 범위의 MAX_SCORE_GAP_PERCENT 이하이며,
- *   생활지도가 한 칸 이하로 다릅니다.
+ * - 점수 차이가 같은 성별 성적 범위의 MAX_SCORE_GAP_PERCENT 이하이고, 생활지도가 한 칸 이하로 다릅니다.
  *   전출 예정 학생끼리는 이 두 가지를 보지 않습니다. 전출 뒤 기준으로 맞추므로 성적과 생활지도가 균형에 들어가지 않기 때문입니다.
- * 순서: 생활지도 칸 수 x GUIDANCE_STEP_COST + 순위 차이가 작은 순, 같으면 성적 차이, 그다음 균형 변화.
+ * 순서: 점수 차이 + (생활지도가 한 칸 다르면 같은 성별 성적 범위의 GUIDANCE_STEP_PERCENT%)가 작은 순, 같으면 성적 차이, 그다음 균형 변화.
  *
  * mode 'score'(성적만)는 다른 반, 같은 성별, 같은 전출 예정 여부, 필수 조건(고정, 분리, 함께, 그룹, 인원, 남녀)만 지키고
- * 성적이 가장 가까운 순으로 찾습니다. 순위 차이와 생활지도 칸 수로 빼지 않고, -3, -2, 리더 몰림으로도 빼지 않는 대신
+ * 성적이 가장 가까운 순으로 찾습니다. 점수 차이와 생활지도 칸 수로 빼지 않고, -3, -2, 리더 몰림으로도 빼지 않는 대신
  * 새로 생기는 몰림을 warnings에 적습니다.
  */
 export function recommendSwaps(
@@ -188,20 +171,20 @@ export function recommendSwaps(
 
     const problem = compileProblem(students, classCount, groups, RECOMMEND_WEIGHTS);
     const { c, classNames, fixedTo, gender, stay, score, meanScore, scoreWeight, guidancePoints, meanGuidance, dims, dimsOf, avoidAdj, keepAdj } = problem;
-    // 남는 학생은 같은 성별의 남는 학생 안에서, 전출 예정 학생은 같은 성별 전체 안에서 순위를 매깁니다.
-    const rank = new Float64Array(students.length);
+    // 같은 성별 성적 범위로 점수 차이 상한과 생활지도 한 칸의 값을 정합니다.
+    // 남는 학생은 같은 성별의 남는 학생 안에서, 전출 예정 학생은 같은 성별 전체 안에서 잽니다.
     const pool = students
         .map((_, i) => i)
         .filter((i) => gender[i] === gender[self] && (stay[self] ? stay[i] === 1 : true));
-    percentileRanks(pool, score, rank);
-    // 같은 성별 성적 범위로 '생활지도까지'의 점수 차이 상한을 정합니다. 순위와 같은 학생 묶음으로 잽니다.
     let poolMin = Infinity;
     let poolMax = -Infinity;
     for (const i of pool) {
         if (score[i] < poolMin) poolMin = score[i];
         if (score[i] > poolMax) poolMax = score[i];
     }
-    const maxScoreGap = pool.length > 0 ? ((poolMax - poolMin) * MAX_SCORE_GAP_PERCENT) / 100 : 0;
+    const scoreRange = pool.length > 0 ? poolMax - poolMin : 0;
+    const maxScoreGap = (scoreRange * MAX_SCORE_GAP_PERCENT) / 100;
+    const guidanceStepScore = (scoreRange * GUIDANCE_STEP_PERCENT) / 100;
     const classOf = students.map((s) => resolveClassIndex(s.assigned_class, classNames));
     const home = classOf[self];
     if (home < 0) return [];
@@ -277,10 +260,9 @@ export function recommendSwaps(
         if (gender[j] !== gender[self] || stay[j] !== stay[self]) return;
 
         // '생활지도까지'는 닮은 학생만 추천합니다. 전출 예정 학생끼리는 보지 않습니다. '성적만'은 이 제한이 없습니다.
-        const rankDifference = Math.abs(rank[self] - rank[j]);
         const steps = guidanceSteps(students[self], candidate);
         const scoreGap = Math.abs(score[self] - score[j]);
-        if (mode === 'guidance' && stay[self] && (rankDifference > MAX_RANK_GAP + 1e-9 || scoreGap > maxScoreGap + 1e-9 || steps > 1)) return;
+        if (mode === 'guidance' && stay[self] && (scoreGap > maxScoreGap + 1e-9 || steps > 1)) return;
 
         // 고정 반을 새로 어기는 교환은 뺍니다.
         if (fixedTo[self] >= 0 && fixedTo[self] !== other) return;
@@ -353,12 +335,11 @@ export function recommendSwaps(
 
         results.push({
             studentId: candidate.id,
-            order: Math.min(steps, 1) * GUIDANCE_STEP_COST + rankDifference,
-            rankDifference,
+            order: scoreGap + Math.min(steps, 1) * guidanceStepScore,
             guidanceChange: steps === 0
                 ? null
                 : { from: guidanceLabel(guidanceCellOf(students[self])), to: guidanceLabel(guidanceCellOf(candidate)), steps },
-            scoreDifference: Math.abs(score[self] - score[j]),
+            scoreDifference: scoreGap,
             balanceChange: hard + soft,
             scoreGapChange: gapBefore === null || gapAfter === null ? 0 : gapAfter - gapBefore,
             warnings: formatWarnings(warnings),
