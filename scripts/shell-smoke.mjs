@@ -144,9 +144,9 @@ try {
     checks.push('삭제도 앱 안의 창으로 묻고, Esc는 취소임. 기본 확인 창 없음');
 
     // 사용 가이드
-    await sidebar.getByRole('button', { name: 'Classzle 사용 가이드' }).click();
+    await sidebar.getByRole('button', { name: '클래스즐 사용 가이드' }).click();
     const guide = page.getByRole('dialog');
-    await expect(guide.getByRole('heading', { name: 'Classzle 사용 가이드' })).toBeVisible();
+    await expect(guide.getByRole('heading', { name: '클래스즐 사용 가이드' })).toBeVisible();
     await expect(guide).toContainText('저장 파일은 암호화되지 않습니다.');
     await expect(guide).toContainText('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.');
     await expect(guide).toContainText('Ctrl + 0');

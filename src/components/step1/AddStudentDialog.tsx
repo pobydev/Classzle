@@ -25,9 +25,9 @@ export function AddStudentDialog({ open, onOpenChange }: { open: boolean; onOpen
     const [draft, setDraft] = useState<Partial<Student>>(EMPTY);
 
     const add = () => {
-        if (!draft.name) return;
+        if (!draft.name?.trim()) return;
         addStudent({
-            name: draft.name,
+            name: draft.name.trim(),
             prev_info: draft.prev_info || '',
             gender: (draft.gender as Gender) || 'M',
             academic_score: draft.academic_score ?? 500,
@@ -111,7 +111,8 @@ export function AddStudentDialog({ open, onOpenChange }: { open: boolean; onOpen
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>취소</Button>
-                    <Button onClick={add}>추가</Button>
+                    {/* 이름이 없으면 눌러도 아무 일이 없으므로 꺼 둡니다. */}
+                    <Button onClick={add} disabled={!draft.name?.trim()} title={draft.name?.trim() ? undefined : '이름을 넣어 주세요'}>추가</Button>
                 </div>
             </DialogContent>
         </Dialog>

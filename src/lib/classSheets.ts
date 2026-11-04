@@ -4,7 +4,7 @@
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import type { BehaviorType, Student } from '@/types';
-import { parseBehaviorDropdown } from './excel';
+import { parseBehaviorDropdown, SCORE_HEADERS } from './excel';
 
 // 앱 전체에서 왼쪽(위)부터 어려운 학생 → 괜찮은 학생 순서입니다.
 export const BEHAVIOR_CRITERIA = [
@@ -159,6 +159,8 @@ export interface ClassSheetFile {
     rows: Record<string, unknown>[];
     /** 생활지도가 모두 빈칸이면 줄에는 나타나지 않으므로 머리글에서 따로 봅니다. */
     hasBehaviorColumn: boolean;
+    /** 성적 칸이 있으면 입력표가 아니라 학생 명단 원본입니다. 입력표에는 성적을 넣지 않습니다. */
+    hasScoreColumn?: boolean;
 }
 
 export interface BehaviorUpdate {
@@ -208,12 +210,16 @@ export function planClassSheetImport(students: Student[], files: ClassSheetFile[
     type Row = { fileName: string; row: Record<string, unknown>; label: string | null };
     const rows: Row[] = [];
     const filesOfClass = new Map<string, Set<string>>();
-    files.forEach(({ fileName, rows: fileRows, hasBehaviorColumn }) => {
+    files.forEach(({ fileName, rows: fileRows, hasBehaviorColumn, hasScoreColumn }) => {
         const dataRows = fileRows.filter((row) =>
             ['학년', '반', '번호', '이름'].some((key) => String(row[key] ?? '').trim() !== ''),
         );
         if (dataRows.length === 0) {
             plan.invalidFiles.push({ fileName, reason: '학생 줄을 찾지 못했습니다.' });
+            return;
+        }
+        if (hasScoreColumn) {
+            plan.invalidFiles.push({ fileName, reason: '성적 칸이 있는 학생 명단 파일입니다. 담임에게 보낸 입력표만 골라 주세요.' });
             return;
         }
         if (!hasBehaviorColumn || !dataRows.some((row) => '이름' in row)) {
@@ -311,5 +317,6 @@ export function readClassSheet(fileName: string, data: ArrayBuffer): ClassSheetF
         fileName,
         rows: XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet),
         hasBehaviorColumn: header.some((cell) => String(cell ?? '').trim() === '생활지도'),
+        hasScoreColumn: header.some((cell) => SCORE_HEADERS.includes(String(cell ?? '').trim())),
     };
 }

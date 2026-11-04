@@ -45,3 +45,19 @@ describe('학생 교환 검사', () => {
         expect(validateSwap('a', 'b', students)).toEqual([]);
     });
 });
+
+describe('반 이름을 눌러 옮길 때 몰림 경고', () => {
+    it('-3이 이미 있는 반으로 -3 학생을 옮기면 알립니다', async () => {
+        const { moveCrowdingWarnings } = await import('@/lib/validation');
+        const { makeStudent } = await import('./helpers/students');
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1반', behavior_type: 'BEHAVIOR', behavior_score: -3 }),
+            makeStudent({ id: 'b', assigned_class: '2반', behavior_type: 'BEHAVIOR', behavior_score: -3 }),
+            makeStudent({ id: 'c', assigned_class: '3반' }),
+            makeStudent({ id: 'd', assigned_class: '3반' }),
+        ];
+        const warnings = moveCrowdingWarnings('b', '1반', students, 3);
+        expect(warnings.map((w) => w.message)).toEqual(['1반에 행동 -3이 몰립니다 (2명).']);
+        expect(moveCrowdingWarnings('b', '3반', students, 3)).toEqual([]);
+    });
+});

@@ -360,8 +360,8 @@ function BalanceDetailButton({ students, groups, classCount, disabled = false }:
                         <Tabs defaultValue="bands" className="gap-3" data-balance-detail>
                             <TabsList>
                                 <TabsTrigger value="bands" className="px-3">성적 분포</TabsTrigger>
-                                <TabsTrigger value="mix" className="px-3">옛 반 섞임</TabsTrigger>
-                                <TabsTrigger value="levels" className="px-3">옛 반 점수 기준</TabsTrigger>
+                                <TabsTrigger value="mix" className="px-3">전 학년 반 섞임</TabsTrigger>
+                                <TabsTrigger value="levels" className="px-3">전 학년 반 점수 기준</TabsTrigger>
                             </TabsList>
                             <TabsContent value="bands"><ScoreBandsTab students={students} groups={groups} classCount={classCount} /></TabsContent>
                             <TabsContent value="mix"><PreviousMixTab students={students} classCount={classCount} /></TabsContent>

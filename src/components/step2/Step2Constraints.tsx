@@ -103,6 +103,10 @@ const GROUP_COLORS = [
     { name: '청록', value: 'bg-cyan-200 text-cyan-800' },
 ];
 
+// 새 그룹의 기본 색은 아직 쓰지 않은 첫 색입니다. 모두 쓰였으면 첫 색을 두고, 추가할 때 다시 묻습니다.
+const freeGroupColor = (groups: CustomGroup[]) =>
+    (GROUP_COLORS.find((c) => !groups.some((g) => g.color === c.value)) ?? GROUP_COLORS[0]).value;
+
 export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) {
     const {
         students,
@@ -461,7 +465,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                 color: newGroup.color,
                 member_ids: [],
             });
-            setNewGroup({ name: '', color: GROUP_COLORS[0].value });
+            setNewGroup({ name: '', color: freeGroupColor(useClasszleStore.getState().groups) });
             setIsGroupDialogOpen(false);
             // 만든 그룹을 바로 골라 왼쪽에서 학생을 넣을 수 있게 합니다.
             const created = useClasszleStore.getState().groups.at(-1);
@@ -602,7 +606,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
         rightTools = (
             <Button variant="outline" size="sm" onClick={() => {
                 setEditingGroup(null);
-                setNewGroup({ name: '', color: GROUP_COLORS[0].value });
+                setNewGroup({ name: '', color: freeGroupColor(groups) });
                 setIsGroupDialogOpen(true);
             }}>
                 <Plus aria-hidden="true" />새 그룹

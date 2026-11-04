@@ -892,7 +892,7 @@ function formatStudentDetails(student: Student, groups: CustomGroup[], allStuden
 
     // 5. 고정 배정
     if (student.fixed_class) {
-        details.push(`${student.fixed_class}고정`);
+        details.push(`${student.fixed_class} 고정`);
     }
 
     if (student.behavior_note) {

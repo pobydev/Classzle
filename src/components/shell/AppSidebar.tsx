@@ -73,7 +73,7 @@ export function AppSidebar({
                 </button>
                 <StepTabs isCollapsed />
                 <div className="flex flex-col gap-1 border-t border-line pt-2">
-                    <button type="button" onClick={() => onCollapsedChange(false)} aria-label="저장된 작업" title="저장된 작업" className={RAIL_BUTTON}>
+                    <button type="button" onClick={() => onCollapsedChange(false)} aria-label="저장한 작업" title="저장한 작업" className={RAIL_BUTTON}>
                         <FolderOpen size={18} />
                     </button>
                     <button type="button" onClick={onSave} aria-label="작업 저장" title="작업 저장" className={RAIL_BUTTON}>
@@ -94,7 +94,7 @@ export function AppSidebar({
                             <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-brand ring-2 ring-card" />
                         </button>
                     )}
-                    <button type="button" onClick={onOpenGuide} aria-label="Classzle 사용 가이드" title="Classzle 사용 가이드" className={RAIL_BUTTON}>
+                    <button type="button" onClick={onOpenGuide} aria-label="클래스즐 사용 가이드" title="클래스즐 사용 가이드" className={RAIL_BUTTON}>
                         <Question size={18} />
                     </button>
                 </div>
@@ -188,7 +188,7 @@ export function AppSidebar({
                 <UpdateNotice updates={updates} />
                 <button type="button" onClick={onOpenGuide} className={SIDE_LINK}>
                     <Question size={16} />
-                    Classzle 사용 가이드
+                    클래스즐 사용 가이드
                     <ArrowRight size={14} className="ml-auto" />
                 </button>
             </div>

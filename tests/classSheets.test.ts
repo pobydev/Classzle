@@ -87,6 +87,14 @@ describe('내보내기', () => {
 });
 
 describe('받기', () => {
+    it('성적 칸이 있는 학생 명단 원본은 입력표로 받지 않습니다', () => {
+        const plan = planClassSheetImport(roster, [
+            { ...file('명단.xlsx', [row(1, 1, '가상가', '정서(-2)')]), hasScoreColumn: true },
+        ]);
+        expect(plan.invalidFiles).toEqual([{ fileName: '명단.xlsx', reason: '성적 칸이 있는 학생 명단 파일입니다. 담임에게 보낸 입력표만 골라 주세요.' }]);
+        expect(plan.updates).toEqual([]);
+    });
+
     it('맞는 학생의 생활지도만 계산합니다', () => {
         const plan = planClassSheetImport(roster, [
             file('1반.xlsx', [row(1, 1, '가상가', '정서(-2)'), row(1, 2, '가상나', '해당없음')]),

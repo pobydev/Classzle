@@ -318,6 +318,8 @@ function SelectedDetail({
                 <p className="text-small text-soft">
                     {!placed
                         ? '미배정 학생은 반 이름을 눌러 옮깁니다.'
+                        : student.fixed_class
+                            ? `${student.fixed_class} 고정 배정이라 바꿀 상대가 없습니다. 바꾸려면 2단계에서 고정 배정을 풀어 주세요.`
                         : recommendMode === 'guidance'
                             ? '생활지도까지 닮은 상대가 없습니다. 성적만을 누르면 성적이 가까운 학생을 볼 수 있습니다.'
                             : '조건에 맞는 상대가 없습니다.'}

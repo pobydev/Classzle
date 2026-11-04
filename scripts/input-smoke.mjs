@@ -263,7 +263,7 @@ try {
     checks.push('11개 반의 값이 반영되고, 이름 오타와 같은 반 파일은 반영되지 않음');
 
     // 받은 뒤 파일은 그대로 두되 앱은 파일을 지우지 않습니다.
-    await page.getByRole('button', { name: 'Classzle 사용 가이드' }).first().click();
+    await page.getByRole('button', { name: '클래스즐 사용 가이드' }).first().click();
     await expect(page.getByRole('dialog')).toContainText('둘 다 있으면 정도를 감안해 하나만 고릅니다');
     await expect(page.getByRole('dialog')).toContainText('반별 입력표 내보내기');
     await page.getByRole('dialog').getByRole('button', { name: '확인', exact: true }).click();

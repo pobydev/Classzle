@@ -44,7 +44,7 @@ export function GuideDialog({
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[760px] max-h-[calc(100vh-32px)] overflow-y-auto gap-6 p-8">
                 <div className="flex flex-col gap-2 pr-6">
-                    <DialogTitle className="text-title font-bold">Classzle 사용 가이드</DialogTitle>
+                    <DialogTitle className="text-title font-bold">클래스즐 사용 가이드</DialogTitle>
                     <DialogDescription className={BODY}>학생 명단을 넣고 다음 학년도 반을 편성하는 순서입니다.</DialogDescription>
                 </div>
 
@@ -63,7 +63,7 @@ export function GuideDialog({
                         <li>양식 B: 이미 나눈 배정안을 고칠 때 씁니다. 신학년 배정 결과를 함께 넣습니다.</li>
                     </ul>
                     <p>
-                        채운 파일을 끌어다 놓거나 <strong className={STRONG}>파일 선택</strong>으로 넣습니다. 열 이름은{' '}
+                        채운 파일을 끌어다 놓거나 <strong className={STRONG}>파일 고르기</strong>로 넣습니다. 열 이름은{' '}
                         <strong className={STRONG}>작성 방법</strong>에 있습니다. 넣은 뒤에는 표에서 고치거나 학생을 추가할 수 있습니다.
                     </p>
                 </Step>
@@ -134,7 +134,7 @@ export function GuideDialog({
                         엑셀은 기본 정보와 상세 정보 중에서 고릅니다. 둘 다 성적과 반 평균이 들어 있고, 상세 정보에는 생활지도,
                         그룹, 관계 조건, 고정 배정이 더 있습니다. 담임 회의와 담당자가 쓰는 파일이므로 학생에게 나눠 주지 말아 주세요.
                     </p>
-                    <p>편성이 모두 끝나면 왼쪽 목록에서 저장된 작업을 지워 주세요.</p>
+                    <p>편성이 모두 끝나면 왼쪽 목록에서 저장한 작업을 지워 주세요.</p>
                 </Step>
 
                 <section className={SECTION} data-guide-shortcuts>

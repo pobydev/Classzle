@@ -2,7 +2,7 @@
 
 // 학생 표의 한 줄. 300명이 넘어도 값 하나를 바꿀 때 바뀐 줄만 다시 그리도록 memo로 둡니다.
 
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { PencilSimple, Trash } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,14 +33,37 @@ function StudentTableRowBase({
     onBehaviorChange: (id: string, type: BehaviorType, score: number) => void;
     onDelete: (id: string) => void;
 }) {
+    // 이름과 성적은 '완료'를 누를 때 넣습니다. 이름을 비우면 완료되지 않고, 성적을 비우면 고치기 전 값으로 둡니다.
+    const [draftName, setDraftName] = useState(student.name);
+    const [draftScore, setDraftScore] = useState(String(student.academic_score));
+    useEffect(() => {
+        if (isEditing) {
+            setDraftName(student.name);
+            setDraftScore(String(student.academic_score));
+        }
+        // 수정을 시작할 때만 지금 값으로 채웁니다.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isEditing]);
+    const nameMissing = draftName.trim() === '';
+    const finish = () => {
+        if (nameMissing) return;
+        const score = scoreFromInput(draftScore);
+        onUpdate(student.id, { name: draftName.trim(), academic_score: score ?? student.academic_score });
+        onEditingChange(null);
+    };
     return (
         <tr className="border-b border-line transition-colors hover:bg-wash focus-within:bg-wash">
             <td className={`${TD} text-soft tabular-nums`}>{index + 1}</td>
             <td className={TD}>
                 {isEditing ? (
                     <Input
-                        value={student.name}
-                        onChange={(e) => onUpdate(student.id, { name: e.target.value })}
+                        value={draftName}
+                        aria-label="이름"
+                        aria-invalid={nameMissing || undefined}
+                        title={nameMissing ? '이름을 넣어 주세요' : undefined}
+                        placeholder="이름"
+                        onChange={(e) => setDraftName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && finish()}
                         className="w-20 h-8 mx-auto text-center"
                     />
                 ) : (
@@ -80,8 +103,11 @@ function StudentTableRowBase({
                     <Input
                         type="number"
                         step="any"
-                        value={student.academic_score}
-                        onChange={(e) => onUpdate(student.id, { academic_score: scoreFromInput(e.target.value) ?? 0 })}
+                        value={draftScore}
+                        aria-label="성적"
+                        placeholder={String(student.academic_score)}
+                        onChange={(e) => setDraftScore(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && finish()}
                         className="w-16 h-8 mx-auto text-center"
                     />
                 ) : (
@@ -101,7 +127,7 @@ function StudentTableRowBase({
             <td className={TD}>
                 <div className="flex gap-1 justify-center">
                     {isEditing ? (
-                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => onEditingChange(null)}>
+                        <Button size="sm" variant="outline" className="h-7 px-2" onClick={finish} disabled={nameMissing} title={nameMissing ? '이름을 넣어 주세요' : undefined}>
                             완료
                         </Button>
                     ) : (

@@ -82,7 +82,7 @@ const shot = async (name) => {
 const notice = () => page.locator('[data-update-notice]');
 const noticeBox = () => notice().locator('../..');
 const guideSection = () => page.locator('[data-update-section]');
-const openGuide = () => page.getByRole('button', { name: 'Classzle 사용 가이드' }).first().click();
+const openGuide = () => page.getByRole('button', { name: '클래스즐 사용 가이드' }).first().click();
 const closeGuide = () => page.getByRole('dialog').getByRole('button', { name: '확인', exact: true }).click();
 const setting = () => page.getByRole('switch', { name: '켤 때 새 버전 확인' });
 

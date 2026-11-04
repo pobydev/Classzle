@@ -1,6 +1,7 @@
 import type { CustomGroup, Student, Violation } from '@/types';
 import { collectViolations, resolveClassIndex, makeClassNames } from './assignment';
 import { sameClass } from './assignment/problem';
+import { calculateBalanceTable, crowdedClasses } from './balanceTable';
 
 function inferClassCount(students: Student[]): number {
     const numbers = students
@@ -62,4 +63,36 @@ export function validateMove(
     if (!student || sameClass(student.assigned_class, className)) return [];
     const count = classCount ?? Math.max(inferClassCount(allStudents), resolveClassIndex(className, makeClassNames(99)) + 1);
     return validateChange({ [studentId]: className }, allStudents, count, groups);
+}
+
+/**
+ * 반 이름을 눌러 학생을 옮길 때 새로 생기는 생활지도 몰림입니다. 통계표의 '!'와 같은 기준입니다.
+ * 꼭 지킬 조건은 아니지만 경고 창에 함께 보여 줍니다. 예: '4반에 행동 -3이 몰립니다 (2명).'
+ */
+export function moveCrowdingWarnings(
+    studentId: string,
+    className: string,
+    students: Student[],
+    classCount: number,
+    groups: CustomGroup[] = [],
+): Violation[] {
+    const student = students.find((s) => s.id === studentId);
+    if (!student || sameClass(student.assigned_class, className)) return [];
+    const itemsOf = (list: Student[]) =>
+        new Set((crowdedClasses(calculateBalanceTable(list, classCount, groups)).find((c) => sameClass(c.className, className))?.items ?? [])
+            .filter((item) => /^(행동|정서) -[23] /.test(item)));
+    const before = itemsOf(students);
+    const after = itemsOf(students.map((s) => (s.id === studentId ? { ...s, assigned_class: className } : s)));
+    return [...after]
+        .filter((item) => !before.has(item))
+        .map((item) => {
+            const [label, count] = [item.replace(/ \d+명$/, ''), item.match(/(\d+)명$/)?.[1]];
+            return {
+                type: 'BEHAVIOR_IMBALANCE' as const,
+                key: `CROWD|${className}|${label}`,
+                message: `${className}에 ${label}${label.endsWith('3') ? '이' : '가'} 몰립니다 (${count}명).`,
+                studentIds: [studentId],
+                className,
+            };
+        });
 }

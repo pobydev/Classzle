@@ -66,7 +66,8 @@ function readStudent(raw: unknown, issues: StudentIssues): Student | null {
 
     const student = {
         ...raw,
-        prev_info: String(raw.prev_info ?? ''),
+        // 1.2.4 파일은 번호 칸이 없던 학생을 '2-1-undefined'로 저장했습니다. 그 부분은 빈칸으로 둡니다.
+        prev_info: String(raw.prev_info ?? '').split('-').map((part) => (part === 'undefined' ? '' : part)).join('-'),
         gender,
         academic_score: score,
         behavior_type: knownType ? type : 'NONE',

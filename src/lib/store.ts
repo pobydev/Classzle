@@ -430,12 +430,15 @@ export const useClasszleStore = create<ClasszleStore>()(
                 groups: state.groups,
                 settings: state.settings,
                 movementHistory: state.movementHistory,
+                // 1단계 요약 줄의 파일 이름도 다시 켰을 때 그대로 보이게 둡니다.
+                sourceName: state.sourceName,
             }) as unknown as ClasszleStore,
             // 저장소의 값도 파일과 같은 검사를 거칩니다. 나쁜 값이 있어도 앱은 켜지고, 고친 내용을 안내합니다.
             merge: (persisted, current) => {
                 const repaired = repairStoredState(persisted);
                 if (!repaired) return current;
-                return { ...current, ...repaired.data, notices: repaired.notices, undoStack: [] };
+                const saved = (persisted as { sourceName?: unknown } | null)?.sourceName;
+                return { ...current, ...repaired.data, sourceName: typeof saved === 'string' ? saved : null, notices: repaired.notices, undoStack: [] };
             },
             onRehydrateStorage: () => (state, error) => {
                 // 스토어가 다 만들어진 다음에 부르도록 미룹니다. 고친 값은 저장소에도 다시 씁니다.

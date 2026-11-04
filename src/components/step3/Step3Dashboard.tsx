@@ -20,7 +20,7 @@ import { useClasszleStore } from '@/lib/store';
 import { assignStudents, collectViolations, type AssignmentMode } from '@/lib/assignment';
 import { assignmentNotices } from '@/lib/assignment/messages';
 import { calculateClassStats } from '@/lib/stats';
-import { validateMove, validateSwap } from '@/lib/validation';
+import { moveCrowdingWarnings, validateMove, validateSwap } from '@/lib/validation';
 import { exportToExcel, studentsLeftOutOfExport } from '@/lib/excel';
 import type { RecommendMode } from '@/lib/recommend';
 import { resolveClassIndex, sameClass } from '@/lib/assignment/problem';
@@ -334,7 +334,7 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
 
     const confirmExport = (includeDetails: boolean) => {
         const timestamp = new Date().toISOString().split('T')[0];
-        exportToExcel(students, settings.classCount, `반편성_결과_${timestamp}.xlsx`, {
+        exportToExcel(students, settings.classCount, `반 편성 결과_${timestamp}.xlsx`, {
             includeDetails,
             groups,
             numberingMethod: settings.numberingMethod
@@ -383,7 +383,11 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
         if (!selectedStudentId) return;
         // 미배정으로 빼는 것은 임시로 두는 일이라 묻지 않습니다.
         if (className) {
-            const moveViolations = validateMove(selectedStudentId, className, students, settings.classCount, groups);
+            // 꼭 지킬 조건에 더해 -3, -2가 몰리는지도 함께 알립니다(추천 목록의 '몰립니다'와 같은 뜻).
+            const moveViolations = [
+                ...validateMove(selectedStudentId, className, students, settings.classCount, groups),
+                ...moveCrowdingWarnings(selectedStudentId, className, students, settings.classCount, groups),
+            ];
             if (moveViolations.length > 0) {
                 setPendingSwap({ s1Id: selectedStudentId, className, violations: moveViolations });
                 return;
@@ -661,7 +665,7 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
                         <DialogTitle className="flex items-center gap-2 text-title-sm font-bold text-danger">
                             <WarningCircle size={22} />조건 위반 알림
                         </DialogTitle>
-                        <DialogDescription>옮기면 새로 어기게 되는 조건을 확인하세요.</DialogDescription>
+                        <DialogDescription>옮기면 새로 어기게 되는 조건을 확인해 주세요.</DialogDescription>
                     </DialogHeader>
                     <p className="text-body font-medium text-ink">
                         {pendingSwap?.s2Id ? '두 학생을 바꾸면' : '이 반으로 옮기면'} 다음 조건을 어깁니다.
@@ -739,9 +743,9 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-title-sm font-bold">
-                            <Trash size={22} className="text-danger" />반편성 초기화
+                            <Trash size={22} className="text-danger" />배정 초기화
                         </DialogTitle>
-                        <DialogDescription>현재 반편성 결과를 초기화합니다.</DialogDescription>
+                        <DialogDescription>지금 배정한 결과를 지웁니다.</DialogDescription>
                     </DialogHeader>
                     <p className="text-body text-ink">
                         모든 학생의 <strong>배정된 반</strong>이 초기화되어 <strong>미배정</strong> 상태가 됩니다.
@@ -758,7 +762,7 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
                                 clearMovements();
                                 clearSelection();
                                 setIsResetConfirmOpen(false);
-                                toast.success('반편성이 초기화되었습니다.');
+                                toast.success('배정을 초기화했습니다. 되돌리기로 돌아올 수 있습니다.');
                             }}
                         >
                             초기화 실행
@@ -777,7 +781,7 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
                         </DialogDescription>
                     </DialogHeader>
                     <p className="rounded-button bg-wash p-3 text-small text-accent-ink">
-                        어긴 조건만 고치려면 취소한 뒤 현재 배정 수정을 고르세요. 새로 배정한 뒤에도 되돌리기로 돌아올 수 있습니다.
+                        어긴 조건만 고치려면 취소한 뒤 현재 배정 수정을 골라 주세요. 새로 배정한 뒤에도 되돌리기로 돌아올 수 있습니다.
                     </p>
                     <div className="flex justify-end gap-2 border-t border-line pt-4">
                         <Button variant="outline" onClick={() => setIsNewConfirmOpen(false)}>취소</Button>

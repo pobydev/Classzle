@@ -203,3 +203,15 @@ describe('앱을 켤 때 저장소 읽기', () => {
         expect(state.settings.classCount).toBe(3);
     });
 });
+
+describe('옛 파일의 빈 번호', () => {
+    it("'2-1-undefined'는 '2-1-'로 읽습니다", async () => {
+        const { parseProjectFile } = await import('@/lib/projectFile');
+        const parsed = parseProjectFile(JSON.stringify({
+            students: [{ id: 'a', name: '가상', prev_info: '2-1-undefined', gender: 'M', academic_score: 500, behavior_score: 0, behavior_type: 'NONE', group_ids: [], avoid_ids: [], keep_ids: [] }],
+            groups: [],
+            settings: { classCount: 2 },
+        }));
+        expect(parsed?.data.students[0].prev_info).toBe('2-1-');
+    });
+});
