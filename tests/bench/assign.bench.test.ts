@@ -36,6 +36,9 @@ function row(label: string, list: (Measure & { moved?: number; ms?: number })[])
         리더없는반: f1(avg(list.map((m) => m.noLeader))),
         이전반: `${f1(avg(list.map((m) => m.previousAvg)))}/${Math.max(...list.map((m) => m.previousMax))}`,
         전출최대: Math.max(...list.map((m) => m.transferMax)),
+        전출전인원: `${f2(avg(list.map((m) => m.beforeCount)))}/${Math.max(...list.map((m) => m.beforeCount))}`,
+        전출전남: `${f2(avg(list.map((m) => m.beforeMale)))}/${Math.max(...list.map((m) => m.beforeMale))}`,
+        전출전여: `${f2(avg(list.map((m) => m.beforeFemale)))}/${Math.max(...list.map((m) => m.beforeFemale))}`,
         초: f2(avg(list.map((m) => m.ms ?? 0)) / 1000),
     };
 }

@@ -71,25 +71,27 @@ describe('13. 새 어김이 있는 교환', () => {
     });
 
     it('어김이 다른 반으로 옮겨 갈 뿐이면 추천하지 않습니다', () => {
-        // 남학생이 1반 3명, 2반 2명, 3반 1명입니다. 2반 여학생과 바꾸면 어김이 2반으로 옮겨 가고, 3반 여학생과 바꿔야 줄어듭니다.
-        const make = (id: string, gender: 'M' | 'F', cn: string) => makeStudent({ id, gender, assigned_class: cn });
+        // 그룹이 1반 3명, 2반 2명, 3반 1명입니다. 2반 학생과 바꾸면 어김이 2반으로 옮겨 가고, 3반 학생과 바꿔야 줄어듭니다.
+        const groups = [{ id: 'g', name: '가상', color: '', member_ids: ['g1', 'g2', 'g3', 'g4', 'g5', 'g6'] }];
+        const make = (id: string, cn: string) => makeStudent({ id, assigned_class: cn });
         const students = [
-            make('m1', 'M', '1반'), make('m2', 'M', '1반'), make('m3', 'M', '1반'), make('f1', 'F', '1반'),
-            make('m4', 'M', '2반'), make('m5', 'M', '2반'), make('f2', 'F', '2반'), make('f3', 'F', '2반'),
-            make('m6', 'M', '3반'), make('f4', 'F', '3반'), make('f5', 'F', '3반'), make('f6', 'F', '3반'),
+            make('g1', '1반'), make('g2', '1반'), make('g3', '1반'), make('a1', '1반'),
+            make('g4', '2반'), make('g5', '2반'), make('b1', '2반'), make('b2', '2반'),
+            make('g6', '3반'), make('c1', '3반'), make('c2', '3반'), make('c3', '3반'),
         ];
-        const list = ids(recommendSwaps('m1', students, 3, [], 12));
-        expect(list).not.toContain('f2');
-        expect(list).not.toContain('f3');
-        expect(list).toEqual(expect.arrayContaining(['f4', 'f5', 'f6']));
+        const list = ids(recommendSwaps('g1', students, 3, groups, 12));
+        expect(list).not.toContain('b1');
+        expect(list).not.toContain('b2');
+        expect(list).toEqual(expect.arrayContaining(['c1', 'c2', 'c3']));
     });
 
-    it('한쪽 어김이 줄어드는 교환은 추천합니다', () => {
+    it('남녀가 어긋나 있어도 다른 성별과는 바꾸지 않습니다', () => {
+        // 1:1 같은 성별 교환만 추천합니다(사용자 결정, 2026-11-04). 남녀를 맞추는 일은 수정이 합니다.
         const students = [
             ...['m1', 'm2', 'm3', 'm4'].map((id) => makeStudent({ id, gender: 'M', assigned_class: '1반' })),
             ...['f1', 'f2', 'f3', 'f4'].map((id) => makeStudent({ id, gender: 'F', assigned_class: '2반' })),
         ];
-        expect(ids(recommendSwaps('m1', students, 2, [], 10)).length).toBeGreaterThan(0);
+        expect(recommendSwaps('m1', students, 2, [], 10)).toEqual([]);
     });
 });
 

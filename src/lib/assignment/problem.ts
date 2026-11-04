@@ -46,6 +46,7 @@ export interface Weights {
     count: number;
     gender: number;
     transfer: number;
+    beforeTransfer: number;
     level3: number;
     level2: number;
     level1: number;
@@ -68,6 +69,8 @@ export interface BalanceDim {
     lo: number;
     hi: number;
     hard: boolean;
+    // -3, -2, 리더처럼 한 반에 몰리면 안 되는 항목입니다. 교환 추천은 이 항목의 범위를 새로 벗어나는 교환을 뺍니다.
+    crowding: boolean;
     // 'single'은 혼자 옮겨야, 'crossGender'는 다른 성별과 바꿔야 줄어드는 항목입니다.
     fix: 'single' | 'crossGender' | 'sameGender';
 }
@@ -176,7 +179,7 @@ export function compileProblem(
     const addDim = (
         members: number[],
         weight: number,
-        options: { hard?: boolean; fix?: BalanceDim['fix'] } = {},
+        options: { hard?: boolean; crowding?: boolean; fix?: BalanceDim['fix'] } = {},
     ) => {
         if (members.length === 0 || weight <= 0) return;
         const id = dims.length;
@@ -185,6 +188,7 @@ export function compileProblem(
             lo: Math.floor(members.length / c),
             hi: Math.ceil(members.length / c),
             hard: options.hard ?? false,
+            crowding: options.crowding ?? false,
             fix: options.fix ?? 'sameGender',
         });
         members.forEach((i) => memberLists[i].push(id));
@@ -196,6 +200,14 @@ export function compileProblem(
     addDim(stayers.filter((i) => gender[i] === 0), weights.gender, { hard: true, fix: 'crossGender' });
     addDim(stayers.filter((i) => gender[i] === 1), weights.gender, { hard: true, fix: 'crossGender' });
     addDim(indices.filter((i) => !stay[i]), weights.transfer);
+    // 남는 선택지 안에서 전출 전 인원과 남녀(전출 예정 학생 포함)도 고르게 합니다.
+    // 예: 남는 학생이 28, 28, 27, 27명이고 전출 예정이 2명이면 27명인 두 반에 넣습니다.
+    // 전출 예정 학생이 없으면 전출 뒤와 같으므로 넣지 않습니다.
+    if (stayers.length < n) {
+        addDim(indices, weights.beforeTransfer);
+        addDim(indices.filter((i) => gender[i] === 0), weights.beforeTransfer);
+        addDim(indices.filter((i) => gender[i] === 1), weights.beforeTransfer);
+    }
 
     for (const group of groups) {
         const members = (group.member_ids ?? [])
@@ -208,18 +220,19 @@ export function compileProblem(
         const value = students[i].behavior_score;
         return level === -3 ? value <= -3 : value === level;
     };
-    addDim(stayers.filter(scoreIs(-3)), weights.level3);
-    addDim(stayers.filter(scoreIs(-2)), weights.level2);
+    const crowding = { crowding: true };
+    addDim(stayers.filter(scoreIs(-3)), weights.level3, crowding);
+    addDim(stayers.filter(scoreIs(-2)), weights.level2, crowding);
     addDim(stayers.filter(scoreIs(-1)), weights.level1);
     // 행동과 정서는 다른 어려움입니다. 등급별 합이 맞아도 한 반에 한 유형만 몰리지 않게 따로 맞춥니다.
     for (const type of ['BEHAVIOR', 'EMOTIONAL'] as const) {
         const ofType = stayers.filter((i) => students[i].behavior_type === type);
-        addDim(ofType.filter(scoreIs(-3)), weights.typeLevel3);
-        addDim(ofType.filter(scoreIs(-2)), weights.typeLevel2);
+        addDim(ofType.filter(scoreIs(-3)), weights.typeLevel3, crowding);
+        addDim(ofType.filter(scoreIs(-2)), weights.typeLevel2, crowding);
         addDim(ofType.filter(scoreIs(-1)), weights.typeLevel1);
     }
-    addDim(stayers.filter((i) => students[i].behavior_type === 'LEADER'), weights.leader);
-    addDim(stayers.filter((i) => students[i].behavior_type === 'LEADER' && students[i].behavior_score >= 2), weights.leaderStrong);
+    addDim(stayers.filter((i) => students[i].behavior_type === 'LEADER'), weights.leader, crowding);
+    addDim(stayers.filter((i) => students[i].behavior_type === 'LEADER' && students[i].behavior_score >= 2), weights.leaderStrong, crowding);
     addDim(stayers.filter((i) => students[i].behavior_type === 'BEHAVIOR'), weights.type);
     addDim(stayers.filter((i) => students[i].behavior_type === 'EMOTIONAL'), weights.type);
 
