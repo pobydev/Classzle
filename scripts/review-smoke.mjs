@@ -203,6 +203,15 @@ try {
     await pickView.getByRole('button', { name: '4반 칸 빼기' }).click();
     await expect(pickView).toHaveAttribute('data-columns', '3');
     await pickView.locator('[data-chip]').first().click();
+    // 추천 방식: 성적만으로 바꾸면 앱 설정에 기억하고, 생활지도까지로 돌려 둡니다.
+    const modeSwitch = page.locator('[data-recommend-mode]');
+    await modeSwitch.getByRole('button', { name: '성적만' }).click();
+    await expect(modeSwitch).toHaveAttribute('data-recommend-mode', 'score');
+    expect(await page.evaluate(() => localStorage.getItem('classzle-recommend-mode'))).toBe('score');
+    await expect(page.locator('[data-rec-row]').first()).toBeVisible();
+    await modeSwitch.getByRole('button', { name: '생활지도까지' }).click();
+    await expect(modeSwitch).toHaveAttribute('data-recommend-mode', 'guidance');
+    checks.push('추천 방식 생활지도까지/성적만 전환, 앱 설정에 기억');
     await page.locator('[data-rec-row]').first().click();
     await expect(pickView).toHaveAttribute('data-columns', '2');
     await expect(pickView.getByRole('button', { name: /칸 빼기$/ })).toHaveCount(0);

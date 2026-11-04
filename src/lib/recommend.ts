@@ -15,6 +15,9 @@ export interface GuidanceChange {
     steps: 1 | 2;
 }
 
+// 추천 방식입니다. 'guidance'(생활지도까지)는 성적과 생활지도가 닮은 학생만, 'score'(성적만)는 성적이 가까운 학생을 찾습니다.
+export type RecommendMode = 'guidance' | 'score';
+
 export interface SwapRecommendation {
     studentId: string;
     // 추천 순서 값입니다. 생활지도 칸 수 x GUIDANCE_STEP_COST + 성적 순위 차이(%p). 작을수록 닮은 학생입니다.
@@ -29,6 +32,8 @@ export interface SwapRecommendation {
     balanceChange: number;
     // 바꾼 뒤 두 반의 전출 뒤 성적 평균 차이가 얼마나 달라지는지입니다. 음수면 차이가 줄어듭니다.
     scoreGapChange: number;
+    // '성적만'에서 바꾸면 새로 생기는 몰림입니다. 예: '7반 -2가 몰립니다'. '생활지도까지'에서는 늘 비어 있습니다.
+    warnings: string[];
 }
 
 // 이보다 작은 변화는 교사가 평균을 볼 때 달라 보이지 않습니다.
@@ -44,13 +49,58 @@ export function describeScoreGapChange(change: number): string {
 }
 
 // 보드 패널의 추천 설명 한 줄입니다. 예: '성적 차이 4.1점 · 생활지도 한 칸 차이(행-2 → 행-1)'.
-export function describeRecommendation(r: Pick<SwapRecommendation, 'scoreDifference' | 'guidanceChange'>): string {
+// '성적만'에서는 생활지도가 조금이라도 다르면 '다름'이라고 씁니다. 몰림 안내는 warnings로 따로 보여 줍니다.
+export function describeRecommendation(
+    r: Pick<SwapRecommendation, 'scoreDifference' | 'guidanceChange'>,
+    mode: RecommendMode = 'guidance',
+): string {
     const change = r.guidanceChange;
     const guidance = !change
         ? '생활지도 같음'
-        : `생활지도 ${change.steps === 1 ? '한 칸 차이' : '다름'}(${change.from} → ${change.to})`;
+        : `생활지도 ${change.steps === 1 && mode === 'guidance' ? '한 칸 차이' : '다름'}(${change.from} → ${change.to})`;
     return `${describeScoreDifference(r.scoreDifference)} · ${guidance}`;
 }
+
+// 몰림 항목의 이름입니다. 배정 코드(problem.ts)의 몰림 항목과 같은 기준으로 학생을 묶어 이름을 붙입니다.
+// 같은 학생 묶음이 여럿이면 앞의 이름(더 넓은 이름)을 씁니다.
+function crowdingLabels(students: Student[], stay: ArrayLike<number>): { label: string; members: string }[] {
+    const ids = (pick: (s: Student) => boolean) =>
+        students.map((s, i) => (stay[i] && pick(s) ? i : -1)).filter((i) => i >= 0).join(',');
+    const level = (s: Student, value: number) => (value === -3 ? s.behavior_score <= -3 : s.behavior_score === value);
+    return [
+        { label: '-3', members: ids((s) => level(s, -3)) },
+        { label: '-2', members: ids((s) => level(s, -2)) },
+        { label: '행동 -3', members: ids((s) => s.behavior_type === 'BEHAVIOR' && level(s, -3)) },
+        { label: '행동 -2', members: ids((s) => s.behavior_type === 'BEHAVIOR' && level(s, -2)) },
+        { label: '정서 -3', members: ids((s) => s.behavior_type === 'EMOTIONAL' && level(s, -3)) },
+        { label: '정서 -2', members: ids((s) => s.behavior_type === 'EMOTIONAL' && level(s, -2)) },
+        { label: '리더', members: ids((s) => s.behavior_type === 'LEADER') },
+        { label: '리더 +2', members: ids((s) => s.behavior_type === 'LEADER' && s.behavior_score >= 2) },
+    ];
+}
+
+interface CrowdingWarning {
+    className: string;
+    label: string;
+    crowded: boolean;
+}
+
+// 같은 반에 '-2'와 '정서 -2'가 함께 몰리면 더 자세한 '정서 -2'만 남깁니다.
+// 리더는 반대로 '리더'가 있으면 '리더 +2'를 뺍니다. 리더가 모자란 것이 더 큰 일입니다.
+function formatWarnings(list: CrowdingWarning[]): string[] {
+    const same = (x: CrowdingWarning, y: CrowdingWarning) => x.className === y.className && x.crowded === y.crowded;
+    const kept = list.filter((w) => {
+        if (w.label === '-3' || w.label === '-2') {
+            return !list.some((o) => same(o, w) && (o.label === `행동 ${w.label}` || o.label === `정서 ${w.label}`));
+        }
+        if (w.label === '리더 +2') return !list.some((o) => same(o, w) && o.label === '리더');
+        return true;
+    });
+    return [...new Set(kept.map((w) => `${w.className} ${withSubject(w.label)} ${w.crowded ? '몰립니다' : '모자랍니다'}`))];
+}
+
+// '-3이', '-2가', '리더가'처럼 받침에 맞춰 조사를 붙입니다.
+const withSubject = (label: string) => `${label}${label.endsWith('3') ? '이' : '가'}`;
 
 // 생활지도를 칸으로 나타냅니다. kind: 0 없음, 1 행동, 2 정서, 3 리더. level: 어려움은 1~3, 리더는 1~2.
 interface GuidanceCell {
@@ -116,6 +166,10 @@ export const RECOMMEND_WEIGHTS = FULL_WEIGHTS;
  * - 같은 성별 안 성적 순위 차이가 MAX_RANK_GAP 이하이고, 생활지도가 한 칸 이하로 다릅니다.
  *   전출 예정 학생끼리는 이 두 가지를 보지 않습니다. 전출 뒤 기준으로 맞추므로 성적과 생활지도가 균형에 들어가지 않기 때문입니다.
  * 순서: 생활지도 칸 수 x GUIDANCE_STEP_COST + 순위 차이가 작은 순, 같으면 성적 차이, 그다음 균형 변화.
+ *
+ * mode 'score'(성적만)는 다른 반, 같은 성별, 같은 전출 예정 여부, 필수 조건(고정, 분리, 함께, 그룹, 인원, 남녀)만 지키고
+ * 성적이 가장 가까운 순으로 찾습니다. 순위 차이와 생활지도 칸 수로 빼지 않고, -3, -2, 리더 몰림으로도 빼지 않는 대신
+ * 새로 생기는 몰림을 warnings에 적습니다.
  */
 export function recommendSwaps(
     studentId: string,
@@ -123,6 +177,7 @@ export function recommendSwaps(
     classCount: number,
     groups: CustomGroup[] = [],
     limit = 10,
+    mode: RecommendMode = 'guidance',
 ): SwapRecommendation[] {
     const self = students.findIndex((s) => s.id === studentId);
     if (self < 0) return [];
@@ -138,6 +193,19 @@ export function recommendSwaps(
     const classOf = students.map((s) => resolveClassIndex(s.assigned_class, classNames));
     const home = classOf[self];
     if (home < 0) return [];
+
+    // '성적만'에서 몰림 안내에 쓸 이름입니다. 몰림 항목마다 학생 묶음을 맞춰 봅니다.
+    const crowdingName = new Map<number, string>();
+    if (mode === 'score') {
+        const members: number[][] = dims.map(() => []);
+        dimsOf.forEach((ds, i) => ds.forEach((d) => members[d].push(i)));
+        const labels = crowdingLabels(students, stay);
+        dims.forEach((dim, d) => {
+            if (!dim.crowding) return;
+            const key = members[d].join(',');
+            crowdingName.set(d, labels.find((l) => l.members === key)?.label ?? '생활지도');
+        });
+    }
 
     const counts = new Int32Array(dims.length * c);
     const stayCount = new Int32Array(c);
@@ -196,10 +264,10 @@ export function recommendSwaps(
         // 같은 성별끼리, 남는 학생은 남는 학생끼리, 전출 예정은 전출 예정끼리 바꿉니다.
         if (gender[j] !== gender[self] || stay[j] !== stay[self]) return;
 
-        // 닮은 학생만 추천합니다. 전출 예정 학생끼리는 보지 않습니다.
+        // '생활지도까지'는 닮은 학생만 추천합니다. 전출 예정 학생끼리는 보지 않습니다. '성적만'은 이 제한이 없습니다.
         const rankDifference = Math.abs(rank[self] - rank[j]);
         const steps = guidanceSteps(students[self], candidate);
-        if (stay[self] && (rankDifference > MAX_RANK_GAP + 1e-9 || steps > 1)) return;
+        if (mode === 'guidance' && stay[self] && (rankDifference > MAX_RANK_GAP + 1e-9 || steps > 1)) return;
 
         // 고정 반을 새로 어기는 교환은 뺍니다.
         if (fixedTo[self] >= 0 && fixedTo[self] !== other) return;
@@ -221,6 +289,7 @@ export function recommendSwaps(
             change.set(d, (change.get(d) ?? 0) - 1);
         }
         let rejected = false;
+        const warnings: CrowdingWarning[] = [];
         change.forEach((amount, d) => {
             if (amount === 0) return;
             const base = d * c;
@@ -236,7 +305,20 @@ export function recommendSwaps(
                 if (worse) rejected = true;
             } else {
                 soft += delta;
-                if (dims[d].crowding && worse) rejected = true;
+                if (dims[d].crowding && worse) {
+                    // '생활지도까지'는 몰림이 새로 생기는 교환을 빼고, '성적만'은 빼지 않고 글로 알립니다.
+                    if (mode === 'guidance') rejected = true;
+                    else {
+                        // 많아지는 쪽은 몰림으로 적고, 적어지는 쪽은 리더일 때만 적습니다. -3, -2가 적어지는 것은 문제가 아닙니다.
+                        const label = crowdingName.get(d) ?? '생활지도';
+                        const note = (cl: number, after: number) => {
+                            if (after > dims[d].hi) warnings.push({ className: classNames[cl], label, crowded: true });
+                            else if (after < dims[d].lo && label.startsWith('리더')) warnings.push({ className: classNames[cl], label, crowded: false });
+                        };
+                        if (homeChange > 0) note(home, va - amount);
+                        if (otherChange > 0) note(other, vb + amount);
+                    }
+                }
             }
         });
         if (rejected) return;
@@ -266,9 +348,12 @@ export function recommendSwaps(
             scoreDifference: Math.abs(score[self] - score[j]),
             balanceChange: hard + soft,
             scoreGapChange: gapBefore === null || gapAfter === null ? 0 : gapAfter - gapBefore,
+            warnings: formatWarnings(warnings),
         });
     });
 
-    results.sort((a, b) => a.order - b.order || a.scoreDifference - b.scoreDifference || a.balanceChange - b.balanceChange);
+    // '성적만'은 성적이 가장 가까운 순, '생활지도까지'는 닮은 순입니다.
+    if (mode === 'score') results.sort((a, b) => a.scoreDifference - b.scoreDifference || a.balanceChange - b.balanceChange);
+    else results.sort((a, b) => a.order - b.order || a.scoreDifference - b.scoreDifference || a.balanceChange - b.balanceChange);
     return results.slice(0, limit);
 }

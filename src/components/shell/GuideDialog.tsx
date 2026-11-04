@@ -114,7 +114,7 @@ export function GuideDialog({
                 <Step number="05" title="결과 다듬기">
                     <p>
                         <strong className={STRONG}>상세 배치 조정</strong>에서 학생을 누르면 바꿀 만한 학생을 오른쪽에 추천합니다. 추천 줄을 누르면
-                        바꾸기 전에 두 반을 비교해 볼 수 있습니다. 학생을 눌러 바로 교환하거나 반 이름을 눌러 옮겨도 됩니다. <strong className={STRONG}>전체 반</strong>은 모든 반을 한 화면에, <strong className={STRONG}>골라 보기</strong>는 고른 2~4개 반을 크게 나란히 보여 줍니다. 잘못 바꾸었으면 <strong className={STRONG}>되돌리기</strong>를 누릅니다.
+                        바꾸기 전에 두 반을 비교해 볼 수 있습니다. 학생을 눌러 바로 교환하거나 반 이름을 눌러 옮겨도 됩니다. 추천은 두 방식 중 고릅니다. <strong className={STRONG}>생활지도까지</strong>는 성적과 생활지도가 닮은 학생만, <strong className={STRONG}>성적만</strong>은 성적이 가까운 학생을 보여 주고 생활지도가 다르거나 몰림이 생기면 글로 알립니다. <strong className={STRONG}>전체 반</strong>은 모든 반을 한 화면에, <strong className={STRONG}>골라 보기</strong>는 고른 2~4개 반을 크게 나란히 보여 줍니다. 잘못 바꾸었으면 <strong className={STRONG}>되돌리기</strong>를 누릅니다.
                     </p>
                 </Step>
 

@@ -15,6 +15,12 @@ describe('배정 뒤 안내', () => {
         expect(assignmentNotices(0, 0)).toEqual([{ kind: 'info', text: '어긴 조건이 없어 옮긴 학생이 없습니다.' }]);
     });
 
+    it('지키지 못한 조건은 화면에 있는 줄 이름으로 안내합니다', () => {
+        const text = assignmentNotices(3, 2)[1].text;
+        expect(text).toContain('지키지 못한 조건');
+        expect(text).not.toContain('조건 준수 현황');
+    });
+
     it('옮겼으면 인원을 말하고 어긴 조건이 있으면 함께 말합니다', () => {
         expect(assignmentNotices(3, 0).map((n) => n.kind)).toEqual(['success']);
         expect(assignmentNotices(3, 1).map((n) => n.kind)).toEqual(['success', 'warning']);

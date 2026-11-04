@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLineDown, Plus, X } from '@phosphor-icons/react';
 import { sameClass } from '@/lib/assignment/problem';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
-import { recommendSwaps } from '@/lib/recommend';
+import { recommendSwaps, type RecommendMode } from '@/lib/recommend';
 import type { calculateClassStats } from '@/lib/stats';
 import { previewSwap } from '@/lib/swapPreview';
 import {
@@ -67,6 +67,8 @@ interface AssignmentBoardProps {
     onPickedChange: (next: string[]) => void;
     query: string;
     showScores: boolean;
+    recommendMode: RecommendMode;
+    onRecommendModeChange: (mode: RecommendMode) => void;
     selectedId: string | null;
     // 비교 중인 상대입니다. 있으면 칸이 고른 학생의 반과 상대의 반 둘로 정해집니다.
     comparePartnerId: string | null;
@@ -128,7 +130,7 @@ function HeadCount({ stat }: { stat?: ClassStat }) {
 
 export function AssignmentBoard({
     students, groups, classNames, numberingMethod, classStats, violations, hasAssignments,
-    view, size, pickedClasses, onPickedChange, query, showScores, selectedId, comparePartnerId,
+    view, size, pickedClasses, onPickedChange, query, showScores, recommendMode, onRecommendModeChange, selectedId, comparePartnerId,
     onChipClick, onHeadClick, onSelect, onCompare, onConfirmCompare, onCancelCompare, onUnassign,
 }: AssignmentBoardProps) {
     const classCount = classNames.length;
@@ -154,8 +156,8 @@ export function AssignmentBoard({
 
     // 고른 학생이 바뀌거나 배정이 바뀔 때만 계산합니다.
     const recommendations = useMemo(
-        () => (selectedId ? recommendSwaps(selectedId, students, classCount, groups) : []),
-        [selectedId, students, classCount, groups],
+        () => (selectedId ? recommendSwaps(selectedId, students, classCount, groups, 10, recommendMode) : []),
+        [selectedId, students, classCount, groups, recommendMode],
     );
     const rankById = useMemo(
         () => new Map(recommendations.map((r, index) => [r.studentId, index + 1])),
@@ -451,6 +453,8 @@ export function AssignmentBoard({
                 comparePartner={comparing ? comparePartner : null}
                 preview={preview}
                 showScores={showScores}
+                recommendMode={recommendMode}
+                onRecommendModeChange={onRecommendModeChange}
                 onPick={onSelect}
                 onClear={() => onSelect(null)}
                 onCompare={onCompare}

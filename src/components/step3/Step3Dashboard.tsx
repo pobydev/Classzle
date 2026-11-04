@@ -23,6 +23,7 @@ import { assignmentNotices } from '@/lib/assignment/messages';
 import { calculateClassStats } from '@/lib/stats';
 import { validateMove, validateSwap } from '@/lib/validation';
 import { exportToExcel, studentsLeftOutOfExport } from '@/lib/excel';
+import type { RecommendMode } from '@/lib/recommend';
 import { resolveClassIndex, sameClass } from '@/lib/assignment/problem';
 import type { AssignmentChange, NumberingMethod, Student, Violation } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,16 @@ interface Step3DashboardProps {
 type DashboardTab = 'stats' | 'board';
 
 const BOARD_SIZE_KEY = 'classzle-board-size';
+// 추천 방식도 이 컴퓨터의 앱 설정에 기억합니다. 저장 파일에는 넣지 않습니다.
+const RECOMMEND_MODE_KEY = 'classzle-recommend-mode';
+
+function readRecommendMode(): RecommendMode {
+    try {
+        return localStorage.getItem(RECOMMEND_MODE_KEY) === 'score' ? 'score' : 'guidance';
+    } catch {
+        return 'guidance';
+    }
+}
 const MIN_PICKED = 2;
 const MAX_PICKED = 4;
 
@@ -115,6 +126,7 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
     const [searchText, setSearchText] = useState('');
     const [showScores, setShowScores] = useState(true);
     const [boardSize, setBoardSize] = useState<BoardSize>(readBoardSize);
+    const [recommendMode, setRecommendMode] = useState<RecommendMode>(readRecommendMode);
     const query = searchText.trim();
 
     const hasAssignments = students.some((s) => s.assigned_class);
@@ -368,6 +380,16 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
         }
     };
 
+    const handleRecommendModeChange = (next: RecommendMode) => {
+        setRecommendMode(next);
+        setComparePartnerId(null);
+        try {
+            localStorage.setItem(RECOMMEND_MODE_KEY, next);
+        } catch {
+            // 저장하지 못해도 지금 창에서는 그대로 씁니다.
+        }
+    };
+
     const handleSelect = useStableCallback((id: string | null) => {
         setSelectedStudentId(id);
         setComparePartnerId(null);
@@ -386,7 +408,7 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
             }
             setPendingSwap(null);
             clearSelection();
-            toast.success('조건을 어기는 변경을 적용했습니다. 조건 준수 현황에 표시됩니다.');
+            toast.success('조건을 어기는 변경을 적용했습니다. 어긴 조건은 오른쪽 목록과 위쪽 조건 어김 표시에 나옵니다.');
         }
     };
 
@@ -493,6 +515,8 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                         onPickedChange={handlePickedChange}
                         query={query}
                         showScores={showScores}
+                        recommendMode={recommendMode}
+                        onRecommendModeChange={handleRecommendModeChange}
                         selectedId={selectedStudentId}
                         comparePartnerId={comparePartnerId}
                         onChipClick={handleChipClick}

@@ -3,8 +3,9 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { CaretRight, CheckCircle, Handshake, Prohibit, WarningCircle, X } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
+import { HelpTip } from '@/components/common/HelpTip';
 import { MINUS_TOTAL_TITLE, PLUS_TOTAL_TITLE, TOTAL_TITLE } from '@/lib/balanceTable';
-import { describeRecommendation, type SwapRecommendation } from '@/lib/recommend';
+import { describeRecommendation, type RecommendMode, type SwapRecommendation } from '@/lib/recommend';
 import { previousClassOf, sameClass } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
 import type { CustomGroup, Student, Violation } from '@/types';
@@ -178,10 +179,33 @@ function RelationList({ kind, student, partnerIds, byId }: {
     );
 }
 
+// 추천 방식 전환입니다. 고른 방식은 앱 설정에 기억합니다.
+function RecommendModeSwitch({ mode, onChange }: { mode: RecommendMode; onChange: (mode: RecommendMode) => void }) {
+    const item = (value: RecommendMode, label: string) => (
+        <button
+            type="button"
+            aria-pressed={mode === value}
+            onClick={() => onChange(value)}
+            className={`h-[24px] cursor-pointer rounded-input px-2 text-caption transition-colors focus-visible:outline-2 ${mode === value ? 'bg-card font-bold text-accent-ink shadow-card' : 'text-soft hover:text-ink'}`}
+        >
+            {label}
+        </button>
+    );
+    return (
+        <div role="group" aria-label="추천 방식" data-recommend-mode={mode} className="inline-flex gap-0.5 rounded-button bg-surface-hover p-[3px]">
+            {item('guidance', '생활지도까지')}
+            {item('score', '성적만')}
+        </div>
+    );
+}
+
 function SelectedDetail({
     student, groups, relations, byId, attendanceNumber, recommendations, comparePartnerId, showScores,
+    recommendMode, onRecommendModeChange,
     onClear, onCompare, onPreviewPartner, onUnassign,
 }: {
+    recommendMode: RecommendMode;
+    onRecommendModeChange: (mode: RecommendMode) => void;
     student: Student;
     groups: CustomGroup[];
     relations: RelationIndex;
@@ -244,16 +268,28 @@ function SelectedDetail({
             <RelationList kind="keep" student={student} partnerIds={relations.keep.get(student.id) ?? []} byId={byId} />
 
             <Heading>바꿔도 조건을 어기지 않는 상대 {recommendations.length}명</Heading>
+            <div className="mb-1.5 flex items-center gap-1.5">
+                <RecommendModeSwitch mode={recommendMode} onChange={onRecommendModeChange} />
+                <HelpTip label="추천 방식" width={300}>
+                    <p><strong>생활지도까지</strong>: 성적과 생활지도가 닮은 학생만 보여 줍니다. 바꿔도 -3, -2, 리더가 몰리지 않습니다.</p>
+                    <p><strong>성적만</strong>: 필수 조건만 지키고 성적이 가까운 학생을 보여 줍니다. 생활지도가 다르거나 몰림이 생기면 줄에 글로 알려 드리니, 알고 고릅니다.</p>
+                </HelpTip>
+            </div>
             {recommendations.length === 0 && (
                 <p className="text-small text-soft">
-                    {placed ? '조건에 맞는 상대가 없습니다.' : '미배정 학생은 반 이름을 눌러 옮깁니다.'}
+                    {!placed
+                        ? '미배정 학생은 반 이름을 눌러 옮깁니다.'
+                        : recommendMode === 'guidance'
+                            ? '생활지도까지 닮은 상대가 없습니다. 성적만을 누르면 성적이 가까운 학생을 볼 수 있습니다.'
+                            : '조건에 맞는 상대가 없습니다.'}
                 </p>
             )}
             <ul className="space-y-1" data-recommendations>
                 {recommendations.map((r, index) => {
                     const partner = byId.get(r.studentId);
                     if (!partner) return null;
-                    const better = r.scoreGapChange <= -0.5;
+                    // 생활지도가 같으면 평소 색, 한 칸 차이나 다름이면 눈에 띄게 둡니다. 글에도 '같음', '한 칸 차이', '다름'이 들어갑니다.
+                    const guidanceDiffers = r.guidanceChange !== null;
                     const current = comparePartnerId === r.studentId;
                     return (
                         <li key={r.studentId}>
@@ -284,9 +320,12 @@ function SelectedDetail({
                                             hasKeep={relations.keep.has(partner.id)}
                                         />
                                     </span>
-                                    <span className={`block text-caption ${better ? 'text-accent-ink' : 'text-soft'}`}>
-                                        {describeRecommendation(r)}
+                                    <span data-rec-guidance={guidanceDiffers ? 'differs' : 'same'} className={`block text-caption ${guidanceDiffers ? 'font-semibold text-accent-ink' : 'text-soft'}`}>
+                                        {describeRecommendation(r, recommendMode)}
                                     </span>
+                                    {r.warnings.map((warning) => (
+                                        <span key={warning} data-rec-warning className="block text-caption font-semibold text-danger">! {warning}</span>
+                                    ))}
                                 </span>
                                 <span className="flex shrink-0 items-center text-caption font-semibold text-accent-ink">
                                     비교<CaretRight size={12} />
@@ -316,7 +355,7 @@ function EmptyDetail({ hasAssignments, violations, found, onPick }: {
     return (
         <>
             <h2 className="text-emph font-bold text-ink">학생을 눌러 주세요</h2>
-            <p className="mt-0.5 text-small text-soft">바꿔도 조건을 어기지 않는 상대를 균형이 좋아지는 순서로 보여 드립니다.</p>
+            <p className="mt-0.5 text-small text-soft">바꿔도 조건을 어기지 않는 상대를 보여 드립니다. 생활지도까지 닮은 학생과 성적만 가까운 학생 중에서 고를 수 있습니다.</p>
 
             {found.length > 0 && (
                 <>
@@ -371,6 +410,8 @@ interface BoardPanelProps {
     comparePartner: Student | null;
     preview: SwapPreview | null;
     showScores: boolean;
+    recommendMode: RecommendMode;
+    onRecommendModeChange: (mode: RecommendMode) => void;
     onPick: (id: string) => void;
     onClear: () => void;
     onCompare: (partnerId: string) => void;
@@ -382,7 +423,7 @@ interface BoardPanelProps {
 
 export function BoardPanel({
     student, groups, relations, byId, attendanceNumber, recommendations,
-    hasAssignments, violations, found, comparePartner, preview, showScores,
+    hasAssignments, violations, found, comparePartner, preview, showScores, recommendMode, onRecommendModeChange,
     onPick, onClear, onCompare, onPreviewPartner, onConfirmCompare, onCancelCompare, onUnassign,
 }: BoardPanelProps) {
     const ref = useRef<HTMLElement>(null);
@@ -420,6 +461,8 @@ export function BoardPanel({
                     recommendations={recommendations}
                     comparePartnerId={comparePartner?.id ?? null}
                     showScores={showScores}
+                    recommendMode={recommendMode}
+                    onRecommendModeChange={onRecommendModeChange}
                     onClear={onClear}
                     onCompare={onCompare}
                     onPreviewPartner={onPreviewPartner}
