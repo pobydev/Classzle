@@ -68,26 +68,26 @@ const GUIDANCE: { type: 'BEHAVIOR' | 'EMOTIONAL' | 'LEADER'; title: string; valu
         type: 'BEHAVIOR',
         title: '행동',
         values: [
-            { text: '행동(-3)', tone: 'level3', meaning: '심각한 방해, 학교폭력 등 집중 관리 필요' },
-            { text: '행동(-2)', tone: 'level2', meaning: '잦은 방해, 지속적 지도 필요' },
-            { text: '행동(-1)', tone: 'level1', meaning: '가벼운 딴짓, 관심 필요' },
+            { text: '행동(-3)', tone: 'b3', meaning: '심각한 방해, 학교폭력 등 집중 관리 필요' },
+            { text: '행동(-2)', tone: 'b2', meaning: '잦은 방해, 지속적 지도 필요' },
+            { text: '행동(-1)', tone: 'b1', meaning: '가벼운 딴짓, 관심 필요' },
         ],
     },
     {
         type: 'EMOTIONAL',
         title: '정서',
         values: [
-            { text: '정서(-3)', tone: 'level3', meaning: '특별한 케어/전문가 개입 필요' },
-            { text: '정서(-2)', tone: 'level2', meaning: '교우관계/정서 지원 필요' },
-            { text: '정서(-1)', tone: 'level1', meaning: '다소 예민함, 배려 필요' },
+            { text: '정서(-3)', tone: 'e3', meaning: '특별한 케어/전문가 개입 필요' },
+            { text: '정서(-2)', tone: 'e2', meaning: '교우관계/정서 지원 필요' },
+            { text: '정서(-1)', tone: 'e1', meaning: '다소 예민함, 배려 필요' },
         ],
     },
     {
         type: 'LEADER',
         title: '리더',
         values: [
-            { text: '리더(+1)', tone: 'leader', meaning: '모범적이고 성실한 학생' },
-            { text: '리더(+2)', tone: 'leader', meaning: '리더십이 탁월한 학생 (회장감)' },
+            { text: '리더(+1)', tone: 'l1', meaning: '모범적이고 성실한 학생' },
+            { text: '리더(+2)', tone: 'l2', meaning: '리더십이 탁월한 학생 (회장감)' },
         ],
     },
 ];

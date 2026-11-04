@@ -36,8 +36,22 @@
   --color-danger: var(--danger);
   --color-danger-wash: var(--danger-wash);
   --color-overlay: var(--overlay);
-  --color-guidance-strong: var(--guidance-strong);
-  --color-guidance-soft: var(--guidance-soft);
+  --color-guidance-b1: var(--guidance-b1);
+  --color-guidance-b1-ink: var(--guidance-b1-ink);
+  --color-guidance-b2: var(--guidance-b2);
+  --color-guidance-b2-ink: var(--guidance-b2-ink);
+  --color-guidance-b3: var(--guidance-b3);
+  --color-guidance-b3-ink: var(--guidance-b3-ink);
+  --color-guidance-e1: var(--guidance-e1);
+  --color-guidance-e1-ink: var(--guidance-e1-ink);
+  --color-guidance-e2: var(--guidance-e2);
+  --color-guidance-e2-ink: var(--guidance-e2-ink);
+  --color-guidance-e3: var(--guidance-e3);
+  --color-guidance-e3-ink: var(--guidance-e3-ink);
+  --color-guidance-l1: var(--guidance-l1);
+  --color-guidance-l1-ink: var(--guidance-l1-ink);
+  --color-guidance-l2: var(--guidance-l2);
+  --color-guidance-l2-ink: var(--guidance-l2-ink);
 
   /* 화면 글자 8단계 */
   --text-micro: 11px;
@@ -116,10 +130,25 @@
   --danger-wash: #fdeeee;
   --overlay: rgba(30, 42, 74, 0.36);
 
-  /* 보드 학생 칸의 생활지도 바탕 (Classzle 전용, 2026-11-04 사용자 승인).
-     -3은 진한, -2는 옅은 따뜻한 바탕이고 행동과 정서는 같은 색입니다. 늘 배지 글자와 함께 씁니다. */
-  --guidance-strong: #fcd9b6;
-  --guidance-soft: #fff1e3;
+  /* 생활지도 색 (Classzle 전용, 2026-11-05 사용자 결정, brand/Classzle-다음수정.md 2-6).
+     종류마다 색(행동 흙 주황, 정서 보라, 리더 초록)이고 정도가 클수록 진합니다. 늘 '행-2' 같은 글자와 함께 씁니다.
+     빨강(분리 배정, 못 지킨 조건)과 하늘색(고른 학생, 추천)과 겹치지 않는 톤입니다. 흰 글자 바탕 셋은 명암비 4.5 이상. */
+  --guidance-b1: #f4e8da;
+  --guidance-b1-ink: #7a4e22;
+  --guidance-b2: #e6c29b;
+  --guidance-b2-ink: #5e3814;
+  --guidance-b3: #a8582a;
+  --guidance-b3-ink: #ffffff;
+  --guidance-e1: #ece7f3;
+  --guidance-e1-ink: #5b4880;
+  --guidance-e2: #cdbfe3;
+  --guidance-e2-ink: #3f2d66;
+  --guidance-e3: #6c4f9e;
+  --guidance-e3-ink: #ffffff;
+  --guidance-l1: #e2efe6;
+  --guidance-l1-ink: #2f6142;
+  --guidance-l2: #3f7a55;
+  --guidance-l2-ink: #ffffff;
 
   --radius: 10px;
 

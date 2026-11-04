@@ -3,26 +3,27 @@
 import { memo, type ReactNode } from 'react';
 import { Handshake, Prohibit } from '@phosphor-icons/react';
 import type { CustomGroup, Student } from '@/types';
-import { behaviorMark, groupsOf, type MarkTone } from './boardModel';
+import { behaviorMark, groupsOf, guidanceTone, isDarkTone, TONE_CLASS, type GuidanceTone, type MarkTone } from './boardModel';
 
-const TONE_CLASS: Record<MarkTone, string> = {
-    level3: 'bg-danger-wash text-danger',
-    level2: 'bg-surface-hover text-danger',
-    level1: 'bg-surface-hover text-ink',
-    leader: 'bg-tint text-accent-ink',
-    plain: 'bg-surface-hover text-ink',
+// 표시가 놓이는 바탕입니다. 생활지도 색을 칠한 칸 위에서는 표시를 반투명 흰 바탕으로 둡니다(진한 칸은 흰 글자).
+export type MarkSurface = 'plain' | 'light' | 'dark';
+const SURFACE_CLASS: Record<Exclude<MarkSurface, 'plain'>, string> = {
+    light: 'bg-white/55 text-inherit',
+    dark: 'bg-white/20 text-white',
 };
 
-export function Mark({ tone = 'plain', className, title, children }: {
+export function Mark({ tone = 'plain', surface = 'plain', className, title, children }: {
     tone?: MarkTone;
+    surface?: MarkSurface;
     className?: string;
     title?: string;
     children: ReactNode;
 }) {
+    const toneClass = surface !== 'plain' ? SURFACE_CLASS[surface] : tone === 'plain' ? 'bg-surface-hover text-ink' : TONE_CLASS[tone];
     return (
         <span
             title={title}
-            className={`inline-flex h-[calc(var(--chip-mark,11px)+5px)] shrink-0 items-center rounded-full px-[3px] text-[length:var(--chip-mark,11px)] leading-none font-bold whitespace-nowrap ${className ?? TONE_CLASS[tone]}`}
+            className={`inline-flex h-[calc(var(--chip-mark,11px)+5px)] shrink-0 items-center rounded-full px-[3px] text-[length:var(--chip-mark,11px)] leading-none font-bold whitespace-nowrap ${className ?? toneClass}`}
         >
             {children}
         </span>
@@ -37,21 +38,24 @@ export function RankBadge({ rank, className = '' }: { rank: number; className?: 
     );
 }
 
-export function StudentMarks({ student, groups, hasAvoid, hasKeep }: {
+// surface: 칠한 칸 위에 놓으면 'light'나 'dark'입니다. 따로 놓으면(패널, 안내) 'plain'이고 생활지도 표시에 그 색을 씁니다.
+// 그룹 첫 글자는 어느 바탕에서도 그룹 색 그대로 둡니다.
+export function StudentMarks({ student, groups, hasAvoid, hasKeep, surface = 'plain' }: {
     student: Student;
     groups: CustomGroup[];
     hasAvoid: boolean;
     hasKeep: boolean;
+    surface?: MarkSurface;
 }) {
     const behavior = behaviorMark(student);
     return (
         <>
-            {behavior && <Mark tone={behavior.tone} title={behavior.label}>{behavior.text}</Mark>}
+            {behavior && <Mark tone={behavior.tone} surface={surface} title={behavior.label}>{behavior.text}</Mark>}
             {/* 표시에 마우스를 올리면 짧은 뜻이 나옵니다. 모아 본 뜻은 보드 위 ? 에 있습니다. */}
-            {student.fixed_class && <Mark title={`고정 배정 (${student.fixed_class})`}>고</Mark>}
-            {hasAvoid && <Mark title="분리 배정">분</Mark>}
-            {hasKeep && <Mark title="함께 배정">함</Mark>}
-            {student.is_pre_transfer && <Mark title="전출 예정">전</Mark>}
+            {student.fixed_class && <Mark surface={surface} title={`고정 배정 (${student.fixed_class})`}>고</Mark>}
+            {hasAvoid && <Mark surface={surface} title="분리 배정">분</Mark>}
+            {hasKeep && <Mark surface={surface} title="함께 배정">함</Mark>}
+            {student.is_pre_transfer && <Mark surface={surface} title="전출 예정">전</Mark>}
             {groupsOf(student, groups).map((g) => (
                 <Mark key={g.id} className={g.color} title={`그룹: ${g.name}`}>{g.name.slice(0, 1)}</Mark>
             ))}
@@ -82,23 +86,14 @@ interface StudentChipProps {
     onSelect: (id: string) => void;
 }
 
-// 생활지도 바탕: -3은 진한, -2는 옅은 따뜻한 바탕입니다. -1과 리더는 바탕 없이 배지만 씁니다.
-export type ChipLevel = 'strong' | 'soft' | null;
-export function chipLevelOf(student: Pick<Student, 'behavior_type' | 'behavior_score'>): ChipLevel {
-    if (student.behavior_type === 'LEADER' || student.behavior_type === 'NONE') return null;
-    if (student.behavior_score <= -3) return 'strong';
-    if (student.behavior_score === -2) return 'soft';
-    return null;
-}
-export const LEVEL_BG: Record<Exclude<ChipLevel, null>, string> = {
-    strong: 'bg-guidance-strong',
-    soft: 'bg-guidance-soft',
-};
+// 생활지도 바탕(A안, 2026-11-05): 학생 칸 전체를 종류의 색으로, 정도가 클수록 진하게 칠합니다. -1과 리+1도 아주 옅게 칠합니다.
+export type ChipLevel = GuidanceTone | null;
+export const chipLevelOf = guidanceTone;
 
 // 생활지도 바탕이 있는 칩은 바탕을 그대로 두고 테두리와 고리로만 상태를 보여 줍니다.
-// 그래서 고른 학생, 추천, 비교 상대도 -3, -2 바탕과 함께 알아볼 수 있습니다.
+// 그래서 고른 학생, 추천, 비교 상대도 생활지도 색과 함께 알아볼 수 있습니다.
 function stateClass({ selected, rank, relation, found, emphasized, partner }: StudentChipProps, level: ChipLevel): string {
-    const bg = (state: string) => (level ? LEVEL_BG[level] : state);
+    const bg = (state: string) => (level ? TONE_CLASS[level] : state);
     if (selected) return `border-accent ring-2 ring-accent ${bg('bg-tint')}`;
     if (partner) return `border-dashed border-accent ring-2 ring-accent ${bg('bg-tint')}`;
     const recommended = rank !== null;
@@ -109,7 +104,7 @@ function stateClass({ selected, rank, relation, found, emphasized, partner }: St
     if (relation === 'keep') return `${line} border-ink ${bg('bg-surface-hover')}${emphasis}`;
     if (recommended) return `border-dashed border-accent ${bg(emphasized ? 'bg-tint' : 'bg-wash')}${emphasis}`;
     if (found) return `border-accent-ink ${bg('bg-tint')}`;
-    return level ? `border-transparent ${LEVEL_BG[level]} hover:border-hairline` : 'border-transparent hover:bg-surface-hover';
+    return level ? `border-transparent ${TONE_CLASS[level]} hover:border-ink/40` : 'border-transparent hover:bg-surface-hover';
 }
 
 export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
@@ -119,7 +114,10 @@ export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
     } = props;
     const gender = student.gender === 'M' ? '남' : '여';
     const level = chipLevelOf(student);
-    const isLeader = student.behavior_type === 'LEADER' && student.behavior_score > 0;
+    const dark = isDarkTone(level);
+    // 칠한 칸에서는 이름이 칸의 글자색을 따르고, 진한 칸은 이름 굵게 흰색, 성별과 점수는 옅은 흰색입니다.
+    const subText = dark ? 'text-white/85' : 'text-soft';
+    const surface: MarkSurface = !level ? 'plain' : dark ? 'dark' : 'light';
     const relationLabel = relation === 'avoid' ? '분리 배정 상대' : relation === 'keep' ? '함께 배정 상대' : null;
     const title = [
         student.name,
@@ -159,24 +157,23 @@ export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
             {wide && (
                 <span className="w-6 shrink-0 text-right text-caption text-soft tabular-nums">{attendanceNumber ?? ''}</span>
             )}
-            {/* 이름은 줄이지 않습니다. 칸보다 긴 이름만 말줄임이 됩니다. 리더는 이름 앞에 ★를 둡니다. */}
-            <span className={`max-w-full shrink-0 truncate font-medium text-ink ${wide ? 'ml-1' : ''}`}>
-                {isLeader && <span className="mr-px text-accent" aria-hidden="true">★</span>}
+            {/* 이름은 줄이지 않습니다. 칸보다 긴 이름만 말줄임이 됩니다. */}
+            <span className={`max-w-full shrink-0 truncate ${dark ? 'font-bold text-white' : level ? 'font-medium' : 'font-medium text-ink'} ${wide ? 'ml-1' : ''}`}>
                 {student.name}
             </span>
-            <span className={`shrink-0 text-soft ${wide ? 'text-caption' : 'text-[length:var(--chip-sub,12px)]'}`}>{gender}</span>
+            <span className={`shrink-0 ${subText} ${wide ? 'text-caption' : 'text-[length:var(--chip-sub,12px)]'}`}>{gender}</span>
             {showScore && !wide && (
-                <span data-chip-score className="shrink-0 text-[length:var(--chip-sub,12px)] text-soft tabular-nums">
+                <span data-chip-score className={`shrink-0 text-[length:var(--chip-sub,12px)] ${subText} tabular-nums`}>
                     {/* 좁은 칸에서는 정수로 줄입니다. 소수점까지는 칩의 도움말, 패널, 두 반 보기에 나옵니다. */}
                     <span className="@min-[160px]:hidden">{Math.round(student.academic_score)}</span>
                     <span className="hidden @min-[160px]:inline">{student.academic_score}</span>
                 </span>
             )}
-            <StudentMarks student={student} groups={groups} hasAvoid={hasAvoid} hasKeep={hasKeep} />
+            <StudentMarks student={student} groups={groups} hasAvoid={hasAvoid} hasKeep={hasKeep} surface={surface} />
             {wide && selected && <Mark className="bg-accent text-white">선택</Mark>}
             {wide && partner && <Mark className="bg-accent text-white">상대</Mark>}
             {showScore && wide && (
-                <span data-chip-score className="ml-auto shrink-0 pr-1 text-caption text-soft tabular-nums">{student.academic_score}점</span>
+                <span data-chip-score className={`ml-auto shrink-0 pr-1 text-caption ${subText} tabular-nums`}>{student.academic_score}점</span>
             )}
         </button>
     );

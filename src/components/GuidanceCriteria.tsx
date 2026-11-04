@@ -4,6 +4,7 @@
 import { ONE_VALUE_RULE } from '@/lib/classSheets';
 import { BehaviorIcon } from '@/components/BehaviorChip';
 import type { BehaviorType } from '@/types';
+import { guidanceTone, TONE_CLASS } from '@/components/step3/boardModel';
 
 export const GUIDANCE_CRITERIA: { type: Exclude<BehaviorType, 'NONE'>; title: string; items: { level: string; text: string }[] }[] = [
     {
@@ -47,7 +48,9 @@ export function GuidanceCriteria({ only }: { only?: Exclude<BehaviorType, 'NONE'
                     <ul className="space-y-0.5 pl-5">
                         {group.items.map((item) => (
                             <li key={item.level}>
-                                <span className="inline-block w-6 font-semibold tabular-nums">{item.level}</span>
+                                <span className="mr-1.5 inline-block w-7">
+                                    <span className={`inline-flex rounded-[4px] px-1 font-semibold tabular-nums ${TONE_CLASS[guidanceTone({ behavior_type: group.type, behavior_score: Number(item.level) })!]}`}>{item.level}</span>
+                                </span>
                                 {item.text}
                             </li>
                         ))}

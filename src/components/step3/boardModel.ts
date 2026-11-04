@@ -5,7 +5,32 @@ export const UNASSIGNED = '미배정';
 
 const compareNames = new Intl.Collator('ko').compare;
 
-export type MarkTone = 'level3' | 'level2' | 'level1' | 'leader' | 'plain';
+// 생활지도 색 단계입니다(globals.css의 --guidance-*). b는 행동, e는 정서, l은 리더이고 숫자가 클수록 진합니다.
+export type GuidanceTone = 'b1' | 'b2' | 'b3' | 'e1' | 'e2' | 'e3' | 'l1' | 'l2';
+export type MarkTone = GuidanceTone | 'plain';
+
+// 바탕과 글자를 함께 칠합니다. 1단계 버튼, 보드 칸과 배지, 반 머리, 안내 창이 같은 값을 씁니다.
+export const TONE_CLASS: Record<GuidanceTone, string> = {
+    b1: 'bg-guidance-b1 text-guidance-b1-ink',
+    b2: 'bg-guidance-b2 text-guidance-b2-ink',
+    b3: 'bg-guidance-b3 text-guidance-b3-ink',
+    e1: 'bg-guidance-e1 text-guidance-e1-ink',
+    e2: 'bg-guidance-e2 text-guidance-e2-ink',
+    e3: 'bg-guidance-e3 text-guidance-e3-ink',
+    l1: 'bg-guidance-l1 text-guidance-l1-ink',
+    l2: 'bg-guidance-l2 text-guidance-l2-ink',
+};
+
+// 흰 글자를 쓰는 진한 단계입니다(-3, 리+2).
+export const isDarkTone = (tone: GuidanceTone | null | undefined) => tone === 'b3' || tone === 'e3' || tone === 'l2';
+
+export function guidanceTone(student: Pick<Student, 'behavior_type' | 'behavior_score'>): GuidanceTone | null {
+    const { behavior_type: type, behavior_score: score } = student;
+    if (type === 'LEADER') return score >= 2 ? 'l2' : score >= 1 ? 'l1' : null;
+    if (type !== 'BEHAVIOR' && type !== 'EMOTIONAL' || score >= 0) return null;
+    const level = Math.min(3, -score) as 1 | 2 | 3;
+    return `${type === 'BEHAVIOR' ? 'b' : 'e'}${level}` as GuidanceTone;
+}
 
 export interface BehaviorMark {
     text: string;
@@ -20,8 +45,8 @@ export function behaviorMark(student: Pick<Student, 'behavior_type' | 'behavior_
     const { behavior_type: type, behavior_score: score } = student;
     if (type === 'NONE' || !score) return null;
     const value = signed(score);
-    if (type === 'LEADER') return { text: `리${value}`, label: `리더 ${value}`, tone: 'leader' };
-    const tone: MarkTone = score <= -3 ? 'level3' : score === -2 ? 'level2' : 'level1';
+    const tone: MarkTone = guidanceTone(student) ?? 'plain';
+    if (type === 'LEADER') return { text: `리${value}`, label: `리더 ${value}`, tone };
     return type === 'BEHAVIOR'
         ? { text: `행${value}`, label: `행동 ${value}`, tone }
         : { text: `정${value}`, label: `정서 ${value}`, tone };

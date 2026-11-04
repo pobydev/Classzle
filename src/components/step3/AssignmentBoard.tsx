@@ -98,7 +98,7 @@ function HeadFigures({ stat, moveHere = false }: { stat?: ClassStat; moveHere?: 
     );
 }
 
-// 반 머리의 생활지도 한 줄입니다. 전출 뒤 기준입니다.
+// 반 머리의 생활지도 한 줄입니다. 전출 뒤 기준입니다. -3, -2는 행동과 정서를 합쳐 세므로 회색 이름표, 리더는 리+1과 같은 초록 이름표입니다.
 // 이름표와 숫자를 작은 칸 하나로 묶어 '-3 0 -2 3'이 '-30 -23'처럼 읽히지 않게 합니다.
 // 0은 옅은 글자(--soft, 4.5:1 이상)로 두고, 통계표에서 기준을 넘은 값은 빨간 바탕과 '!'로 표시합니다.
 function HeadLevels({ stat, flags }: { stat?: ClassStat; flags?: HeadFlags }) {
@@ -106,7 +106,7 @@ function HeadLevels({ stat, flags }: { stat?: ClassStat; flags?: HeadFlags }) {
     const items: [string, string, number, boolean][] = [
         ['-3', '-3 학생', stat.minus3Count, flags?.minus3 ?? false],
         ['-2', '-2 학생', stat.minus2Count, flags?.minus2 ?? false],
-        ['★', '리더', stat.leaderCount, flags?.leader ?? false],
+        ['리', '리더', stat.leaderCount, flags?.leader ?? false],
     ];
     return (
         <span data-head-levels className="flex flex-wrap items-center gap-[3px] text-caption tabular-nums">
@@ -116,12 +116,12 @@ function HeadLevels({ stat, flags }: { stat?: ClassStat; flags?: HeadFlags }) {
                     data-head-level={mark}
                     data-flagged={flagged || undefined}
                     aria-label={`${label} ${count}명${flagged ? ', 다른 반보다 몰림' : ''}`}
-                    title={`${label} ${count}명${flagged ? (mark === '★' && count === 0 ? ' · 리더가 없음' : ' · 다른 반보다 몰림') : ''}`}
-                    className={`inline-flex h-[18px] items-center gap-[3px] whitespace-nowrap rounded-[4px] px-[3px] ${flagged ? 'bg-danger-wash' : 'bg-surface-hover'}`}
+                    title={`${label} ${count}명${flagged ? (mark === '리' && count === 0 ? ' · 리더가 없음' : ' · 다른 반보다 몰림') : ''}`}
+                    className={`inline-flex h-[18px] items-center gap-[3px] whitespace-nowrap rounded-[4px] px-[3px] ${flagged ? 'bg-danger-wash' : mark === '리' ? 'bg-guidance-l1' : 'bg-surface-hover'}`}
                 >
                     {flagged && <span className="-mr-0.5 font-bold text-danger" aria-hidden="true">!</span>}
-                    <span className={mark === '★' ? 'text-accent' : 'text-soft'} aria-hidden="true">{mark}</span>
-                    <span className={count > 0 || flagged ? 'font-bold text-ink' : 'text-soft'} aria-hidden="true">{count}</span>
+                    <span className={mark === '리' ? 'text-guidance-l1-ink' : 'text-soft'} aria-hidden="true">{mark}</span>
+                    <span className={count > 0 || flagged ? `font-bold ${mark === '리' && !flagged ? 'text-guidance-l1-ink' : 'text-ink'}` : mark === '리' ? 'text-guidance-l1-ink' : 'text-soft'} aria-hidden="true">{count}</span>
                 </span>
             ))}
         </span>

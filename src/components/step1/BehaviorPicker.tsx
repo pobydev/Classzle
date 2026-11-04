@@ -5,6 +5,7 @@
 
 import { memo } from 'react';
 import { BehaviorIcon } from '@/components/BehaviorChip';
+import { guidanceTone, TONE_CLASS } from '@/components/step3/boardModel';
 import type { BehaviorType } from '@/types';
 
 type Kind = Exclude<BehaviorType, 'NONE'>;
@@ -16,13 +17,10 @@ export const GROUPS: { type: Kind; label: string; options: { score: number; key:
     { type: 'LEADER', label: '리더', options: [{ score: 1, key: '7' }, { score: 2, key: '8' }] },
 ];
 
-// 고른 값의 색은 3단계 보드와 같은 뜻으로 씁니다(StudentChip.tsx).
-// -3은 진한 바탕, -2는 옅은 바탕에 빨간 글자, -1은 배지처럼 회색 바탕, 리더는 ★와 옅은 하늘색입니다. 행동과 정서는 같은 색입니다.
+// 고른 값만 3단계 보드와 같은 생활지도 색으로 칠합니다(행동 흙 주황, 정서 보라, 리더 초록, 정도가 클수록 진하게).
 function selectedClass(type: Kind, score: number): string {
-    if (type === 'LEADER') return 'border-accent/40 bg-tint text-accent-ink';
-    if (score <= -3) return 'border-danger/40 bg-guidance-strong text-danger';
-    if (score === -2) return 'border-danger/30 bg-guidance-soft text-danger';
-    return 'border-hairline bg-surface-hover text-ink';
+    const tone = guidanceTone({ behavior_type: type, behavior_score: score });
+    return `border-transparent ${tone ? TONE_CLASS[tone] : ''}`;
 }
 const BUTTON_WIDTH = 32;
 const BUTTON_GAP = 2;
@@ -161,7 +159,6 @@ function BehaviorPickerBase({
                                         : 'border-transparent text-soft hover:bg-surface-hover hover:text-ink'
                                 }`}
                             >
-                                {isOn && group.type === 'LEADER' && <span aria-hidden="true">★</span>}
                                 {signed(option.score)}
                             </button>
                         );

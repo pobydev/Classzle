@@ -36,6 +36,12 @@ const TD = 'border-b border-line px-2 py-1.5 text-center tabular-nums';
 const STICKY_HEAD = 'sticky top-[49px] z-[5]';
 // 칸 묶음(기본, 행동, 정서, 리더, 합계) 사이는 세로줄 대신 간격을 둡니다.
 const GROUP_START = 'pl-5';
+// 행동, 정서, 리더 머리글은 보드와 같은 종류의 색(가장 옅은 단계)으로 띠를 둡니다.
+const BAND = {
+    behavior: '!bg-guidance-b1 !text-guidance-b1-ink',
+    emotional: '!bg-guidance-e1 !text-guidance-e1-ink',
+    leader: '!bg-guidance-l1 !text-guidance-l1-ink',
+};
 // 행동과 리더 묶음은 아주 옅은 바탕으로 이웃 묶음과 나눕니다.
 const BAND_TINT = 'bg-canvas/50';
 
@@ -145,13 +151,13 @@ export function BalanceTable({ students, groups, classCount, hasAssignments, onO
                         <tr>
                             <th rowSpan={2} className={`${TH} text-left`}>반</th>
                             {before.map((c) => <th key={c.key} rowSpan={2} className={TH}>{c.label}</th>)}
-                            <th colSpan={behavior.length} className={`${TH} ${GROUP_START}`}>
+                            <th colSpan={behavior.length} className={`${TH} ${GROUP_START} ${BAND.behavior}`}>
                                 <span className="inline-flex items-center gap-0.5">행동<HelpTip label="행동 기준"><GuidanceCriteria only="BEHAVIOR" /></HelpTip></span>
                             </th>
-                            <th colSpan={emotional.length} className={`${TH} ${GROUP_START}`}>
+                            <th colSpan={emotional.length} className={`${TH} ${GROUP_START} ${BAND.emotional}`}>
                                 <span className="inline-flex items-center gap-0.5">정서<HelpTip label="정서 기준"><GuidanceCriteria only="EMOTIONAL" /></HelpTip></span>
                             </th>
-                            <th colSpan={leader.length} className={`${TH} ${GROUP_START}`}>
+                            <th colSpan={leader.length} className={`${TH} ${GROUP_START} ${BAND.leader}`}>
                                 <span className="inline-flex items-center gap-0.5">리더<HelpTip label="리더 기준"><GuidanceCriteria only="LEADER" /></HelpTip></span>
                             </th>
                             {totals.map((c, i) => (
@@ -321,7 +327,7 @@ function PreviousLevelsTab({ students }: { students: Student[] }) {
                             <th className={`${TH} ${GROUP_START}`}>-3</th>
                             <th className={TH}>-2</th>
                             <th className={TH}>-1</th>
-                            <th className={`${TH} ${GROUP_START}`}>리더</th>
+                            <th className={`${TH} ${GROUP_START} ${BAND.leader}`}>리더</th>
                         </tr>
                     </thead>
                     <tbody>

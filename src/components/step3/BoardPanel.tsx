@@ -10,7 +10,8 @@ import { previousClassOf, sameClass } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
 import type { CustomGroup, Student, Violation } from '@/types';
 import { behaviorMark, groupsOf, relationMemo, UNASSIGNED, type RelationIndex } from './boardModel';
-import { Mark, RankBadge, StudentMarks, LEVEL_BG } from './StudentChip';
+import { Mark, RankBadge, StudentMarks } from './StudentChip';
+import { TONE_CLASS, type GuidanceTone } from './boardModel';
 
 // 공통 디자인의 스크롤바: 평소에는 보이지 않고 마우스를 올린 곳에서만 5px로 나타납니다.
 
@@ -38,6 +39,11 @@ function Pair({ mark, children }: { mark: ReactNode; children: ReactNode }) {
     );
 }
 
+// 칠한 학생 칸의 작은 견본입니다. 보드와 같은 색입니다.
+function ToneSample({ tone, children }: { tone: GuidanceTone; children: ReactNode }) {
+    return <span className={`inline-flex h-[18px] items-center rounded-[4px] px-1 text-caption font-bold ${TONE_CLASS[tone]}`}>{children}</span>;
+}
+
 function HeadSample({ children, flagged = false }: { children: ReactNode; flagged?: boolean }) {
     return (
         <span className={`inline-flex h-[18px] items-center gap-[3px] rounded-[4px] px-[3px] text-caption tabular-nums ${flagged ? 'bg-danger-wash' : 'bg-surface-hover'}`}>
@@ -51,12 +57,11 @@ export function BoardMarksHelp({ groups }: { groups: CustomGroup[] }) {
     return (
         <div data-board-marks-help className="space-y-3 text-small">
             <section>
-                <h4 className={title}>생활지도 (행은 행동, 정은 정서)</h4>
+                <h4 className={title}>생활지도 (학생 칸 전체를 칠합니다. 정도가 클수록 진합니다)</h4>
                 <ul className="space-y-1">
-                    <Pair mark={<span className={`flex items-center rounded-input px-1 py-px ${LEVEL_BG.strong}`}><Mark tone="level3">행-3</Mark></span>}>-3, 이름 칸에 진한 바탕</Pair>
-                    <Pair mark={<span className={`flex items-center rounded-input px-1 py-px ${LEVEL_BG.soft}`}><Mark tone="level2">정-2</Mark></span>}>-2, 이름 칸에 옅은 바탕</Pair>
-                    <Pair mark={<Mark tone="level1">행-1</Mark>}>-1, 바탕 없음</Pair>
-                    <Pair mark={<><span className="text-accent" aria-hidden="true">★</span><Mark tone="leader">리+2</Mark><Mark tone="leader">리+1</Mark></>}>리더 +2, +1. 이름 앞에 ★</Pair>
+                    <Pair mark={<>{(['b3', 'b2', 'b1'] as const).map((t, i) => <ToneSample key={t} tone={t}>행-{3 - i}</ToneSample>)}</>}>행동 (흙 주황)</Pair>
+                    <Pair mark={<>{(['e3', 'e2', 'e1'] as const).map((t, i) => <ToneSample key={t} tone={t}>정-{3 - i}</ToneSample>)}</>}>정서 (보라)</Pair>
+                    <Pair mark={<><ToneSample tone="l1">리+1</ToneSample><ToneSample tone="l2">리+2</ToneSample></>}>리더 (초록)</Pair>
                 </ul>
             </section>
             <section>
@@ -64,7 +69,7 @@ export function BoardMarksHelp({ groups }: { groups: CustomGroup[] }) {
                 <ul className="space-y-1">
                     <Pair mark={<span className="text-caption text-soft">27명 (전출 전 28)</span>}>전출 예정 학생을 뺀 인원</Pair>
                     <Pair mark={<HeadSample><span className="text-soft">-3</span><b className="text-ink">1</b></HeadSample>}>-3 학생 1명 (행동과 정서를 합침)</Pair>
-                    <Pair mark={<HeadSample><span className="text-accent">★</span><b className="text-ink">3</b></HeadSample>}>리더 3명</Pair>
+                    <Pair mark={<span className="inline-flex h-[18px] items-center gap-[3px] rounded-[4px] bg-guidance-l1 px-[3px] text-caption text-guidance-l1-ink tabular-nums"><span>리</span><b>3</b></span>}>리더 3명</Pair>
                     <Pair mark={<HeadSample flagged><b className="text-danger">!</b><span className="text-soft">-2</span><b className="text-ink">4</b></HeadSample>}>다른 반보다 몰림 (통계표의 빨간 칸과 같음)</Pair>
                 </ul>
             </section>
