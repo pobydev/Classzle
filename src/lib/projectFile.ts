@@ -108,6 +108,8 @@ function readSettings(raw: unknown, students: Student[]): AppSettings {
         scoreTolerance: isFiniteNumber(value.scoreTolerance) ? value.scoreTolerance : 50,
         numberingMethod: method === 'maleFirst' || method === 'femaleFirst' ? method : 'mixed',
         useAdvancedConstraints: typeof value.useAdvancedConstraints === 'boolean' ? value.useAdvancedConstraints : true,
+        // 옛 파일에는 없습니다. 없으면 보고서에 '기록 없음'으로 씁니다.
+        ...(isFiniteNumber(value.assignedAt) ? { assignedAt: value.assignedAt } : {}),
     };
 }
 

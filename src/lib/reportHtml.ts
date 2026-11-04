@@ -1,7 +1,9 @@
-import { groupHistory } from '@/lib/history';
-import type { AssignmentChange } from '@/types';
+import type { BalanceColumn } from './balanceTable';
+import { formatReportDate, formatReportTime, PRIVACY_NOTICE, REPORT_TITLE, type ConditionSummary, type ReportModel } from './report';
 
-// 인쇄용 리포트 HTML입니다. 이름과 그룹 이름은 교사가 넣은 값이고 엑셀에서도 들어오므로 모두 이스케이프합니다.
+// 인쇄용 '배정 결과 보고서' HTML입니다. 이름과 그룹 이름은 교사가 넣은 값이고 엑셀에서도 들어오므로 모두 이스케이프합니다.
+// 흑백으로 뽑아도 읽히게 색 대신 ✓/✗와 '!', 굵은 글자, 옅은 회색 바탕을 씁니다.
+// 쪽 번호, 출력 시각, 개인정보 안내는 쪽마다 아래에 찍습니다. 메인 프로세스가 <meta name="classzle-footer">를 읽어 넣습니다.
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
@@ -9,255 +11,218 @@ export function esc(value: string | number | null | undefined): string {
     return String(value ?? '').replace(/[&<>"']/g, (ch) => ESCAPES[ch]);
 }
 
-export interface ReportData {
-    history: AssignmentChange[];
-    groupStats: { name: string; students: { name: string; class: string }[] }[];
-    relationStats: {
-        keepMet: number;
-        keepTotal: number;
-        avoidMet: number;
-        avoidTotal: number;
-        classDetails: Record<string, { type: 'keep' | 'avoid'; names: string[]; status: string; classes: string[] }[]>;
-    };
-    movementStats: { name: string; initialClass?: string | null; finalClass?: string | null }[];
-    specialStats: {
-        fixed: { name: string; class: string; target?: string | null; isMet: boolean }[];
-        preTransfer: { name: string; class: string }[];
-    };
-    printedAt: string;
+export type ReportPrintMode = 'summary' | 'names';
+
+const STATUS_TEXT: Record<ConditionSummary['status'], string> = {
+    kept: '✓ 지킴',
+    broken: '✗ 못 지킴',
+    none: '– 없음',
+};
+
+const kept = (ok: boolean) => (ok ? '<span class="ok">✓ 지킴</span>' : '<span class="bad">✗ 못 지킴</span>');
+
+function balanceHtml(model: ReportModel): string {
+    const { balance } = model;
+    // 앱의 표와 같은 순서입니다. 인원, 남, 여, 평균 → 행동 → 정서 → 리더 → 합계 → 그룹.
+    const order = ['기본', '행동', '정서', '리더', '합계', '그룹 분산'] as const;
+    const sectionOf = (c: BalanceColumn) =>
+        c.section ?? (['minusTotal', 'plusTotal', 'guidanceTotal'].includes(c.key) ? '합계' : '기본');
+    const columns = order.flatMap((section) => balance.columns.filter((c) => sectionOf(c) === section));
+    const label = (c: BalanceColumn) => (c.key === 'count' ? '인원' : c.label);
+    const groupHead = order
+        .map((section) => {
+            const count = columns.filter((c) => sectionOf(c) === section).length;
+            if (count === 0) return '';
+            if (section === '기본' || section === '합계') return '';
+            return `<th colspan="${count}">${esc(section)}</th>`;
+        });
+    const basic = columns.filter((c) => sectionOf(c) === '기본');
+    const totals = columns.filter((c) => sectionOf(c) === '합계');
+    const cell = (value: string | number, flagged: boolean) =>
+        `<td class="${flagged ? 'flag' : ''}">${flagged ? '<b>!</b>' : ''}${esc(value)}</td>`;
+    const rows = balance.rows.map((row) => `
+        <tr>
+            <th scope="row">${esc(row.className)}</th>
+            ${columns.map((c) => cell(row.cells[c.key].value, row.cells[c.key].flagged)).join('')}
+            <td>${row.transferMale + row.transferFemale > 0 ? `${row.transferMale}/${row.transferFemale}` : '-'}</td>
+        </tr>`).join('');
+    const difference = `
+        <tr class="diff">
+            <th scope="row">차이</th>
+            ${columns.map((c) => cell(c.key === 'average' ? balance.difference.average.value.toFixed(1) : balance.difference[c.key].value, balance.difference[c.key].flagged)).join('')}
+            <td>-</td>
+        </tr>`;
+    return `
+        <table class="balance">
+            <thead>
+                <tr>
+                    <th rowspan="2">반</th>
+                    ${basic.map((c) => `<th rowspan="2">${esc(label(c))}</th>`).join('')}
+                    ${groupHead[1]}${groupHead[2]}${groupHead[3]}
+                    ${totals.map((c) => `<th rowspan="2">${esc(c.label)}</th>`).join('')}
+                    ${groupHead[5]}
+                    <th rowspan="2">전출<br>남/여</th>
+                </tr>
+                <tr>
+                    ${columns.filter((c) => !['기본', '합계'].includes(sectionOf(c))).map((c) => `<th>${esc(c.label)}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>${difference}${rows}</tbody>
+        </table>
+        <p class="note">인원, 남, 여, 평균과 생활지도는 전출 뒤 기준입니다. <b>!</b>는 다른 반보다 몰린 칸입니다. 차이는 가장 많은 반과 가장 적은 반의 차이입니다.</p>`;
 }
 
-export function buildReportHtml({ history, groupStats, relationStats, movementStats, specialStats, printedAt }: ReportData): string {
-    const historyEntries = groupHistory(history);
-
-    const historyHtml = history.length === 0
-        ? '<tr><td colspan="5" style="text-align:center; padding: 40px; color: #999;">배정 변경 이력이 없습니다.</td></tr>'
-        : historyEntries.map((entry, i) => {
-            const describe = (c: AssignmentChange) => c.type === 'swap'
-                ? `${esc(c.studentName)}: ${esc(c.oldClass)} →${esc(c.newClass)}<br>${esc(c.partnerName)}: ${esc(c.newClass)} →${esc(c.oldClass)}`
-                : `${esc(c.studentName)}: ${esc(c.oldClass || '미배정')} → ${esc(c.newClass || '미배정')}`;
-            const isRun = entry.source === 'auto' && entry.changes.length > 1;
-            const first = entry.changes[0];
-            return `
-            <tr>
-                <td style="text-align:center;">${i + 1}</td>
-                <td style="text-align:center;">${entry.source === 'auto' ? '자동' : '수동'}</td>
-                <td style="text-align:center; font-size: 11px;">${new Date(entry.timestamp).toLocaleTimeString()}</td>
-                <td style="font-weight: bold;">
-                    ${isRun
-                ? `자동 수정 ${entry.changes.length}건`
-                : first.type === 'swap' ? `${esc(first.studentName)}<br>↔${esc(first.partnerName)}` : esc(first.studentName)}
-                </td>
-                <td>${entry.changes.map(describe).join('<br>')}</td>
-            </tr>`;
-        }).join('');
-
-    const groupHtml = groupStats.length === 0
-        ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 그룹 분산이 없습니다.</p>'
-        : groupStats.map(g => `
-            <div style="margin-bottom: 12px;">
-                <strong style="font-size: 11pt; color: #333;">그룹명: ${esc(g.name)}</strong>
-                <div style="margin-top: 5px; padding-left: 15px; font-size: 10pt; line-height: 1.6;">
-                    ${g.students.length === 0
-                ? '<span style="color: #999;">소속 학생 없음</span>'
-                : g.students.map(s => `${esc(s.name)} (${esc(s.class)})`).join(', ')
-            }
-                </div>
-            </div>
-        `).join('');
-
-    const relationHtml = Object.keys(relationStats.classDetails).length === 0
-        ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">설정된 관계 조건이 없습니다.</p>'
-        : Object.entries(relationStats.classDetails)
-            .filter(([_, details]) => details.length > 0)
-            .map(([className, details]) => `
-            <div style="margin-top: 20px; break-inside: auto;">
-                <h3 style="font-size: 13pt; color: #444; margin-bottom: 8px; border-left: 4px solid #6366f1; padding-left: 10px; break-after: avoid;">
-                    이전 학년도: ${esc(className)}
-                </h3>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 5px; break-inside: auto;">
-                    <thead style="display: table-header-group;">
-                        <tr style="background-color: #f8fafc;">
-                            <th style="width: 70px;">유형</th>
-                            <th>대상 학생 (최종 배정반)</th>
-                            <th style="width: 70px;">상태</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${details.map(d => `
-                            <tr>
-                                <td style="text-align:center;">
-                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9pt; font-weight: bold; 
-                                        ${d.type === 'keep'
-                    ? 'background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;'
-                    : 'background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;'}">
-                                        ${d.type === 'keep' ? '함께 배정' : '분리 배정'}
-                                    </span>
-                                </td>
-                                <td>
-                                    ${esc(d.names[0])} (${esc(d.classes[0])}) - ${esc(d.names[1])} (${esc(d.classes[1])})
-                                </td>
-                                <td style="text-align:center; font-weight: bold; color: ${d.status === '만족' ? '#059669' : '#dc2626'}">${d.status}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `).join('');
-
-    const movementHtml = movementStats.length === 0
-        ? '<p style="color: #999; margin-left: 10px; font-size: 11pt;">이동한 학생이 없습니다.</p>'
-        : `
-            <div style="margin-top: 20px; break-inside: auto;">
-                <p style="font-size: 10pt; color: #666; margin-bottom: 10px; break-after: avoid;">
-                    * 최초 배정된 반에서 최종 배정된 반이 변경된 학생들의 목록입니다. (최초 반 번호순 정렬)
-                </p>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 5px; break-inside: auto;">
-                    <thead style="display: table-header-group;">
-                        <tr style="background-color: #f8fafc;">
-                            <th style="width: 50px;">No</th>
-                            <th>학생명</th>
-                            <th>최초 배정반</th>
-                            <th>최종 배정반</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${movementStats.map((s, i) => `
-                            <tr>
-                                <td style="text-align:center;">${i + 1}</td>
-                                <td style="text-align:center; font-weight: bold;">${esc(s.name)}</td>
-                                <td style="text-align:center;">${esc(s.initialClass)}</td>
-                                <td style="text-align:center; font-weight: bold; color: #4f46e5;">${esc(s.finalClass)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-
-    const specialHtml = `
-        <div style="padding: 10px; border: 1px solid #333; border-radius: 4px;">
-            <div style="margin-bottom: 12px;">
-                <strong style="font-size: 11pt; color: #333;">고정 배정 학생 현황</strong>
-                <div style="margin-top: 5px; padding-left: 15px;">
-                    ${specialStats.fixed.length === 0
-            ? '<span style="color: #999; font-size: 10pt;">고정 배정 학생 없음</span>'
-            : specialStats.fixed.map(s => `
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10pt;">
-                                <span>${esc(s.name)} (${esc(s.target)} 고정)</span>
-                                <span style="color: ${s.isMet ? '#2e7d32' : '#d32f2f'}; font-weight: bold; font-size: 9pt;">
-                                    ${s.isMet ? `만족(${esc(s.class || '미배정')})` : `미충족(${esc(s.class || '미배정')})`}
-                                </span>
-                            </div>
-                        `).join('')}
-                </div>
-            </div>
-            <div style="margin-top: 15px; border-top: 1px dashed #eee; padding-top: 15px;">
-                <strong style="font-size: 11pt; color: #333;">전출 예정 학생 현황</strong>
-                <div style="margin-top: 5px; padding-left: 15px; font-size: 10pt; line-height: 1.6;">
-                    ${specialStats.preTransfer.length === 0
-            ? '<span style="color: #999;">전출 예정 학생 없음</span>'
-            : specialStats.preTransfer.map(s => `${esc(s.name)} (${esc(s.class || '미배정')})`).join(', ')
-        }
-                </div>
-            </div>
-        </div>
-    `;
-
+function summaryHtml(model: ReportModel): string {
+    const { meta } = model;
+    const work = meta.workName ? esc(meta.workName) : '저장하지 않은 작업';
+    const date = meta.assignedAt ? esc(formatReportDate(meta.assignedAt)) : '기록 없음';
+    const people = meta.transferCount > 0
+        ? `전출 전 ${meta.totalBefore}명 · 전출 뒤 ${meta.totalAfter}명 (전출 예정 ${meta.transferCount}명)`
+        : `${meta.totalAfter}명`;
     return `
-    <!DOCTYPE html>
-        <html>
-            <head>
-                <title>학생 배정 상세 리포트</title>
-                <style>
-                    @page { size: A4; margin: 20mm; }
-                    body { font-family: sans-serif; margin: 0; padding: 0; line-height: 1.5; color: #333; }
-                    .header { text-align: center; margin-bottom: 30px; }
-                    .header h1 { font-size: 24pt; margin: 0; }
-                    .header p { text-align: right; font-size: 10pt; color: #666; }
-                    h2 { font-size: 16pt; border-bottom: 2px solid #333; padding-bottom: 5px; margin-top: 30px; break-after: avoid; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; table-layout: fixed; break-inside: auto; }
-                    thead { display: table-header-group; }
-                    th, td { border: 1px solid #333; padding: 8px; font-size: 11pt; word-break: break-all; vertical-align: middle; }
-                    th { background-color: #f5f5f5; font-weight: bold; }
-                    tr { break-inside: avoid; break-after: auto; }
-                    .summary-table th { width: 40%; }
-                    .summary-table td { text-align: center; }
-                    .history-table th:nth-child(1) { width: 40px; }
-                    .history-table th:nth-child(2) { width: 60px; }
-                    .history-table th:nth-child(3) { width: 100px; }
-                    .history-table th:nth-child(4) { width: 150px; }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <p>출력 일시: ${esc(printedAt)}</p>
-                    <h1>학생 배정 상세 리포트</h1>
-                </div>
+        <h2>개요</h2>
+        <table class="meta">
+            <tbody>
+                <tr><th>작업 이름</th><td>${work}</td><th>편성 날짜</th><td>${date}</td></tr>
+                <tr><th>반 수</th><td>${meta.classCount}개 반</td><th>인원</th><td>${esc(people)}</td></tr>
+                <tr><th>남녀 (전출 뒤)</th><td colspan="3">남 ${meta.maleAfter}명 · 여 ${meta.femaleAfter}명</td></tr>
+            </tbody>
+        </table>
 
-                <h2>1. 그룹별 배정 현황 및 특수 배정 현황</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div style="padding: 10px; border: 1px solid #333; border-radius: 4px;">
-                        ${groupHtml}
-                    </div>
-                    ${specialHtml}
-                </div>
+        <h2>반별 균형</h2>
+        ${balanceHtml(model)}
 
-                <h2>2. 지킨 조건 요약</h2>
-                <table class="summary-table">
-                    <thead>
-                        <tr>
-                            <th>구분 (조건)</th>
-                            <th>지킨 조건 / 전체</th>
-                            <th>지킨 비율(%)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>함께 배정</td>
-                            <td>${relationStats.keepMet} / ${relationStats.keepTotal}</td>
-                            <td>${relationStats.keepTotal > 0 ? Math.round((relationStats.keepMet / relationStats.keepTotal) * 100) : 100}%</td>
-                        </tr>
-                        <tr>
-                            <td>분리 배정</td>
-                            <td>${relationStats.avoidMet} / ${relationStats.avoidTotal}</td>
-                            <td>${relationStats.avoidTotal > 0 ? Math.round((relationStats.avoidMet / relationStats.avoidTotal) * 100) : 100}%</td>
-                        </tr>
-                        <tr>
-                            <td>고정 배정</td>
-                            <td>${specialStats.fixed.filter(s => s.isMet).length} / ${specialStats.fixed.length}</td>
-                            <td>${specialStats.fixed.length > 0 ? Math.round((specialStats.fixed.filter(s => s.isMet).length / specialStats.fixed.length) * 100) : 100}%</td>
-                        </tr>
-                    </tbody>
-                </table>
+        <h2>조건 지킴</h2>
+        <table class="conditions">
+            <thead><tr><th>조건</th><th>결과</th><th>내용</th></tr></thead>
+            <tbody>
+                ${model.conditions.map((c) => `
+                <tr>
+                    <th scope="row">${esc(c.label)}</th>
+                    <td class="${c.status === 'broken' ? 'bad' : c.status === 'kept' ? 'ok' : 'none'}">${STATUS_TEXT[c.status]}</td>
+                    <td>${esc(c.detail)}</td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+        <p class="note">손으로 바꾼 횟수: <b>${model.manualChangeCount}회</b></p>`;
+}
 
-                <h3 style="margin-top: 15px; font-size: 13pt;">학급별 관계 상세 현황</h3>
-                ${relationHtml}
+function namesHtml(model: ReportModel): string {
+    const unmet = model.unmet.length === 0
+        ? '<p>없음</p>'
+        : `<ul class="unmet">${model.unmet.map((v) => `<li>✗ ${esc(v.message)}</li>`).join('')}</ul>`;
+    const who = (s: { name: string; className: string; previous: string }) =>
+        `<b>${esc(s.name)}</b> ${esc(s.className)}${s.previous ? ` <span class="soft">(${esc(s.previous)})</span>` : ''}`;
+    const pairs = model.pairs.length === 0
+        ? '<p>없음</p>'
+        : `<table>
+            <thead><tr><th class="w-kind">구분</th><th>학생</th><th>학생</th><th class="w-result">결과</th></tr></thead>
+            <tbody>${model.pairs.map((p) => `
+                <tr><td class="nowrap">${p.kind === 'avoid' ? '분리 배정' : '함께 배정'}</td><td>${who(p.a)}</td><td>${who(p.b)}</td><td class="nowrap">${kept(p.kept)}</td></tr>`).join('')}
+            </tbody>
+        </table>`;
+    const fixed = model.fixed.length === 0
+        ? '<p>없음</p>'
+        : `<table>
+            <thead><tr><th>학생</th><th class="w-class">고정 반</th><th class="w-result">결과</th></tr></thead>
+            <tbody>${model.fixed.map((f) => `
+                <tr><td>${who(f.student)}</td><td class="nowrap">${esc(f.target)}</td><td class="nowrap">${kept(f.kept)}</td></tr>`).join('')}
+            </tbody>
+        </table>`;
+    const groups = model.groups.length === 0
+        ? '<p>없음</p>'
+        : model.groups.map((g) => `
+            <div class="group">
+                <p><b>${esc(g.name)}</b> ${kept(g.kept)}</p>
+                <p class="group-classes">${g.classes.filter((c) => c.names.length > 0).map((c) => `${esc(c.className)} ${c.names.length}명: ${c.names.map(esc).join(', ')}`).join('<br>')}</p>
+            </div>`).join('');
+    const transfers = model.transfers.length === 0
+        ? '<p>없음</p>'
+        : `<p>${model.transfers.map((t) => `${esc(t.name)} (${esc(t.className)})`).join(', ')}</p>`;
+    const history = model.history.length === 0
+        ? '<p>없음</p>'
+        : `<table>
+            <thead><tr><th class="w-time">때</th><th class="w-kind">구분</th><th>처음 반 → 바꾼 반</th></tr></thead>
+            <tbody>${model.history.map((h) => `
+                <tr><td class="nowrap">${esc(formatReportTime(h.timestamp))}</td><td class="nowrap">${h.source === 'auto' ? '자동' : '직접'}</td><td>${h.lines.map(esc).join('<br>')}</td></tr>`).join('')}
+            </tbody>
+        </table>`;
+    return `
+        <section class="names">
+            <h1 class="names-title">이름 확인표</h1>
+            <p class="notice">${esc(PRIVACY_NOTICE)}</p>
+            <h2>지키지 못한 조건</h2>
+            ${unmet}
+            <h2>분리 배정 · 함께 배정</h2>
+            ${pairs}
+            <h2>고정 배정</h2>
+            ${fixed}
+            <h2>그룹별 반 나뉨</h2>
+            ${groups}
+            <h2>전출 예정</h2>
+            ${transfers}
+            <h2>바꾼 기록</h2>
+            ${history}
+        </section>`;
+}
 
-                <h2>3. 이동 학생 명단 (총 ${movementStats.length}명)</h2>
-                ${movementHtml}
-
-                <h2>4. 변경 누적 이력 (총 ${historyEntries.length}건)</h2>
-                <table class="history-table">
-
-                    <thead>
-                        <tr>
-                            <th>No</th>
-                            <th>변경구분</th>
-                            <th>변경시각</th>
-                            <th>대상 학생</th>
-                            <th>전환 상세 내용</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${historyHtml}
-                    </tbody>
-                </table>
-
-                <div style="margin-top: 50px; text-align: center; font-size: 9pt; color: #999;">
-                    Classzle - 학급 편성 도우미
-                </div>
-            </body>
-        </html>
+export function buildReportHtml(model: ReportModel, { mode, printedAt }: { mode: ReportPrintMode; printedAt: string }): string {
+    const footer = `${mode === 'names' ? `${PRIVACY_NOTICE}  ` : ''}출력 ${printedAt}`;
+    return `<!DOCTYPE html>
+<html lang="ko">
+    <head>
+        <meta charset="utf-8">
+        <meta name="classzle-footer" content="${esc(footer)}">
+        <title>${REPORT_TITLE}</title>
+        <style>
+            @page { size: A4; }
+            * { box-sizing: border-box; }
+            body { font-family: Pretendard, "Malgun Gothic", sans-serif; margin: 0; color: #111; font-size: 9.5pt; line-height: 1.45; word-break: keep-all; }
+            .head { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #111; padding-bottom: 4px; }
+            h1 { font-size: 17pt; margin: 0; }
+            .head p { margin: 0; font-size: 9pt; color: #333; }
+            .sub { margin: 4px 0 0; font-size: 9pt; color: #333; }
+            h2 { font-size: 11.5pt; margin: 16px 0 6px; break-after: avoid; }
+            table { width: 100%; border-collapse: collapse; break-inside: auto; }
+            thead { display: table-header-group; }
+            tr { break-inside: avoid; }
+            th, td { border: 1px solid #555; padding: 3px 5px; vertical-align: middle; }
+            th { background: #eee; font-weight: 700; }
+            .meta th { width: 16%; text-align: left; }
+            .balance { table-layout: fixed; font-size: 8pt; }
+            .balance th, .balance td { padding: 2px 1px; text-align: center; white-space: nowrap; }
+            .balance tbody th { text-align: center; }
+            .balance .diff td, .balance .diff th { border-bottom: 2px solid #111; font-weight: 700; }
+            .flag { background: #ddd; font-weight: 700; }
+            .flag b { margin-right: 1px; }
+            .conditions th[scope=row] { width: 18%; text-align: left; }
+            .conditions td:nth-child(2) { width: 16%; white-space: nowrap; }
+            .ok { font-weight: 700; }
+            .bad { font-weight: 700; text-decoration: underline; }
+            .none { color: #444; }
+            .note { margin: 4px 0 0; font-size: 8.5pt; color: #333; }
+            .soft { color: #444; font-size: 8.5pt; }
+            .nowrap, .w-kind, .w-result, .w-class, .w-time { white-space: nowrap; }
+            .w-kind { width: 13%; } .w-result { width: 13%; } .w-class { width: 13%; } .w-time { width: 22%; }
+            .names { break-before: page; }
+            .names-title { font-size: 15pt; border-bottom: 2px solid #111; padding-bottom: 4px; }
+            .notice { margin: 6px 0 0; padding: 4px 8px; border: 1.5px solid #111; font-weight: 700; }
+            .unmet { margin: 0; padding-left: 0; list-style: none; }
+            .unmet li { margin: 2px 0; }
+            .group { margin: 0 0 8px; break-inside: avoid; }
+            .group p { margin: 0; }
+            .group-classes { padding-left: 10px; font-size: 9pt; }
+        </style>
+    </head>
+    <body>
+        <div class="head">
+            <h1>${REPORT_TITLE}</h1>
+            <p>출력 ${esc(printedAt)}</p>
+        </div>
+        <p class="sub">참고자료입니다. ${mode === 'summary' ? '학생 이름은 넣지 않았습니다.' : '뒤쪽 이름 확인표에 학생 이름이 들어 있습니다.'}</p>
+        ${summaryHtml(model)}
+        ${mode === 'names' ? namesHtml(model) : ''}
+    </body>
+</html>
 `;
 }

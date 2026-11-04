@@ -99,9 +99,9 @@ describe('17. 리더 칸', () => {
     const leader = (id: string, cn: string, score: number) =>
         makeStudent({ id, assigned_class: cn, behavior_type: 'LEADER', behavior_score: score });
 
-    it('리더를 +2와 +1 두 칸으로 나눠 보여 줍니다', () => {
+    it('리더를 +1과 +2 두 칸으로 나눠 보여 줍니다(어려운 학생 → 괜찮은 학생 순서)', () => {
         const table = calculateBalanceTable([leader('a', '1반', 2), leader('b', '1반', 1), leader('c', '2반', 1)], 2);
-        expect(table.columns.filter((c) => c.section === '리더').map((c) => c.label)).toEqual(['+2', '+1']);
+        expect(table.columns.filter((c) => c.section === '리더').map((c) => c.label)).toEqual(['+1', '+2']);
         expect(table.rows.map((r) => [r.cells.leader2.value, r.cells.leader1.value])).toEqual([[1, 1], [0, 1]]);
     });
 

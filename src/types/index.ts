@@ -51,6 +51,7 @@ export interface AppSettings {
     scoreTolerance: number;        // 성적 유사도 허용 범위 (±)
     numberingMethod: NumberingMethod; // 번호 부여 방식
     useAdvancedConstraints: boolean;
+    assignedAt?: number;           // 마지막으로 신규 배정한 때(밀리초). 보고서의 편성 날짜입니다.
 }
 
 // 배정 결과 통계 (확장)

@@ -132,10 +132,12 @@ function HeadCount({ stat }: { stat?: ClassStat }) {
     if (!stat) return null;
     return (
         <>
-            <span className="text-caption text-soft" title={stat.preTransferCount > 0 ? `전출 예정 ${stat.preTransferCount}명을 뺀 인원입니다.` : undefined}>
+            <span className="whitespace-nowrap text-caption text-soft" title={stat.preTransferCount > 0 ? `전출 예정 ${stat.preTransferCount}명을 뺀 인원입니다.` : undefined}>
                 {stat.stayCount}명
-                {stat.preTransferCount > 0 && <span className="whitespace-nowrap"> (전출 전 {stat.studentCount})</span>}
             </span>
+            {stat.preTransferCount > 0 && (
+                <span className="whitespace-nowrap text-caption text-soft" title={`전출 예정 ${stat.preTransferCount}명을 뺀 인원입니다.`}>(전출 전 {stat.studentCount})</span>
+            )}
         </>
     );
 }
@@ -376,7 +378,8 @@ export function AssignmentBoard({
                                             onClick={() => onHeadClick(name)}
                                             className="sticky top-0 z-10 block w-full cursor-pointer rounded-t-card border-b border-line bg-card px-1.5 py-1 text-left transition-colors hover:bg-wash focus-visible:outline-2 focus-visible:-outline-offset-2"
                                         >
-                                            <span className="flex items-center gap-1">
+                                            {/* 좁은 칸에서는 '(전출 전 28)'이 다음 줄로 내려갑니다. 잘리지 않게 합니다. */}
+                                            <span className="flex flex-wrap items-center gap-x-1">
                                                 <b className="text-[length:var(--chip-head,14px)] text-ink">{name}</b>
                                                 <HeadCount stat={stat} />
                                             </span>

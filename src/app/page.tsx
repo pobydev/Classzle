@@ -100,7 +100,7 @@ export default function Home() {
 
             {/* 3단계는 도구 줄을 위에 붙이고 보드 높이를 창에 맞추므로 여백을 스스로 둡니다. */}
             <TabsContent value="step3" className="h-full">
-              <Step3Dashboard onBoardActiveChange={setBoardActive} />
+              <Step3Dashboard onBoardActiveChange={setBoardActive} workName={projects.activeName} />
             </TabsContent>
           </main>
 

@@ -63,6 +63,8 @@ import { ConditionsStatus } from './ConditionsStatus';
 interface Step3DashboardProps {
     // 상세 배치 조정 탭이 열리고 닫힐 때 알립니다. 앱 틀이 사이드바를 접는 데 씁니다.
     onBoardActiveChange?: (active: boolean) => void;
+    // 지금 연 작업 이름입니다. 배정 결과 보고서에 씁니다. 저장하지 않았으면 null입니다.
+    workName?: string | null;
 }
 
 type DashboardTab = 'stats' | 'board';
@@ -109,7 +111,7 @@ function useStableCallback<Args extends unknown[], Result>(callback: (...args: A
     return useCallback((...args: Args) => latest.current(...args), []);
 }
 
-export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardProps) {
+export default function Step3Dashboard({ onBoardActiveChange, workName = null }: Step3DashboardProps) {
     const {
         students, groups, settings,
         applyAssignment, undoLastChange, undoStack,
@@ -475,6 +477,9 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                 students={students}
                 groups={groups}
                 history={movementHistory}
+                classCount={settings.classCount}
+                workName={workName}
+                assignedAt={settings.assignedAt ?? null}
             />
 
             <Tabs
@@ -623,7 +628,7 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                                     </Button>
                                     <span className="mx-1 h-8 w-px bg-line" aria-hidden />
                                     <Button variant="outline" onClick={() => setIsReportOpen(true)} disabled={!hasAssignments}>
-                                        <ChartBar />배정 리포트
+                                        <ChartBar />배정 결과 보고서
                                     </Button>
                                     <Button variant="outline" onClick={() => setIsExportDialogOpen(true)} disabled={!hasAssignments}>
                                         <DownloadSimple />배정 결과 엑셀

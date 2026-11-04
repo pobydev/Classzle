@@ -183,6 +183,13 @@ ipcMain.handle('save-class-sheets', async (_event, files: { name: string; data: 
     }
 });
 
+// 인쇄물 쪽 아래 글입니다. 리포트가 넣은 글은 이미 이스케이프되어 있어 그대로 씁니다.
+function printFooterTemplate(html: string): string {
+    const text = /<meta name="classzle-footer" content="([^"]*)">/.exec(html)?.[1] ?? '';
+    return `<div style="width:100%;padding:0 12mm;font-size:8px;color:#333;font-family:Pretendard,'Malgun Gothic',sans-serif;display:flex;justify-content:space-between;gap:12px;">`
+        + `<span>${text}</span><span style="white-space:nowrap;"><span class="pageNumber"></span> / <span class="totalPages"></span>쪽</span></div>`;
+}
+
 // 인쇄 미리보기 핸들러
 ipcMain.handle('print-preview', async (_event, htmlContent: string) => {
     const printDir = path.join(app.getPath('temp'), PRINT_FOLDER);
@@ -216,15 +223,19 @@ ipcMain.handle('print-preview', async (_event, htmlContent: string) => {
         await conversionWindow.loadURL(pathToFileURL(htmlPath).href);
 
         // 3. PDF로 변환
+        // 쪽마다 아래에 안내, 출력 시각, 쪽 번호를 찍습니다. 글은 리포트의 <meta name="classzle-footer">에 이스케이프된 채로 있습니다.
         const pdfData = await conversionWindow.webContents.printToPDF({
             printBackground: true,
             landscape: false,
             pageSize: 'A4',
+            displayHeaderFooter: true,
+            headerTemplate: '<span></span>',
+            footerTemplate: printFooterTemplate(htmlContent),
             margins: {
-                top: 0,
-                bottom: 0,
-                left: 0,
-                right: 0
+                top: 0.5,
+                bottom: 0.6,
+                left: 0.5,
+                right: 0.5
             }
         });
 

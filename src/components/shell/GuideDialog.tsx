@@ -127,7 +127,7 @@ export function GuideDialog({
                 <Step number="06" title="저장하고 내보내기">
                     <p>
                         왼쪽 <strong className={STRONG}>작업 저장</strong>으로 이름을 정해 저장하면 다음에 이어서 할 수 있습니다.{' '}
-                        <strong className={STRONG}>배정 리포트</strong>에서 조건 현황과 이동 명단을 보고,{' '}
+                        <strong className={STRONG}>배정 결과 보고서</strong>에서 조건을 지켰는지와 바꾼 기록을 보고 인쇄하며,{' '}
                         <strong className={STRONG}>배정 결과 엑셀</strong>로 명단을 받습니다. 번호 부여 방식은 내보내기 창에서 고릅니다.
                     </p>
                     <p>

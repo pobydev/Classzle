@@ -185,7 +185,11 @@ export const useClasszleStore = create<ClasszleStore>()(
 
             // 학생 관련 액션
             // 새 명단을 넣을 때 씁니다. 옛 명단의 되돌리기 기록은 쓸 수 없으므로 비웁니다.
-            setStudents: (students) => set((state) => ({ students, undoStack: [], notices: [], workId: state.workId + 1 })),
+            setStudents: (students) => set((state) => {
+                const { assignedAt: _old, ...settings } = state.settings;
+                void _old;
+                return { students, settings, undoStack: [], notices: [], workId: state.workId + 1 };
+            }),
 
             addStudent: (student) => set((state) => ({
                 students: [...state.students, { ...student, id: uuidv4() }]
@@ -303,6 +307,8 @@ export const useClasszleStore = create<ClasszleStore>()(
             applyAssignment: (students, changes, startHistory) => set((state) => ({
                 undoStack: withSnapshot(state),
                 students,
+                // 신규 배정한 때를 보고서의 편성 날짜로 둡니다.
+                ...(startHistory ? { settings: { ...state.settings, assignedAt: Date.now() } } : {}),
                 movementHistory: startHistory ? [] : [...state.movementHistory, ...changes]
             })),
 

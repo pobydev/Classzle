@@ -5,6 +5,7 @@ import { ArrowRight, ArrowsLeftRight, CaretDown, CaretRight, Clock } from '@phos
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { changeMentions, groupHistory, summarizeStudentChanges } from '@/lib/history';
+import { previousLabel } from '@/lib/report';
 import type { AssignmentChange, Student } from '@/types';
 
 type SourceFilter = 'all' | 'manual' | 'auto';
@@ -65,6 +66,7 @@ export function HistoryPanel({ history, students }: { history: AssignmentChange[
             .reverse();
     }, [history, filter, search]);
 
+    const previousOf = useMemo(() => new Map(students.map((s) => [s.id, previousLabel(s)])), [students]);
     const stillMoved = summaries.filter((s) => !s.returned).length;
     const returned = summaries.filter((s) => s.returned).length;
 
@@ -107,7 +109,10 @@ export function HistoryPanel({ history, students }: { history: AssignmentChange[
                     <div className="max-h-56 divide-y divide-line overflow-y-auto rounded-card border border-line bg-card">
                         {summaries.map((s) => (
                             <div key={s.id} className="flex items-center justify-between gap-3 px-4 py-2 text-small">
-                                <span className="font-semibold text-ink">{s.name}</span>
+                                <span>
+                                    <span className="font-semibold text-ink">{s.name}</span>
+                                    {previousOf.get(s.id) && <span className="ml-1.5 text-caption text-soft">{previousOf.get(s.id)}</span>}
+                                </span>
                                 <span className="flex items-center gap-2 text-soft">
                                     {s.firstClass || '미배정'}
                                     <ArrowRight size={13} className="text-soft" aria-label="에서" />
