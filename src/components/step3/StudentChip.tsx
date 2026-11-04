@@ -47,12 +47,13 @@ export function StudentMarks({ student, groups, hasAvoid, hasKeep }: {
     return (
         <>
             {behavior && <Mark tone={behavior.tone} title={behavior.label}>{behavior.text}</Mark>}
-            {student.fixed_class && <Mark title={`${student.fixed_class} 고정`}>고</Mark>}
-            {hasAvoid && <Mark title="분리 배정 있음">분</Mark>}
-            {hasKeep && <Mark title="함께 배정 있음">함</Mark>}
+            {/* 표시에 마우스를 올리면 짧은 뜻이 나옵니다. 모아 본 뜻은 보드 위 ? 에 있습니다. */}
+            {student.fixed_class && <Mark title={`고정 배정 (${student.fixed_class})`}>고</Mark>}
+            {hasAvoid && <Mark title="분리 배정">분</Mark>}
+            {hasKeep && <Mark title="함께 배정">함</Mark>}
             {student.is_pre_transfer && <Mark title="전출 예정">전</Mark>}
             {groupsOf(student, groups).map((g) => (
-                <Mark key={g.id} className={g.color} title={g.name}>{g.name.slice(0, 1)}</Mark>
+                <Mark key={g.id} className={g.color} title={`그룹: ${g.name}`}>{g.name.slice(0, 1)}</Mark>
             ))}
         </>
     );

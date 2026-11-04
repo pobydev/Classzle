@@ -3,6 +3,7 @@ import {
     calculateBalanceTable,
     calculatePreviousClassMatrix,
     calculateScoreBands,
+    crowdedClasses,
     flagColumn,
     headFlagsByClass,
 } from '@/lib/balanceTable';
@@ -212,6 +213,23 @@ describe('학급별 균형 표', () => {
             makeStudent({ id: 'z', assigned_class: '3반' }),
         ], 3);
         expect(spread.rows.some((row) => row.cells.behavior2.flagged || row.cells.emotional2.flagged)).toBe(false);
+    });
+
+    it('손볼 곳의 몰린 반은 생활지도와 합계에서 표시된 칸만 적고, 리더가 없으면 리더 없음입니다', () => {
+        const list = crowdedClasses(table);
+        const one = list.find((c) => c.className === '1반')!;
+        expect(one.items).toContain('행동 -3 2명');
+        expect(one.items).toContain('정서 -3 1명');
+        // 인원, 남녀, 그룹은 지키지 못한 조건에 따로 나오므로 넣지 않습니다.
+        expect(one.items.join()).not.toContain('인원');
+        const leaders = calculateBalanceTable([
+            makeStudent({ id: 'l1', assigned_class: '1반', behavior_type: 'LEADER', behavior_score: 1 }),
+            makeStudent({ id: 'l2', assigned_class: '1반', behavior_type: 'LEADER', behavior_score: 1 }),
+            makeStudent({ id: 'l3', assigned_class: '2반', behavior_type: 'LEADER', behavior_score: 1 }),
+            makeStudent({ id: 'l4', assigned_class: '2반', behavior_type: 'LEADER', behavior_score: 1 }),
+            makeStudent({ id: 'n', assigned_class: '3반' }),
+        ], 3);
+        expect(crowdedClasses(leaders).find((c) => c.className === '3반')?.items).toEqual(['리더 없음']);
     });
 
     it('차이가 기준 안이면 표시하지 않습니다', () => {

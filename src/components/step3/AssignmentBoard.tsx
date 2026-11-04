@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLineDown, Plus, X } from '@phosphor-icons/react';
-import { calculateBalanceTable, headFlagsByClass, type HeadFlags } from '@/lib/balanceTable';
+import { calculateBalanceTable, crowdedClasses, headFlagsByClass, type HeadFlags } from '@/lib/balanceTable';
 import { sameClass } from '@/lib/assignment/problem';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { recommendSwaps, type RecommendMode } from '@/lib/recommend';
@@ -82,6 +82,8 @@ interface AssignmentBoardProps {
     onConfirmCompare: () => void;
     onCancelCompare: () => void;
     onUnassign: () => void;
+    // '손볼 곳'의 몰린 반을 누르면 그 반을 골라 보기로 엽니다.
+    onOpenClass: (className: string) => void;
 }
 
 // 반 머리의 인원과 평균입니다. 학생을 고른 동안에는 옮길 수 있는 반에 '여기로'를 씁니다.
@@ -89,8 +91,8 @@ function HeadFigures({ stat, moveHere = false }: { stat?: ClassStat; moveHere?: 
     if (!stat) return null;
     return (
         <span className="flex flex-wrap gap-x-1.5 text-caption text-soft">
-            <span className="whitespace-nowrap">남{stat.stayMaleCount} 여{stat.stayFemaleCount}</span>
-            <span className="whitespace-nowrap">평균 {stat.stayAverageScore}</span>
+            <span className="whitespace-nowrap" title={`남학생 ${stat.stayMaleCount}명, 여학생 ${stat.stayFemaleCount}명 (전출 뒤)`}>남{stat.stayMaleCount} 여{stat.stayFemaleCount}</span>
+            <span className="whitespace-nowrap" title="성적 평균 (전출 뒤)">평균 {stat.stayAverageScore}</span>
             {moveHere && <span data-move-here className="ml-auto whitespace-nowrap font-semibold text-accent-ink">여기로</span>}
         </span>
     );
@@ -102,8 +104,8 @@ function HeadFigures({ stat, moveHere = false }: { stat?: ClassStat; moveHere?: 
 function HeadLevels({ stat, flags }: { stat?: ClassStat; flags?: HeadFlags }) {
     if (!stat) return null;
     const items: [string, string, number, boolean][] = [
-        ['-3', '생활지도 -3', stat.minus3Count, flags?.minus3 ?? false],
-        ['-2', '생활지도 -2', stat.minus2Count, flags?.minus2 ?? false],
+        ['-3', '-3 학생', stat.minus3Count, flags?.minus3 ?? false],
+        ['-2', '-2 학생', stat.minus2Count, flags?.minus2 ?? false],
         ['★', '리더', stat.leaderCount, flags?.leader ?? false],
     ];
     return (
@@ -113,7 +115,8 @@ function HeadLevels({ stat, flags }: { stat?: ClassStat; flags?: HeadFlags }) {
                     key={mark}
                     data-head-level={mark}
                     data-flagged={flagged || undefined}
-                    aria-label={`${label} ${count}명${flagged ? ', 기준 넘음' : ''}`}
+                    aria-label={`${label} ${count}명${flagged ? ', 다른 반보다 몰림' : ''}`}
+                    title={`${label} ${count}명${flagged ? (mark === '★' && count === 0 ? ' · 리더가 없음' : ' · 다른 반보다 몰림') : ''}`}
                     className={`inline-flex h-[18px] items-center gap-[3px] whitespace-nowrap rounded-[4px] px-[3px] ${flagged ? 'bg-danger-wash' : 'bg-surface-hover'}`}
                 >
                     {flagged && <span className="-mr-0.5 font-bold text-danger" aria-hidden="true">!</span>}
@@ -140,7 +143,7 @@ function HeadCount({ stat }: { stat?: ClassStat }) {
 export function AssignmentBoard({
     students, groups, classNames, numberingMethod, classStats, violations, hasAssignments,
     view, size, pickedClasses, onPickedChange, query, showScores, recommendMode, onRecommendModeChange, selectedId, comparePartnerId,
-    onChipClick, onHeadClick, onSelect, onCompare, onConfirmCompare, onCancelCompare, onUnassign,
+    onChipClick, onHeadClick, onSelect, onCompare, onConfirmCompare, onCancelCompare, onUnassign, onOpenClass,
 }: AssignmentBoardProps) {
     const classCount = classNames.length;
     const boardRef = useRef<HTMLDivElement>(null);
@@ -166,11 +169,13 @@ export function AssignmentBoard({
     }, [byClass, classNames, numberingMethod]);
     const relations = useMemo(() => buildRelations(students), [students]);
     const statByClass = useMemo(() => new Map(classStats.map((stat) => [stat.className, stat])), [classStats]);
-    // 통계표와 같은 기준으로 반 머리에 '!'를 붙입니다.
-    const headFlags = useMemo(
-        () => (hasAssignments ? headFlagsByClass(calculateBalanceTable(students, classCount, groups)) : new Map<string, HeadFlags>()),
+    // 통계표와 같은 기준으로 반 머리에 '!'를 붙이고, 패널의 '손볼 곳'에 몰린 반을 적습니다.
+    const balance = useMemo(
+        () => (hasAssignments ? calculateBalanceTable(students, classCount, groups) : null),
         [hasAssignments, students, classCount, groups],
     );
+    const headFlags = useMemo(() => (balance ? headFlagsByClass(balance) : new Map<string, HeadFlags>()), [balance]);
+    const crowded = useMemo(() => (balance ? crowdedClasses(balance) : []), [balance]);
 
     // 고른 학생이 바뀌거나 배정이 바뀔 때만 계산합니다.
     const recommendations = useMemo(
@@ -482,6 +487,9 @@ export function AssignmentBoard({
                 recommendations={recommendations}
                 hasAssignments={hasAssignments}
                 violations={violations}
+                crowded={crowded}
+                unassigned={unassigned}
+                onOpenClass={onOpenClass}
                 found={found}
                 comparePartner={comparing ? comparePartner : null}
                 preview={preview}

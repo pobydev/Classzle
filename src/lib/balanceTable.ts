@@ -277,6 +277,35 @@ export interface HeadFlags {
     leader: boolean;
 }
 
+// 보드 패널 '손볼 곳'의 몰린 반입니다. 생활지도 칸과 합계에서 표시된 칸만 모읍니다(인원, 남녀, 그룹은 지키지 못한 조건에 따로 나옵니다).
+// 예: { className: '4반', items: ['행동 -3 2명', '정서 -3 1명'] }, 리더가 한 명도 없으면 '리더 없음'입니다.
+export interface CrowdedClass {
+    className: string;
+    items: string[];
+}
+
+const CROWDING_LABELS: [string, string][] = [
+    ['behavior3', '행동 -3'], ['behavior2', '행동 -2'], ['emotional3', '정서 -3'], ['emotional2', '정서 -2'],
+    ['leader1', '리더 +1'], ['leader2', '리더 +2'], ['guidanceTotal', '합계'],
+];
+
+export function crowdedClasses(table: BalanceTable): CrowdedClass[] {
+    return table.rows.flatMap((row) => {
+        const items: string[] = [];
+        const noLeader = (row.cells.leader1?.value ?? 0) + (row.cells.leader2?.value ?? 0) === 0;
+        for (const [key, label] of CROWDING_LABELS) {
+            const cell = row.cells[key];
+            if (!cell?.flagged) continue;
+            if (key.startsWith('leader') && noLeader) {
+                if (!items.includes('리더 없음')) items.push('리더 없음');
+            } else {
+                items.push(key === 'guidanceTotal' ? `합계 ${cell.value}` : `${label} ${cell.value}명`);
+            }
+        }
+        return items.length > 0 ? [{ className: row.className, items }] : [];
+    });
+}
+
 export function headFlagsByClass(table: BalanceTable): Map<string, HeadFlags> {
     const flagged = (row: BalanceRow, ...keys: string[]) => keys.some((key) => row.cells[key]?.flagged ?? false);
     return new Map(table.rows.map((row) => [row.className, {

@@ -55,6 +55,7 @@ import {
 } from '@/components/ui/select';
 import { MoreMenu, MoreMenuItem } from '@/components/common/MoreMenu';
 import { AssignmentReportDialog } from './AssignmentReportDialog';
+import { BoardMarksHelp } from './BoardPanel';
 import { AssignmentBoard, type BoardSize, type BoardView } from './AssignmentBoard';
 import { BalanceTable } from './BalanceStats';
 import { ConditionsStatus } from './ConditionsStatus';
@@ -539,6 +540,10 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                                     </DropdownMenuRadioGroup>
                                 </DropdownMenuContent>
                             </DropdownMenu>
+                            {/* 보드 표시의 뜻을 모아 둔 상자입니다. 늘 보이는 범례 대신 둡니다. */}
+                            <HelpTip label="보드 표시" width={380}>
+                                <BoardMarksHelp groups={groups} />
+                            </HelpTip>
                             <Button variant="outline" size="sm" onClick={handleUndo} disabled={undoStack.length === 0}>
                                 <ArrowCounterClockwise />되돌리기
                             </Button>
@@ -577,6 +582,10 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                         onConfirmCompare={confirmCompare}
                         onCancelCompare={() => setComparePartnerId(null)}
                         onUnassign={() => moveSelectedTo(null)}
+                        onOpenClass={(className) => {
+                            clearSelection();
+                            openInTwoClassView(className);
+                        }}
                     />
                 </TabsContent>
 
