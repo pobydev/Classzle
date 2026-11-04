@@ -188,7 +188,62 @@ describe('전출 예정 학생', () => {
         expect(m.female).toBe(0);
         expect(m.transferMax).toBe(1);
     });
+
+    // 남는 학생과 전출 예정 학생을 성별 수대로 만들어 네 반에 나눕니다.
+    const NAMES4 = ['1반', '2반', '3반', '4반'];
+    const withTransfers = (male: number, female: number, leavingGenders: ('M' | 'F')[]) => [
+        ...Array.from({ length: male }, (_, i) => makeStudent({ id: `m${i}`, gender: 'M', academic_score: 1 + ((i * 37) % 1000) })),
+        ...Array.from({ length: female }, (_, i) => makeStudent({ id: `f${i}`, gender: 'F', academic_score: 1 + ((i * 53) % 1000) })),
+        ...leavingGenders.map((gender, i) => makeStudent({ id: `t${i}`, gender, is_pre_transfer: true })),
+    ];
+    const perClass = (students: Student[], fn: (s: Student) => boolean) =>
+        NAMES4.map((cn) => students.filter((s) => s.assigned_class === cn && fn(s)).length);
+    const TRANSFER_SEEDS = [1, 2, 3, 4, 5];
+
+    it('남는 학생이 28, 28, 27, 27명이면 전출 예정 2명을 27명인 두 반에 넣습니다', () => {
+        // 남는 학생 110명(남 56, 여 54), 남자 전출 예정 2명입니다.
+        for (const seed of TRANSFER_SEEDS) {
+            const result = assignStudents(withTransfers(56, 54, ['M', 'M']), 4, [], { seed, ...FAST });
+            expect(result.violations).toEqual([]);
+            const staying = perClass(result.students, (s) => !s.is_pre_transfer);
+            const leaving = perClass(result.students, (s) => !!s.is_pre_transfer);
+            expect([...staying].sort()).toEqual([27, 27, 28, 28]);
+            expect(leaving.map((n, k) => (n > 0 ? staying[k] : null)).filter((v) => v !== null)).toEqual([27, 27]);
+            expect(perClass(result.students, () => true)).toEqual([28, 28, 28, 28]);
+            // 남학생은 전출 뒤 14명씩, 전출 전 58명이라 15, 15, 14, 14명입니다.
+            expect(spread(perClass(result.students, (s) => s.gender === 'M'))).toBeLessThanOrEqual(1);
+        }
+    });
+
+    it('남녀가 엇갈려도 전출 전 인원과 남녀를 함께 맞춥니다', () => {
+        // 남 55, 여 55명이면 전출 뒤 남학생이 13명인 반과 여학생이 13명인 반이 따로 생깁니다.
+        // 남자 전출 예정은 남학생 13명인 반에, 여자 전출 예정은 여학생 13명인 반에 가야 전출 전이 모두 28명, 남녀 14명씩입니다.
+        for (const seed of TRANSFER_SEEDS) {
+            const result = assignStudents(withTransfers(55, 55, ['M', 'F']), 4, [], { seed, ...FAST });
+            expect(result.violations).toEqual([]);
+            expect(perClass(result.students, () => true)).toEqual([28, 28, 28, 28]);
+            expect(perClass(result.students, (s) => s.gender === 'M')).toEqual([14, 14, 14, 14]);
+            expect(perClass(result.students, (s) => s.gender === 'F')).toEqual([14, 14, 14, 14]);
+        }
+    });
+
+    it('전출 예정 학생이 반 수보다 많아도 전출 전 인원을 고르게 합니다', () => {
+        // 남는 학생 110명에 전출 예정 6명(남 3, 여 3)이면 전출 전 116명, 반마다 29명입니다.
+        for (const seed of TRANSFER_SEEDS) {
+            const result = assignStudents(withTransfers(55, 55, ['M', 'M', 'M', 'F', 'F', 'F']), 4, [], { seed, ...FAST });
+            expect(result.violations).toEqual([]);
+            const leaving = perClass(result.students, (s) => !!s.is_pre_transfer);
+            expect(Math.max(...leaving) - Math.min(...leaving)).toBeLessThanOrEqual(1);
+            expect(perClass(result.students, () => true)).toEqual([29, 29, 29, 29]);
+            expect(spread(perClass(result.students, (s) => s.gender === 'M'))).toBeLessThanOrEqual(1);
+            expect(spread(perClass(result.students, (s) => s.gender === 'F'))).toBeLessThanOrEqual(1);
+        }
+    });
 });
+
+function spread(values: number[]) {
+    return Math.max(...values) - Math.min(...values);
+}
 
 describe('전학년도 반 섞기', () => {
     it('같은 전학년도 반 학생이 한 반에 몰리지 않습니다', () => {

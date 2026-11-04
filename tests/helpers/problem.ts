@@ -190,6 +190,10 @@ export interface Measure {
     previousAvg: number;
     previousMax: number;
     transferMax: number;
+    // 전출 예정 학생까지 넣은 전출 전 인원, 남학생, 여학생의 반별 차이입니다.
+    beforeCount: number;
+    beforeMale: number;
+    beforeFemale: number;
     unassigned: number;
     allKept: boolean;
 }
@@ -225,6 +229,7 @@ export function measure(students: Student[], groups: CustomGroup[], names: strin
     const previous = [...new Set(stay.map((s) => s.prev_info.split('-')[1]))];
     const previousDiffs = previous.map((pc) => spread(names.map((cn) => stay.filter((s) => s.assigned_class === cn && s.prev_info.split('-')[1] === pc).length)));
     const leaders = countBy((s) => s.behavior_type === 'LEADER');
+    const beforeBy = (fn: (s: Student) => boolean) => spread(names.map((cn) => students.filter((s) => s.assigned_class === cn && fn(s)).length));
 
     return {
         fixed,
@@ -252,6 +257,9 @@ export function measure(students: Student[], groups: CustomGroup[], names: strin
         previousAvg: previousDiffs.reduce((a, b) => a + b, 0) / Math.max(previousDiffs.length, 1),
         previousMax: Math.max(0, ...previousDiffs),
         transferMax: Math.max(...names.map((cn) => students.filter((s) => s.assigned_class === cn && s.is_pre_transfer).length)),
+        beforeCount: beforeBy(() => true),
+        beforeMale: beforeBy((s) => s.gender === 'M'),
+        beforeFemale: beforeBy((s) => s.gender === 'F'),
         unassigned: students.filter((s) => !names.includes(s.assigned_class as string)).length,
         allKept: fixed === 0 && avoid === 0 && keep === 0 && groupSpread <= 1 && count <= 1 && male <= 1 && female <= 1,
     };

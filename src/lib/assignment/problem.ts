@@ -46,6 +46,7 @@ export interface Weights {
     count: number;
     gender: number;
     transfer: number;
+    beforeTransfer: number;
     level3: number;
     level2: number;
     level1: number;
@@ -199,6 +200,14 @@ export function compileProblem(
     addDim(stayers.filter((i) => gender[i] === 0), weights.gender, { hard: true, fix: 'crossGender' });
     addDim(stayers.filter((i) => gender[i] === 1), weights.gender, { hard: true, fix: 'crossGender' });
     addDim(indices.filter((i) => !stay[i]), weights.transfer);
+    // 남는 선택지 안에서 전출 전 인원과 남녀(전출 예정 학생 포함)도 고르게 합니다.
+    // 예: 남는 학생이 28, 28, 27, 27명이고 전출 예정이 2명이면 27명인 두 반에 넣습니다.
+    // 전출 예정 학생이 없으면 전출 뒤와 같으므로 넣지 않습니다.
+    if (stayers.length < n) {
+        addDim(indices, weights.beforeTransfer);
+        addDim(indices.filter((i) => gender[i] === 0), weights.beforeTransfer);
+        addDim(indices.filter((i) => gender[i] === 1), weights.beforeTransfer);
+    }
 
     for (const group of groups) {
         const members = (group.member_ids ?? [])
