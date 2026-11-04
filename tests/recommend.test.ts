@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assignStudents } from '@/lib/assignment';
-import { describeScoreGapChange, recommendSwaps } from '@/lib/recommend';
+import { describeRecommendation, describeScoreDifference, describeScoreGapChange, guidanceSteps, recommendSwaps } from '@/lib/recommend';
 import { validateMove, validateSwap } from '@/lib/validation';
 import type { Student } from '@/types';
 import { makeScenario, SCENARIOS } from './helpers/problem';
@@ -79,15 +79,139 @@ describe('교환 추천', () => {
         expect(ids(recommendSwaps('a', students, 2))).not.toContain('b');
     });
 
-    it('성적 평균이 좋아지는 상대를 앞에 둡니다', () => {
+    // 남학생 21명을 10점 간격으로 둡니다(r0 100점 ~ r20 300점). 순위가 한 명 차이면 5%p입니다.
+    // 따로 적지 않은 학생은 3반에 둡니다.
+    const ladder = (placed: Record<number, Partial<Student>>) =>
+        Array.from({ length: 21 }, (_, r) =>
+            makeStudent({ id: `r${r}`, gender: 'M', academic_score: 100 + r * 10, assigned_class: '3반', ...placed[r] }),
+        );
+
+    it('같은 성별 학생만 추천합니다', () => {
         const students = [
-            makeStudent({ id: 'high', assigned_class: '1반', academic_score: 900 }),
-            makeStudent({ id: 'x', assigned_class: '1반', academic_score: 800 }),
-            makeStudent({ id: 'low', assigned_class: '2반', academic_score: 100 }),
-            makeStudent({ id: 'mid', assigned_class: '2반', academic_score: 700 }),
+            makeStudent({ id: 'a', gender: 'M', assigned_class: '1반' }),
+            makeStudent({ id: 'k', gender: 'F', assigned_class: '1반' }),
+            makeStudent({ id: 'girl', gender: 'F', assigned_class: '2반' }),
+            makeStudent({ id: 'boy', gender: 'M', assigned_class: '2반' }),
         ];
-        // mid와 바꾸면 반 평균이 750과 500(차이 250), low와 바꾸면 450과 800(차이 350)입니다.
-        expect(ids(recommendSwaps('high', students, 2))[0]).toBe('mid');
+        // 성적과 생활지도가 똑같아도 다른 성별은 추천하지 않습니다.
+        expect(ids(recommendSwaps('a', students, 2))).toEqual(['boy']);
+        expect(ids(recommendSwaps('k', students, 2))).toEqual(['girl']);
+    });
+
+    it('전출 예정 학생은 전출 예정 학생끼리, 남는 학생은 남는 학생끼리 추천합니다', () => {
+        const students = [
+            makeStudent({ id: 'leave1', assigned_class: '1반', is_pre_transfer: true }),
+            makeStudent({ id: 'stay1', assigned_class: '1반' }),
+            makeStudent({ id: 'leave2', assigned_class: '2반', is_pre_transfer: true }),
+            makeStudent({ id: 'stay2', assigned_class: '2반' }),
+            makeStudent({ id: 'leave3', assigned_class: '3반', is_pre_transfer: true }),
+            makeStudent({ id: 'stay3', assigned_class: '3반' }),
+        ];
+        expect(ids(recommendSwaps('leave1', students, 3)).sort()).toEqual(['leave2', 'leave3']);
+        expect(ids(recommendSwaps('stay1', students, 3)).sort()).toEqual(['stay2', 'stay3']);
+    });
+
+    it('전출 예정 학생끼리는 성적 순위와 생활지도가 달라도 추천합니다', () => {
+        const students = [
+            makeStudent({ id: 'leave1', assigned_class: '1반', is_pre_transfer: true, academic_score: 900 }),
+            makeStudent({ id: 'leave2', assigned_class: '2반', is_pre_transfer: true, academic_score: 100, behavior_type: 'BEHAVIOR', behavior_score: -3 }),
+            makeStudent({ id: 'stay1', assigned_class: '1반' }),
+            makeStudent({ id: 'stay2', assigned_class: '2반' }),
+        ];
+        const [only] = recommendSwaps('leave1', students, 2);
+        expect(only.studentId).toBe('leave2');
+        expect(describeRecommendation(only)).toBe('성적 차이 800점 · 생활지도 다름(없음 → 행-3)');
+    });
+
+    it('성적 순위가 가장 비슷한 학생이 1번입니다', () => {
+        const students = ladder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 13: { assigned_class: '2반' } });
+        const result = recommendSwaps('r10', students, 3);
+        expect(result[0].studentId).toBe('r11');
+        expect(result[0].rankDifference).toBeCloseTo(5);
+        expect(describeRecommendation(result[0])).toBe('성적 차이 10점 · 생활지도 같음');
+    });
+
+    it('생활지도가 같아도 성적 순위가 15%p 넘게 차이 나면 뺍니다', () => {
+        const students = ladder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 14: { assigned_class: '2반' } });
+        const result = recommendSwaps('r10', students, 3);
+        // r7과 r13은 15%p, r6과 r14는 20%p 차이입니다.
+        expect(ids(result).sort()).toEqual(['r11', 'r12', 'r13', 'r7', 'r8']);
+        result.forEach((r) => expect(r.rankDifference).toBeLessThanOrEqual(15 + 1e-9));
+    });
+
+    it('생활지도가 한 칸 다르고 성적이 아주 가까운 학생이 생활지도가 같고 성적이 먼 학생보다 앞섭니다', () => {
+        const students = ladder({
+            10: { assigned_class: '1반' },
+            11: { assigned_class: '2반', behavior_type: 'EMOTIONAL', behavior_score: -1 },
+            13: { assigned_class: '2반' },
+        });
+        const result = recommendSwaps('r10', students, 3);
+        const order = ids(result);
+        // r11: 한 칸(5) + 5%p = 10. r13: 0칸 + 15%p = 15.
+        expect(order.indexOf('r11')).toBeGreaterThanOrEqual(0);
+        expect(order.indexOf('r11')).toBeLessThan(order.indexOf('r13'));
+        const near = result.find((r) => r.studentId === 'r11')!;
+        expect(near.order).toBeCloseTo(10);
+        expect(describeRecommendation(near)).toBe('성적 차이 10점 · 생활지도 한 칸 차이(없음 → 정-1)');
+    });
+
+    it('생활지도가 두 칸 이상 다르면 뺍니다', () => {
+        const students = ladder({
+            10: { assigned_class: '1반', behavior_type: 'BEHAVIOR', behavior_score: -3 },
+            11: { assigned_class: '2반', behavior_type: 'BEHAVIOR', behavior_score: -1 },
+            12: { assigned_class: '2반', behavior_type: 'BEHAVIOR', behavior_score: -2 },
+            9: { assigned_class: '2반', behavior_type: 'LEADER', behavior_score: 1 },
+        });
+        // 행-3과 한 칸 차이는 r12(행-2)뿐입니다. 행-1, 리더, 생활지도 없는 학생은 두 칸 이상입니다.
+        const result = recommendSwaps('r10', students, 3);
+        expect(ids(result)).toEqual(['r12']);
+        expect(describeRecommendation(result[0])).toBe('성적 차이 20점 · 생활지도 한 칸 차이(행-3 → 행-2)');
+    });
+
+    it('순서 값과 성적 차이가 같으면 균형이 좋아지는 상대를 앞에 둡니다', () => {
+        const students = ladder({
+            8: { assigned_class: '1반' },
+            20: { assigned_class: '1반' },
+            7: { assigned_class: '2반' },
+            9: { assigned_class: '2반' },
+        });
+        // 둘 다 5%p, 10점 차이입니다. r7과 바꾸면 반 평균이 235와 185, r9와 바꾸면 245와 175입니다.
+        const order = ids(recommendSwaps('r8', students, 3));
+        expect(order.slice(0, 2)).toEqual(['r7', 'r9']);
+    });
+
+    it('성적이 같아도 분리 배정이나 고정 배정을 어기면 뺍니다', () => {
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1반', avoid_ids: ['enemy'] }),
+            makeStudent({ id: 'k', assigned_class: '1반' }),
+            makeStudent({ id: 'enemy', assigned_class: '2반' }),
+            makeStudent({ id: 'close', assigned_class: '2반' }),
+            makeStudent({ id: 'pinned', assigned_class: '3반', fixed_class: '3반' }),
+            makeStudent({ id: 'other', assigned_class: '3반' }),
+        ];
+        // close와 바꾸면 a가 enemy와 같은 반이 되고, pinned는 3반 고정입니다.
+        expect(ids(recommendSwaps('a', students, 3)).sort()).toEqual(['enemy', 'other']);
+    });
+
+    it.each([
+        ['-3', { behavior_type: 'BEHAVIOR', behavior_score: -3 }, { behavior_type: 'BEHAVIOR', behavior_score: -2 }],
+        ['-2', { behavior_type: 'EMOTIONAL', behavior_score: -2 }, { behavior_type: 'EMOTIONAL', behavior_score: -1 }],
+        ['리더 +2', { behavior_type: 'LEADER', behavior_score: 2 }, { behavior_type: 'LEADER', behavior_score: 1 }],
+        ['리더 +1', { behavior_type: 'LEADER', behavior_score: 1 }, { behavior_type: 'NONE', behavior_score: 0 }],
+    ] as const)('%s 학생을 이미 많은 반으로 보내는 교환은 뺍니다', (_, mark, neighbor) => {
+        const students = [
+            makeStudent({ id: 'a', assigned_class: '1반', ...mark }),
+            makeStudent({ id: 'f1', assigned_class: '1반' }),
+            makeStudent({ id: 'b', assigned_class: '2반', ...mark }),
+            makeStudent({ id: 'c', assigned_class: '2반', ...mark }),
+            // 생활지도 한 칸 차이에 성적이 같아 닮은 학생이지만, 바꾸면 2반이 3명이 됩니다.
+            makeStudent({ id: 'f2', assigned_class: '2반', ...neighbor }),
+            makeStudent({ id: 'f3', assigned_class: '3반' }),
+            makeStudent({ id: 'f4', assigned_class: '3반' }),
+        ];
+        const result = ids(recommendSwaps('a', students, 3));
+        expect(result).not.toContain('f2');
+        expect(result).toContain('b');
     });
 
     it('10명까지만 돌려줍니다', () => {
@@ -118,8 +242,10 @@ describe('교환 추천', () => {
 });
 
 describe('교환 뒤 성적 평균 차이', () => {
+    // 3반에 성적이 아주 높은 학생 40명을 두어 1반, 2반 학생의 성적 순위가 서로 가깝게 합니다. 평균은 1반과 2반만 봅니다.
+    const pool = Array.from({ length: 40 }, (_, i) => makeStudent({ id: `p${i}`, assigned_class: '3반', academic_score: 2000 + i }));
     const changeFor = (students: Student[], partner: string) =>
-        recommendSwaps('a', students, 2).find((r) => r.studentId === partner)?.scoreGapChange;
+        recommendSwaps('a', [...students, ...pool], 3).find((r) => r.studentId === partner)?.scoreGapChange;
 
     it('두 반의 평균 차이가 얼마나 변하는지 알려 줍니다', () => {
         const students = [
@@ -148,23 +274,27 @@ describe('교환 뒤 성적 평균 차이', () => {
         const students = [
             makeStudent({ id: 'a', assigned_class: '1반', academic_score: 900 }),
             makeStudent({ id: 'k', assigned_class: '1반', academic_score: 500 }),
-            makeStudent({ id: 'j', assigned_class: '1반', academic_score: 500 }),
-            makeStudent({ id: 'q', assigned_class: '1반', academic_score: 500 }),
-            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100, is_pre_transfer: true }),
+            makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100 }),
             makeStudent({ id: 'm', assigned_class: '2반', academic_score: 300 }),
-            makeStudent({ id: 'n', assigned_class: '2반', academic_score: 500 }),
+            makeStudent({ id: 't', assigned_class: '2반', academic_score: 1000, is_pre_transfer: true }),
         ];
-        // 전: 1반 600, 2반 400(전출 학생 뺌), 차이 200.
-        // b와 바꾸면 전출 뒤 인원이 3명씩으로 맞습니다. 1반 500(들어온 b는 전출), 2반 1700/3, 차이 200/3.
-        expect(changeFor(students, 'b')).toBeCloseTo(200 / 3 - 200, 5);
+        // 전: 1반 700, 2반 200(전출 학생 뺌), 차이 500. b와 바꾸면 1반 300, 2반 600, 차이 300.
+        // 전출 학생을 넣고 셌다면 차이가 오히려 200 벌어진 것으로 나옵니다.
+        expect(changeFor(students, 'b')).toBeCloseTo(-200);
     });
 
     it('전출 뒤 학생이 없는 반이 있으면 0입니다', () => {
         const students = [
-            makeStudent({ id: 'a', assigned_class: '1반', academic_score: 900 }),
+            makeStudent({ id: 'a', assigned_class: '1반', academic_score: 900, is_pre_transfer: true }),
             makeStudent({ id: 'b', assigned_class: '2반', academic_score: 100, is_pre_transfer: true }),
         ];
         expect(changeFor(students, 'b')).toBe(0);
+    });
+
+    it('성적 차이를 점수로 알려 줍니다', () => {
+        expect(describeScoreDifference(10)).toBe('성적 차이 10점');
+        expect(describeScoreDifference(2.345)).toBe('성적 차이 2.3점');
+        expect(describeScoreDifference(0)).toBe('성적 차이 0점');
     });
 
     it('교사가 읽을 문구로 바꿉니다', () => {
@@ -209,5 +339,42 @@ describe('학생 옮기기 검사', () => {
             makeStudent({ id: 'd', assigned_class: '1반' }),
         ];
         expect(validateSwap('a', 'b', students, 2, groups).map((v) => v.type)).toContain('GROUP_IMBALANCE');
+    });
+});
+
+describe('생활지도 칸 수', () => {
+    const g = (behavior_type: Student['behavior_type'], behavior_score: number) => ({ behavior_type, behavior_score });
+    const none = g('NONE', 0);
+
+    it('같으면 0칸입니다', () => {
+        expect(guidanceSteps(g('BEHAVIOR', -2), g('BEHAVIOR', -2))).toBe(0);
+        expect(guidanceSteps(none, none)).toBe(0);
+        expect(guidanceSteps(g('LEADER', 2), g('LEADER', 2))).toBe(0);
+    });
+
+    it.each([
+        ['행-3 ↔ 행-2', g('BEHAVIOR', -3), g('BEHAVIOR', -2)],
+        ['정-2 ↔ 정-1', g('EMOTIONAL', -2), g('EMOTIONAL', -1)],
+        ['행-1 ↔ 없음', g('BEHAVIOR', -1), none],
+        ['없음 ↔ 정-1', none, g('EMOTIONAL', -1)],
+        ['행-3 ↔ 정-3', g('BEHAVIOR', -3), g('EMOTIONAL', -3)],
+        ['행-1 ↔ 정-1', g('BEHAVIOR', -1), g('EMOTIONAL', -1)],
+        ['리+2 ↔ 리+1', g('LEADER', 2), g('LEADER', 1)],
+        ['리+1 ↔ 없음', g('LEADER', 1), none],
+    ])('%s는 한 칸입니다', (_, a, b) => {
+        expect(guidanceSteps(a, b)).toBe(1);
+        expect(guidanceSteps(b, a)).toBe(1);
+    });
+
+    it.each([
+        ['행-3 ↔ 행-1', g('BEHAVIOR', -3), g('BEHAVIOR', -1)],
+        ['행-2 ↔ 없음', g('BEHAVIOR', -2), none],
+        ['행-3 ↔ 정-2', g('BEHAVIOR', -3), g('EMOTIONAL', -2)],
+        ['리+2 ↔ 없음', g('LEADER', 2), none],
+        ['리+1 ↔ 행-1', g('LEADER', 1), g('BEHAVIOR', -1)],
+        ['리+2 ↔ 정-3', g('LEADER', 2), g('EMOTIONAL', -3)],
+    ])('%s는 두 칸 이상입니다', (_, a, b) => {
+        expect(guidanceSteps(a, b)).toBe(2);
+        expect(guidanceSteps(b, a)).toBe(2);
     });
 });

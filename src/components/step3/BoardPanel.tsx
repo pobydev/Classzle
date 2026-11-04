@@ -4,7 +4,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { CaretRight, CheckCircle, Handshake, Prohibit, WarningCircle, X } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { MINUS_TOTAL_TITLE, PLUS_TOTAL_TITLE, TOTAL_TITLE } from '@/lib/balanceTable';
-import { describeScoreGapChange, type SwapRecommendation } from '@/lib/recommend';
+import { describeRecommendation, type SwapRecommendation } from '@/lib/recommend';
 import { previousClassOf, sameClass } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
 import type { CustomGroup, Student, Violation } from '@/types';
@@ -283,7 +283,7 @@ function SelectedDetail({
                                         />
                                     </span>
                                     <span className={`block text-caption ${better ? 'text-accent-ink' : 'text-soft'}`}>
-                                        {describeScoreGapChange(r.scoreGapChange)}
+                                        {describeRecommendation(r)}
                                     </span>
                                 </span>
                                 <span className="flex shrink-0 items-center text-caption font-semibold text-accent-ink">
