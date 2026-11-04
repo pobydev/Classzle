@@ -4,6 +4,7 @@ import {
     calculatePreviousClassMatrix,
     calculateScoreBands,
     flagColumn,
+    headFlagsByClass,
 } from '@/lib/balanceTable';
 import { makeStudent } from './helpers/students';
 
@@ -187,6 +188,30 @@ describe('학급별 균형 표', () => {
         expect(first.cells['group:g'].flagged).toBe(true);
         expect(first.cells.behavior3.flagged).toBe(true);
         expect(second.cells.behavior3.flagged).toBe(false);
+    });
+
+    it('행동 -3과 정서 -3이 한 반에 모이면 두 유형을 합친 수로 그 반 칸을 표시합니다', () => {
+        const mixed = calculateBalanceTable([
+            makeStudent({ id: 'x', assigned_class: '1반', behavior_type: 'BEHAVIOR', behavior_score: -3 }),
+            makeStudent({ id: 'y', assigned_class: '1반', behavior_type: 'EMOTIONAL', behavior_score: -3 }),
+            makeStudent({ id: 'z', assigned_class: '2반' }),
+            makeStudent({ id: 'w', assigned_class: '3반' }),
+        ], 3);
+        const [one, two] = mixed.rows;
+        // 유형별로는 차이 1이라 기준 안입니다.
+        expect(mixed.difference.behavior3.flagged).toBe(false);
+        expect(one.cells.behavior3.flagged).toBe(true);
+        expect(one.cells.emotional3.flagged).toBe(true);
+        expect(one.cells.behavior3.note).toContain('합친 -3');
+        expect(two.cells.behavior3.flagged).toBe(false);
+        expect(headFlagsByClass(mixed).get('1반')?.minus3).toBe(true);
+        // -2도 같습니다. 한 반에 하나씩이면 표시하지 않습니다.
+        const spread = calculateBalanceTable([
+            makeStudent({ id: 'x', assigned_class: '1반', behavior_type: 'BEHAVIOR', behavior_score: -2 }),
+            makeStudent({ id: 'y', assigned_class: '2반', behavior_type: 'EMOTIONAL', behavior_score: -2 }),
+            makeStudent({ id: 'z', assigned_class: '3반' }),
+        ], 3);
+        expect(spread.rows.some((row) => row.cells.behavior2.flagged || row.cells.emotional2.flagged)).toBe(false);
     });
 
     it('차이가 기준 안이면 표시하지 않습니다', () => {

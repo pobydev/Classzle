@@ -357,7 +357,7 @@ export function AssignmentBoard({
                     {shownView === 'compact' ? (
                         <div
                             data-view="compact"
-                            className="mt-1 grid content-start justify-center gap-[3px]"
+                            className="mt-1 grid content-start justify-center-safe gap-[3px]"
                             style={{ gridTemplateColumns: `repeat(${classCount}, minmax(96px, ${COMPACT_COLUMN_MAX}px))` }}
                         >
                             {classNames.map((name) => {
@@ -391,7 +391,7 @@ export function AssignmentBoard({
                         <div
                             data-view="two"
                             data-columns={shownClasses.length}
-                            className="mt-1 grid content-start justify-center gap-1"
+                            className="mt-1 grid content-start justify-center-safe gap-1"
                             style={{
                                 gridTemplateColumns: `repeat(${shownClasses.length}, minmax(${shownClasses.length > 3 ? 220 : 260}px, ${WIDE_COLUMN_MAX}px))${canAddColumn ? ' 112px' : ''}`,
                             }}

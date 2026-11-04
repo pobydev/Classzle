@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildResultWorkbook, parseRosterRows, requireStudents, studentsLeftOutOfExport } from '@/lib/excel';
+import { buildResultWorkbook, missingColumns, parseRosterRows, requireStudents, studentsLeftOutOfExport } from '@/lib/excel';
 import { makeStudent } from './helpers/students';
 
 describe('엑셀 명단 읽기', () => {
@@ -169,6 +169,16 @@ describe('학생을 읽지 못한 파일', () => {
     it('한 명이라도 읽으면 그대로 돌려줍니다', () => {
         const roster = parseRosterRows([{ 이름: '가상', 성별: '남', 성적: 500 }]);
         expect(requireStudents(roster)).toBe(roster);
+    });
+
+    it('성별이나 성적 열이 없으면 이름 열처럼 막고 못 찾은 열을 알립니다', () => {
+        const roster = parseRosterRows([{ 이름: '가상', 남녀: '남', 총점: 500 }]);
+        expect(() => requireStudents(roster, ['이름', '남녀', '총점'])).toThrow("성별, 성적 열을 찾지 못했습니다");
+        expect(() => requireStudents(roster, ['이름', '성별', '총점'])).toThrow(/^성적 열을 찾지 못했습니다.*이 파일의 첫 줄: 이름, 성별, 총점/);
+        // 열은 있는데 칸이 빈 학생은 막지 않습니다(안내만 합니다).
+        const blank = parseRosterRows([{ 이름: '가상', 성별: '남' }]);
+        expect(requireStudents(blank, ['이름', '성별', '성적'])).toBe(blank);
+        expect(missingColumns(['이름', 'gender', '기준성적'])).toEqual([]);
     });
 });
 

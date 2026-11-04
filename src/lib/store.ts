@@ -131,6 +131,37 @@ function withoutRelationsTo(student: Student, removedId: string): Student {
     };
 }
 
+type PairKind = 'avoid' | 'keep';
+const pairKeys = (kind: PairKind) =>
+    kind === 'avoid' ? { ids: 'avoid_ids', memos: 'avoid_memos' } as const : { ids: 'keep_ids', memos: 'keep_memos' } as const;
+
+// 두 학생 사이의 관계 하나를 지웁니다. 양쪽 모두에서 지웁니다.
+export function unlinkPair(students: Student[], kind: PairKind, a: string, b: string): Student[] {
+    const { ids, memos } = pairKeys(kind);
+    return students.map((s) => {
+        if (s.id !== a && s.id !== b) return s;
+        const other = s.id === a ? b : a;
+        if (!s[ids].includes(other) && !(s[memos] && other in s[memos]!)) return s;
+        const nextMemos = { ...s[memos] };
+        delete nextMemos[other];
+        return { ...s, [ids]: s[ids].filter((id) => id !== other), [memos]: nextMemos };
+    });
+}
+
+// 두 학생 사이에 관계를 넣습니다. 같은 쌍의 반대 관계(분리 ↔ 함께)는 지워서 한쪽만 남깁니다.
+export function linkPair(students: Student[], kind: PairKind, a: string, b: string, memo?: string): Student[] {
+    const { ids, memos } = pairKeys(kind);
+    const cleared = unlinkPair(students, kind === 'avoid' ? 'keep' : 'avoid', a, b);
+    return cleared.map((s) => {
+        if (s.id !== a && s.id !== b) return s;
+        const other = s.id === a ? b : a;
+        const updates: Partial<Student> = {};
+        if (!s[ids].includes(other)) updates[ids] = [...s[ids], other];
+        if (memo !== undefined) updates[memos] = withMemo(s[memos], other, memo);
+        return Object.keys(updates).length > 0 ? { ...s, ...updates } : s;
+    });
+}
+
 export const useClasszleStore = create<ClasszleStore>()(
     persist(
         (set, get) => ({
@@ -306,97 +337,21 @@ export const useClasszleStore = create<ClasszleStore>()(
             }),
 
             // 관계 설정 액션
+            // 한 쌍에는 분리 배정과 함께 배정 중 하나만 둡니다. 한쪽을 넣으면 다른 쪽은 지웁니다(2단계에서 먼저 묻습니다).
             addAvoidRelation: (studentId, avoidId, memo) => set((state) => ({
-                students: state.students.map((s) => {
-                    const updates: Partial<Student> = {};
-                    if (s.id === studentId) {
-                        if (!s.avoid_ids.includes(avoidId)) {
-                            updates.avoid_ids = [...s.avoid_ids, avoidId];
-                        }
-                        if (memo !== undefined) updates.avoid_memos = withMemo(s.avoid_memos, avoidId, memo);
-                    }
-                    if (s.id === avoidId) {
-                        if (!s.avoid_ids.includes(studentId)) {
-                            updates.avoid_ids = [...s.avoid_ids, studentId];
-                        }
-                        // 반대편에도 메모 저장 (선택 사항이나 대칭성 위해)
-                        if (memo !== undefined) updates.avoid_memos = withMemo(s.avoid_memos, studentId, memo);
-                    }
-                    if (Object.keys(updates).length > 0) {
-                        return { ...s, ...updates };
-                    }
-                    return s;
-                })
+                students: linkPair(state.students, 'avoid', studentId, avoidId, memo),
             })),
 
             removeAvoidRelation: (studentId, avoidId) => set((state) => ({
-                students: state.students.map((s) => {
-                    if (s.id === studentId) {
-                        const newMemos = { ...s.avoid_memos };
-                        delete newMemos[avoidId];
-                        return {
-                            ...s,
-                            avoid_ids: s.avoid_ids.filter((id) => id !== avoidId),
-                            avoid_memos: newMemos
-                        };
-                    }
-                    if (s.id === avoidId) {
-                        const newMemos = { ...s.avoid_memos };
-                        delete newMemos[studentId];
-                        return {
-                            ...s,
-                            avoid_ids: s.avoid_ids.filter((id) => id !== studentId),
-                            avoid_memos: newMemos
-                        };
-                    }
-                    return s;
-                })
+                students: unlinkPair(state.students, 'avoid', studentId, avoidId),
             })),
 
             addKeepRelation: (studentId, keepId, memo) => set((state) => ({
-                students: state.students.map((s) => {
-                    const updates: Partial<Student> = {};
-                    if (s.id === studentId) {
-                        if (!s.keep_ids.includes(keepId)) {
-                            updates.keep_ids = [...s.keep_ids, keepId];
-                        }
-                        if (memo !== undefined) updates.keep_memos = withMemo(s.keep_memos, keepId, memo);
-                    }
-                    if (s.id === keepId) {
-                        if (!s.keep_ids.includes(studentId)) {
-                            updates.keep_ids = [...s.keep_ids, studentId];
-                        }
-                        if (memo !== undefined) updates.keep_memos = withMemo(s.keep_memos, studentId, memo);
-                    }
-                    if (Object.keys(updates).length > 0) {
-                        return { ...s, ...updates };
-                    }
-                    return s;
-                })
+                students: linkPair(state.students, 'keep', studentId, keepId, memo),
             })),
 
             removeKeepRelation: (studentId, keepId) => set((state) => ({
-                students: state.students.map((s) => {
-                    if (s.id === studentId) {
-                        const newMemos = { ...s.keep_memos };
-                        delete newMemos[keepId];
-                        return {
-                            ...s,
-                            keep_ids: s.keep_ids.filter((id) => id !== keepId),
-                            keep_memos: newMemos
-                        };
-                    }
-                    if (s.id === keepId) {
-                        const newMemos = { ...s.keep_memos };
-                        delete newMemos[studentId];
-                        return {
-                            ...s,
-                            keep_ids: s.keep_ids.filter((id) => id !== studentId),
-                            keep_memos: newMemos
-                        };
-                    }
-                    return s;
-                })
+                students: unlinkPair(state.students, 'keep', studentId, keepId),
             })),
 
             setFixedClass: (studentId, className, memo) => set((state) => ({

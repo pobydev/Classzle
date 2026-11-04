@@ -49,6 +49,7 @@ function Flagged({ cell, text, bold, className = '', tint = false }: { cell: Bal
     return (
         <td
             data-flagged={cell.flagged || undefined}
+            title={cell.note}
             className={`${TD} ${className} ${cell.flagged ? 'bg-danger-wash font-semibold text-ink' : tint ? `${BAND_TINT} group-hover:bg-wash` : ''} ${zero ? 'text-soft' : bold ? 'font-bold text-ink' : ''}`}
         >
             {cell.flagged && <FlagMark />}

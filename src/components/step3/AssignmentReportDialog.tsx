@@ -96,7 +96,8 @@ export function AssignmentReportDialog({
         });
         prevClasses.forEach(pc => { stats.classDetails[pc] = []; });
 
-        const processedGlobalPairs = new Set<string>();
+        // 분리 배정과 함께 배정을 따로 셉니다. 같은 두 학생이 두 조건에 모두 있어도 각 조건에서 한 번씩 셉니다.
+        const processedPairs = { keep: new Set<string>(), avoid: new Set<string>() };
 
         students.forEach(s => {
             const sPrevClass = getPrevClassLabel(s.prev_info);
@@ -114,7 +115,7 @@ export function AssignmentReportDialog({
                     ? sameClass(s.assigned_class, partner.assigned_class)
                     : (!sameClass(s.assigned_class, partner.assigned_class) && !!s.assigned_class);
 
-                if (!processedGlobalPairs.has(pairId)) {
+                if (!processedPairs[type].has(pairId)) {
                     if (type === 'keep') {
                         stats.keepTotal++;
                         if (isMet) stats.keepMet++;
@@ -122,7 +123,7 @@ export function AssignmentReportDialog({
                         stats.avoidTotal++;
                         if (isMet) stats.avoidMet++;
                     }
-                    processedGlobalPairs.add(pairId);
+                    processedPairs[type].add(pairId);
                 }
 
                 // 2. 리스트 출력 로직 (같은 반이면 앞번호 학생 기준 1회만, 다른 반이면 양쪽 모두 출력)

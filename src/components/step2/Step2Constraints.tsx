@@ -341,6 +341,25 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
         }
     };
 
+    // 같은 쌍에는 분리 배정과 함께 배정 중 하나만 둡니다. 반대 조건이 이미 있으면 바꿀지 묻습니다.
+    // 바꾸기로 하면 저장할 때 반대 조건을 지웁니다(store의 linkPair).
+    const pickRelationTarget = async (target: Student) => {
+        if (!selectedStudent || (relationMode !== 'avoid' && relationMode !== 'keep')) return;
+        const opposite = relationMode === 'avoid' ? relations.keep : relations.avoid;
+        if (opposite.get(selectedStudent.id)?.includes(target.id)) {
+            const was = relationMode === 'avoid' ? '함께 배정' : '분리 배정';
+            const next = relationMode === 'avoid' ? '분리 배정' : '함께 배정';
+            const ok = await confirm({
+                title: `이미 ${was}인 학생입니다. ${next}으로 바꿀까요?`,
+                description: `${selectedStudent.name} 학생과 ${target.name} 학생은 ${was}으로 정해 두었습니다. 한 쌍에는 한 가지 조건만 둘 수 있어, 바꾸면 저장할 때 ${was}은 지웁니다.`,
+                confirmLabel: `${next}으로 바꾸기`,
+                cancelLabel: `${was} 그대로 두기`,
+            });
+            if (!ok) return;
+        }
+        setTempRelationTargetIds((ids) => (ids.includes(target.id) ? ids : [...ids, target.id]));
+    };
+
     const handleSaveRelationTargets = () => {
         if (!selectedStudent || !relationMode) return;
 
@@ -671,7 +690,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                             delete newMemos[s.id];
                             setTempRelationMemos(newMemos);
                         } else {
-                            setTempRelationTargetIds([...tempRelationTargetIds, s.id]);
+                            void pickRelationTarget(s);
                         }
                     }}
                 />

@@ -28,6 +28,7 @@ import { MoreMenu, MoreMenuItem, MoreMenuLabel, MoreMenuSeparator } from '@/comp
 import { GuidanceCriteria } from '@/components/GuidanceCriteria';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
 import { removalConsequences } from '@/lib/studentRemoval';
+import { classesLostByShrinking } from '@/lib/classCount';
 import { BehaviorPickerHeader, KeyboardHint } from './BehaviorPicker';
 import { ClassSheetMenu } from './ClassSheetMenu';
 import { StudentTableRow } from './StudentTableRow';
@@ -67,14 +68,26 @@ function NoticesLine({ notices, onClose }: { notices: string[]; onClose: () => v
 function ClassCountControl() {
     const classCount = useClasszleStore((state) => state.settings.classCount);
     const setClassCount = useClasszleStore((state) => state.setClassCount);
+    const confirm = useConfirm();
     const [open, setOpen] = useState(false);
     const [value, setValue] = useState('');
     const num = parseInt(value);
     const valid = !isNaN(num) && num >= 2 && num <= 20;
-    const apply = () => {
+    const apply = async () => {
         if (!valid) return;
-        setClassCount(num);
         setOpen(false);
+        // 줄이면 없어지는 반에 배정된 학생은 미배정이 됩니다. 몇 반, 몇 명인지 알리고 묻습니다.
+        const lost = classesLostByShrinking(useClasszleStore.getState().students, classCount, num);
+        if (lost.count > 0) {
+            const ok = await confirm({
+                title: `${lost.label} ${lost.count}명이 미배정이 됩니다. 바꿀까요?`,
+                description: `학급 수를 ${num}개로 줄이면 ${lost.label}에 배정된 학생은 반이 없어집니다. 학생의 반 값은 남아 있어 다시 ${classCount}개로 바꾸면 돌아옵니다.`,
+                confirmLabel: `${num}개 반으로 바꾸기`,
+                danger: true,
+            });
+            if (!ok) return;
+        }
+        setClassCount(num);
     };
     return (
         <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -101,12 +114,12 @@ function ClassCountControl() {
                             max={20}
                             value={value}
                             onChange={(e) => setValue(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && apply()}
+                            onKeyDown={(e) => e.key === 'Enter' && void apply()}
                             className="h-8 w-20"
                             autoFocus
                         />
                         <span className="text-soft">개 반</span>
-                        <Button size="sm" className="ml-auto" onClick={apply} disabled={!valid}>확인</Button>
+                        <Button size="sm" className="ml-auto" onClick={() => void apply()} disabled={!valid}>확인</Button>
                     </div>
                     <p className="text-caption text-soft">새 학년도에 만들 반의 수입니다. 2~20개 반까지 됩니다.</p>
                 </PopoverContent>
@@ -235,6 +248,7 @@ export default function Step1Setup() {
             setGroups([]); // 새 파일을 넣으면 그룹을 비웁니다.
             clearMovements(); // 새 파일을 넣으면 이력을 비웁니다.
             setSelectedTab('all');
+            setSearchTerm(''); // 앞 명단에서 쓴 검색어가 남으면 새 명단이 몇 명뿐인 것처럼 보입니다.
 
             // 학급 수: 반이 정해진 학생이 있으면 그 반에서, 없으면 전학년도 반에서 찾습니다.
             let detectedClassCount = 0;

@@ -19,6 +19,7 @@ export function parseExcelFile(file: File): Promise<ParsedRoster> {
 
         reader.onload = (e) => {
             let roster: ParsedRoster;
+            let headerNames: string[] = [];
             try {
                 const data = e.target?.result;
                 const workbook = XLSX.read(data, { type: 'binary' });
@@ -26,13 +27,15 @@ export function parseExcelFile(file: File): Promise<ParsedRoster> {
                 const worksheet = workbook.Sheets[sheetName];
                 // 값이 모두 빈 열은 행에 나오지 않으므로 머리글은 따로 읽습니다.
                 const [headers] = XLSX.utils.sheet_to_json<unknown[]>(worksheet, { header: 1 });
-                roster = parseRosterRows(XLSX.utils.sheet_to_json(worksheet), (headers ?? []).map(String));
-            } catch (error) {
-                reject(new Error('엑셀 파일 파싱 오류: ' + (error as Error).message));
+                headerNames = (headers ?? []).map(String);
+                roster = parseRosterRows(XLSX.utils.sheet_to_json(worksheet), headerNames);
+            } catch {
+                // 잘린 파일, 엑셀이 아닌 파일 등입니다. 개발 용어 대신 할 일을 알립니다.
+                reject(new Error('엑셀 파일이 손상되어 열 수 없습니다. 엑셀에서 열리는지 확인하고 다시 저장해 주세요. 지금 작업은 바뀌지 않았습니다.'));
                 return;
             }
             try {
-                resolve(requireStudents(roster));
+                resolve(requireStudents(roster, headerNames));
             } catch (error) {
                 reject(error);
             }
@@ -46,10 +49,32 @@ export function parseExcelFile(file: File): Promise<ParsedRoster> {
     });
 }
 
-// 학생을 한 명도 읽지 못한 파일로 지금 작업을 바꾸지 않도록 오류로 돌립니다.
-export function requireStudents(roster: ParsedRoster): ParsedRoster {
+export const GENDER_HEADERS = ['성별', 'gender'];
+export const SCORE_HEADERS = ['성적', 'academic_score', '점수', '기준성적'];
+
+// 첫 줄에서 찾지 못한 꼭 필요한 열입니다. 이름 열은 학생 수로 따로 봅니다.
+export function missingColumns(headers: string[]): string[] {
+    const names = new Set(headers.map((h) => h.trim()));
+    const missing: string[] = [];
+    if (!GENDER_HEADERS.some((h) => names.has(h))) missing.push('성별');
+    if (!SCORE_HEADERS.some((h) => names.has(h))) missing.push('성적');
+    return missing;
+}
+
+// 학생을 한 명도 읽지 못했거나 성별, 성적 열이 없는 파일로 지금 작업을 바꾸지 않도록 오류로 돌립니다.
+// 열이 없으면 모든 학생이 여학생 500점으로 들어가 균형이 의미 없어지기 때문입니다. 열은 있는데 칸이 빈 학생은 안내만 합니다.
+export function requireStudents(roster: ParsedRoster, headers?: string[]): ParsedRoster {
     if (roster.students.length === 0) {
         throw new Error('학생을 한 명도 읽지 못했습니다. 첫 줄에 이름 또는 성명 열이 있는지 확인해 주세요. 지금 작업은 바뀌지 않았습니다.');
+    }
+    const missing = headers ? missingColumns(headers) : [];
+    if (missing.length > 0) {
+        const found = headers!.map((h) => h.trim()).filter(Boolean);
+        throw new Error(
+            `${missing.join(', ')} 열을 찾지 못했습니다. 첫 줄의 열 이름을 ${missing.map((m) => `'${m}'`).join(', ')}(으)로 맞춰 주세요.`
+            + (found.length > 0 ? ` 이 파일의 첫 줄: ${found.join(', ')}.` : '')
+            + ' 지금 작업은 바뀌지 않았습니다.',
+        );
     }
     return roster;
 }

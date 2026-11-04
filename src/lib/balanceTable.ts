@@ -21,6 +21,8 @@ export interface BalanceColumn {
 export interface BalanceCell {
     value: number;
     flagged: boolean;
+    // 칸 값만으로는 기준 안인데 다른 까닭으로 표시한 칸의 설명입니다. 예: 행동과 정서를 합친 -3 몰림.
+    note?: string;
 }
 
 export interface BalanceRow {
@@ -145,6 +147,24 @@ export function calculateBalanceTable(students: Student[], classCount: number, g
         difference[spec.key] = diff;
         cells.forEach((cell, i) => {
             rows[i].cells[spec.key] = { ...cell, value: spec.read(stats[i]) };
+        });
+    }
+
+    // 행동과 정서는 따로 보여 주지만, -3과 -2는 두 유형을 합친 수로도 몰림을 봅니다.
+    // 예: 한 반에 행동 -3 하나와 정서 -3 하나가 모이고 다른 반은 0명이면 두 칸 모두 기준 안이지만 그 반에 -3이 몰린 것입니다.
+    for (const level of [3, 2] as const) {
+        const behaviorKey = `behavior${level}`;
+        const emotionalKey = `emotional${level}`;
+        const combined = rows.map((row) => row.cells[behaviorKey].value + row.cells[emotionalKey].value);
+        const { cells } = flagColumn(combined, LEVEL_LIMIT, 'above');
+        cells.forEach((cell, i) => {
+            if (!cell.flagged) return;
+            for (const key of [behaviorKey, emotionalKey]) {
+                const target = rows[i].cells[key];
+                if (target.value > 0 && !target.flagged) {
+                    rows[i].cells[key] = { ...target, flagged: true, note: `행동과 정서를 합친 -${level}이 다른 반보다 많습니다 (${cell.value}명).` };
+                }
+            }
         });
     }
 

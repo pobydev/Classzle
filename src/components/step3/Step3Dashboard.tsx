@@ -77,6 +77,17 @@ function readRecommendMode(): RecommendMode {
         return 'guidance';
     }
 }
+// '성적 표시'도 다시 켜도 그대로입니다. '골라 보기'의 반 구성은 그때그때 고르므로 기억하지 않습니다.
+const SHOW_SCORES_KEY = 'classzle-show-scores';
+
+function readShowScores(): boolean {
+    try {
+        return localStorage.getItem(SHOW_SCORES_KEY) !== 'off';
+    } catch {
+        return true;
+    }
+}
+
 const MIN_PICKED = 2;
 const MAX_PICKED = 4;
 
@@ -111,7 +122,9 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
     const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [isReportOpen, setIsReportOpen] = useState(false);
     const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
-    const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>('new');
+    // 반이 이미 정해진 명단(양식 B나 배정한 뒤)이면 '현재 배정 수정'을 먼저 골라 둡니다.
+    const [assignmentMode, setAssignmentMode] = useState<AssignmentMode>(() =>
+        useClasszleStore.getState().students.some((s) => s.assigned_class) ? 'optimize' : 'new');
 
     const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     // 비교 중인 상대입니다. 보기 방식과 두 칸의 반은 그대로 두므로 취소하면 있던 자리로 돌아갑니다.
@@ -123,7 +136,16 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
     // 골라 보기에서 나란히 볼 반입니다. 2반부터 4반까지입니다.
     const [pickedClasses, setPickedClasses] = useState<string[]>(['1반', '2반']);
     const [searchText, setSearchText] = useState('');
-    const [showScores, setShowScores] = useState(true);
+    const [showScores, setShowScoresState] = useState(readShowScores);
+    const setShowScores = (next: boolean) => {
+        setShowScoresState(next);
+        try {
+            if (next) localStorage.removeItem(SHOW_SCORES_KEY);
+            else localStorage.setItem(SHOW_SCORES_KEY, 'off');
+        } catch {
+            // 기억하지 못해도 지금 화면에는 그대로 씁니다.
+        }
+    };
     const [boardSize, setBoardSize] = useState<BoardSize>(readBoardSize);
     const [recommendMode, setRecommendMode] = useState<RecommendMode>(readRecommendMode);
     const query = searchText.trim();
@@ -282,11 +304,23 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
             }
 
             // 신규 배정은 이력을 새로 시작하고, 수정과 균형 조정은 이력에 더합니다.
-            applyAssignment(result.students, assignmentMode === 'new' ? [] : changes, assignmentMode === 'new');
+            // 수정과 균형 조정에서 옮긴 학생이 없으면 되돌릴 것도 없으므로 되돌리기 칸을 쌓지 않습니다.
+            if (assignmentMode === 'new' || result.moved > 0) {
+                applyAssignment(result.students, assignmentMode === 'new' ? [] : changes, assignmentMode === 'new');
+            }
             setIsAssigning(false);
 
-            // 리포트는 교사가 누를 때만 엽니다.
-            assignmentNotices(result.moved, result.violations.length).forEach((notice) => toast[notice.kind](notice.text));
+            // 리포트는 교사가 누를 때만 엽니다. 옮긴 인원 알림은 되돌리기 버튼과 함께 오래 둡니다.
+            assignmentNotices(result.moved, result.violations.length, assignmentMode).forEach((notice) => {
+                if (notice.undoable) {
+                    toast[notice.kind](notice.text, {
+                        duration: 12000,
+                        action: { label: '되돌리기', onClick: handleUndo },
+                    });
+                } else {
+                    toast[notice.kind](notice.text);
+                }
+            });
         }, 100);
     };
 

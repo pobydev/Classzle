@@ -25,6 +25,21 @@ describe('작업 상태', () => {
         expect(a.keep_ids).toEqual(['c']);
     });
 
+    it('한 쌍에는 분리 배정과 함께 배정 중 하나만 남습니다', () => {
+        store().addAvoidRelation('a', 'b', '학폭 분리');
+        store().addKeepRelation('b', 'a', '도움');
+        const [a, b] = ['a', 'b'].map((id) => store().students.find((s) => s.id === id)!);
+        expect(a.avoid_ids).toEqual([]);
+        expect(b.avoid_ids).toEqual([]);
+        expect(a.avoid_memos?.b).toBeUndefined();
+        expect(a.keep_ids).toEqual(['b']);
+        expect(b.keep_memos).toEqual({ a: '도움' });
+        store().addAvoidRelation('a', 'b');
+        const after = store().students.find((s) => s.id === 'a')!;
+        expect(after.keep_ids).toEqual([]);
+        expect(after.avoid_ids).toEqual(['b']);
+    });
+
     it('교환을 되돌리면 반과 이력이 돌아옵니다', () => {
         store().swapStudents('a', 'b');
         expect(classOf('a')).toBe('2반');

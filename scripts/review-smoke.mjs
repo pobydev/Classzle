@@ -191,7 +191,7 @@ try {
 
     // 14. 배정이 사라지면 신규 탭
     await page.getByRole('button', { name: '배정 실행' }).click();
-    await page.waitForSelector('text=/명의 학생 배정이 변경|옮긴 학생이 없습니다/', { timeout: 120000 });
+    await page.waitForSelector('text=/명을 배정했습니다|명을 옮겼습니다|옮긴 학생이 없습니다/', { timeout: 120000 });
     await page.waitForTimeout(500);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
@@ -276,7 +276,7 @@ try {
     // 배정 리포트는 배정이 있어야 열립니다. 위에서 초기화했으므로 다시 배정합니다.
     await expect(page.getByRole('button', { name: /배정 리포트/ })).toBeDisabled();
     await page.getByRole('button', { name: '배정 실행' }).click();
-    await page.waitForSelector('text=/명의 학생 배정이 변경|옮긴 학생이 없습니다/', { timeout: 120000 });
+    await page.waitForSelector('text=/명을 배정했습니다|명을 옮겼습니다|옮긴 학생이 없습니다/', { timeout: 120000 });
     await page.getByRole('button', { name: /배정 리포트/ }).click();
     await page.getByRole('button', { name: '보고서 인쇄' }).click();
     await expect(page.getByText('인쇄 미리보기를 열지 못했습니다.').first()).toBeVisible();
