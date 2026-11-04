@@ -14,7 +14,7 @@ export interface BalanceColumn {
     // 반별 차이가 이 값을 넘으면 표시합니다.
     limit: number | null;
     flag: FlagMode;
-    // 머리글에 마우스를 올리면 보이는 설명입니다.
+    // 머리글 옆 ? 에 넣는 설명입니다.
     title?: string;
 }
 

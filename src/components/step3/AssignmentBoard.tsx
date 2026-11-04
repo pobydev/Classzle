@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLineDown } from '@phosphor-icons/react';
+import { ArrowLineDown, Plus, X } from '@phosphor-icons/react';
 import { sameClass } from '@/lib/assignment/problem';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { recommendSwaps } from '@/lib/recommend';
@@ -62,12 +62,13 @@ interface AssignmentBoardProps {
     hasAssignments: boolean;
     view: BoardView;
     size: BoardSize;
-    twoClasses: [string, string];
-    onTwoClassChange: (index: 0 | 1, className: string) => void;
+    // 골라 보기에서 나란히 볼 반(2~4개)입니다.
+    pickedClasses: string[];
+    onPickedChange: (next: string[]) => void;
     query: string;
     showScores: boolean;
     selectedId: string | null;
-    // 비교 중인 상대입니다. 있으면 두 칸이 고른 학생의 반과 상대의 반으로 정해집니다.
+    // 비교 중인 상대입니다. 있으면 칸이 고른 학생의 반과 상대의 반 둘로 정해집니다.
     comparePartnerId: string | null;
     onChipClick: (id: string) => void;
     onHeadClick: (className: string) => void;
@@ -88,6 +89,29 @@ function HeadFigures({ stat }: { stat?: ClassStat }) {
     );
 }
 
+// 반 머리의 생활지도 한 줄입니다. 전출 뒤 기준이고 0은 흐리게 둡니다.
+function HeadLevels({ stat, compact = false }: { stat?: ClassStat; compact?: boolean }) {
+    if (!stat) return null;
+    const items: [string, string, number][] = [
+        ['-3', '생활지도 -3', stat.minus3Count],
+        ['-2', '생활지도 -2', stat.minus2Count],
+        ['★', '리더', stat.leaderCount],
+    ];
+    return (
+        <span data-head-levels className={`flex flex-wrap items-center text-caption tabular-nums ${compact ? 'gap-x-1.5' : 'gap-x-1'}`}>
+            {items.map(([mark, label, count], i) => (
+                <span key={mark} className="flex items-center gap-x-1 whitespace-nowrap">
+                    {/* 좁은 전체 반 칸에서는 점을 빼고 간격만 둡니다. */}
+                    {i > 0 && !compact && <span className="text-hairline" aria-hidden="true">·</span>}
+                    <span className={count > 0 ? 'text-ink' : 'text-faint'} aria-label={`${label} ${count}명`}>
+                        <span className={mark === '★' ? 'text-accent' : ''}>{mark}</span> {count}
+                    </span>
+                </span>
+            ))}
+        </span>
+    );
+}
+
 function HeadCount({ stat }: { stat?: ClassStat }) {
     if (!stat) return null;
     return (
@@ -104,7 +128,7 @@ function HeadCount({ stat }: { stat?: ClassStat }) {
 
 export function AssignmentBoard({
     students, groups, classNames, numberingMethod, classStats, violations, hasAssignments,
-    view, size, twoClasses, onTwoClassChange, query, showScores, selectedId, comparePartnerId,
+    view, size, pickedClasses, onPickedChange, query, showScores, selectedId, comparePartnerId,
     onChipClick, onHeadClick, onSelect, onCompare, onConfirmCompare, onCancelCompare, onUnassign,
 }: AssignmentBoardProps) {
     const classCount = classNames.length;
@@ -149,9 +173,17 @@ export function AssignmentBoard({
     );
     const comparing = preview !== null;
     const shownView: BoardView = comparing ? 'two' : view;
-    const shownClasses: [string, string] = preview
+    // 비교하는 동안에는 두 반으로 정하고, 마치면 보던 칸들로 돌아갑니다.
+    const shownClasses: string[] = preview
         ? [preview.classes[0].className, preview.classes[1].className]
-        : twoClasses;
+        : pickedClasses;
+    const canEditColumns = !comparing;
+    const canAddColumn = canEditColumns && shownClasses.length < 4 && shownClasses.length < classCount;
+    const canRemoveColumn = canEditColumns && shownClasses.length > 2;
+    const addColumn = () => {
+        const next = classNames.find((name) => !shownClasses.includes(name));
+        if (next) onPickedChange([...shownClasses, next]);
+    };
 
     const avoidPartners = useMemo(() => new Set(selectedId ? relations.avoid.get(selectedId) ?? [] : []), [relations, selectedId]);
     const keepPartners = useMemo(() => new Set(selectedId ? relations.keep.get(selectedId) ?? [] : []), [relations, selectedId]);
@@ -297,7 +329,7 @@ export function AssignmentBoard({
                                             type="button"
                                             data-class-head={name}
                                             data-sticky-head
-                                            title={hint ?? '두 반 크게 보기로 열기'}
+                                            title={hint ?? '골라 보기로 열기'}
                                             onClick={() => onHeadClick(name)}
                                             className="sticky top-0 z-10 block w-full cursor-pointer rounded-t-card border-b border-line bg-card px-1.5 py-1 text-left transition-colors hover:bg-wash focus-visible:outline-2 focus-visible:-outline-offset-2"
                                         >
@@ -309,6 +341,7 @@ export function AssignmentBoard({
                                                 )}
                                             </span>
                                             <HeadFigures stat={stat} />
+                                            <HeadLevels stat={stat} compact />
                                         </button>
                                         <div className="grid gap-px p-[3px]">
                                             {byClass[name].map((s) => renderChip(s, false))}
@@ -320,47 +353,68 @@ export function AssignmentBoard({
                     ) : (
                         <div
                             data-view="two"
+                            data-columns={shownClasses.length}
                             className="mt-1 grid content-start justify-center gap-1"
-                            style={{ gridTemplateColumns: `repeat(2, minmax(280px, ${WIDE_COLUMN_MAX}px))` }}
+                            style={{
+                                gridTemplateColumns: `repeat(${shownClasses.length}, minmax(${shownClasses.length > 3 ? 220 : 260}px, ${WIDE_COLUMN_MAX}px))${canAddColumn ? ' 112px' : ''}`,
+                            }}
                         >
-                            {([0, 1] as const).map((index) => {
-                                const name = shownClasses[index];
-                                const other = shownClasses[index === 0 ? 1 : 0];
+                            {shownClasses.map((name, index) => {
+                                const others = shownClasses.filter((_, i) => i !== index);
                                 const stat = statByClass.get(name);
                                 const hint = comparing ? null : moveHint(name);
                                 const canMove = !!selected && !comparing;
                                 return (
                                     <section key={index} aria-label={name} data-class-column={name} data-emphasized={previewClass === name || undefined} className={columnClass(name)}>
-                                        <div data-sticky-head className="sticky top-0 z-10 flex items-center gap-1 rounded-t-card border-b border-line bg-card px-2 py-1">
-                                            {/* 비교하는 동안에는 반을 바꾸지 않습니다. 비교하는 두 반이 정해져 있습니다. */}
-                                            <Select value={name} disabled={comparing} onValueChange={(value) => onTwoClassChange(index, value)}>
-                                                <SelectTrigger size="sm" aria-label={`${index === 0 ? '왼쪽' : '오른쪽'} 칸에 보일 반`} className="w-[88px] text-small font-bold">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {classNames.map((option) => (
-                                                        <SelectItem key={option} value={option} disabled={option === other}>
-                                                            {option}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <button
-                                                type="button"
-                                                data-class-head={name}
-                                                disabled={!canMove}
-                                                title={hint ?? undefined}
-                                                onClick={() => onHeadClick(name)}
-                                                className="flex min-w-0 flex-1 items-center gap-2 rounded-input px-2 py-1 text-left enabled:cursor-pointer enabled:hover:bg-wash focus-visible:outline-2 focus-visible:-outline-offset-2"
-                                            >
-                                                <HeadCount stat={stat} />
-                                                <HeadFigures stat={stat} />
-                                                {canMove && !sameClass(selected.assigned_class, name) && (
-                                                    <span className="ml-auto flex shrink-0 items-center gap-1 text-caption font-semibold text-accent-ink">
-                                                        <ArrowLineDown size={13} aria-hidden />이 반으로 옮기기
-                                                    </span>
+                                        <div data-sticky-head className="sticky top-0 z-10 rounded-t-card border-b border-line bg-card px-2 py-1">
+                                            <div className="flex items-center gap-1">
+                                                {/* 비교하는 동안에는 반을 바꾸지 않습니다. 비교하는 두 반이 정해져 있습니다. */}
+                                                <Select
+                                                    value={name}
+                                                    disabled={!canEditColumns}
+                                                    onValueChange={(value) => onPickedChange(shownClasses.map((old, i) => (i === index ? value : old)))}
+                                                >
+                                                    <SelectTrigger size="sm" aria-label={`${index + 1}번째 칸에 보일 반`} className="w-[84px] text-small font-bold">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {classNames.map((option) => (
+                                                            <SelectItem key={option} value={option} disabled={others.includes(option)}>
+                                                                {option}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <button
+                                                    type="button"
+                                                    data-class-head={name}
+                                                    disabled={!canMove}
+                                                    title={hint ?? undefined}
+                                                    onClick={() => onHeadClick(name)}
+                                                    className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 rounded-input px-1.5 py-0.5 text-left enabled:cursor-pointer enabled:hover:bg-wash focus-visible:outline-2 focus-visible:-outline-offset-2"
+                                                >
+                                                    <HeadCount stat={stat} />
+                                                    <HeadFigures stat={stat} />
+                                                    {canMove && !sameClass(selected.assigned_class, name) && (
+                                                        <span className="flex shrink-0 items-center gap-1 text-caption font-semibold text-accent-ink">
+                                                            <ArrowLineDown size={13} aria-hidden />이 반으로 옮기기
+                                                        </span>
+                                                    )}
+                                                </button>
+                                                {canRemoveColumn && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={`${name} 칸 빼기`}
+                                                        onClick={() => onPickedChange(shownClasses.filter((_, i) => i !== index))}
+                                                        className="flex shrink-0 cursor-pointer items-center gap-0.5 rounded-input px-1.5 py-1 text-caption text-soft hover:bg-surface-hover hover:text-ink focus-visible:outline-2"
+                                                    >
+                                                        <X size={12} aria-hidden="true" />빼기
+                                                    </button>
                                                 )}
-                                            </button>
+                                            </div>
+                                            <div className="mt-0.5 pl-1">
+                                                <HeadLevels stat={stat} />
+                                            </div>
                                         </div>
                                         <div className="grid gap-px p-[3px]">
                                             {byClass[name]?.map((s) => renderChip(s, true))}
@@ -368,6 +422,17 @@ export function AssignmentBoard({
                                     </section>
                                 );
                             })}
+                            {canAddColumn && (
+                                <div className="sticky top-0 self-start">
+                                    <button
+                                        type="button"
+                                        onClick={addColumn}
+                                        className="flex h-[58px] w-full cursor-pointer items-center justify-center gap-1 rounded-card border border-dashed border-hairline bg-card/60 text-small font-semibold text-accent hover:border-ring hover:bg-wash hover:text-accent-ink focus-visible:outline-2"
+                                    >
+                                        <Plus size={14} aria-hidden="true" />반 추가
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

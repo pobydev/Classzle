@@ -4,10 +4,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
     ArrowClockwise,
     ArrowCounterClockwise,
+    CaretDown,
     ChartBar,
     CheckCircle,
     DownloadSimple,
-    Lightbulb,
     MagnifyingGlass,
     Rocket,
     Rows,
@@ -27,7 +27,17 @@ import { resolveClassIndex, sameClass } from '@/lib/assignment/problem';
 import type { AssignmentChange, NumberingMethod, Student, Violation } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Switch } from '@/components/ui/switch';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { HelpTip } from '@/components/common/HelpTip';
 import {
     Dialog,
     DialogContent,
@@ -46,7 +56,8 @@ import {
 import { MoreMenu, MoreMenuItem } from '@/components/common/MoreMenu';
 import { AssignmentReportDialog } from './AssignmentReportDialog';
 import { AssignmentBoard, type BoardSize, type BoardView } from './AssignmentBoard';
-import { BalanceDetailBar, BalanceTable, CriteriaAndStatus } from './BalanceStats';
+import { BalanceTable } from './BalanceStats';
+import { ConditionsStatus } from './ConditionsStatus';
 
 interface Step3DashboardProps {
     // 상세 배치 조정 탭이 열리고 닫힐 때 알립니다. 앱 틀이 사이드바를 접는 데 씁니다.
@@ -56,6 +67,8 @@ interface Step3DashboardProps {
 type DashboardTab = 'stats' | 'board';
 
 const BOARD_SIZE_KEY = 'classzle-board-size';
+const MIN_PICKED = 2;
+const MAX_PICKED = 4;
 
 function readBoardSize(): BoardSize {
     try {
@@ -97,7 +110,8 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
     const [pendingSwap, setPendingSwap] = useState<{ s1Id: string, s2Id?: string, className?: string, violations: Violation[] } | null>(null);
 
     const [view, setView] = useState<BoardView>('compact');
-    const [twoClasses, setTwoClasses] = useState<[string, string]>(['1반', '2반']);
+    // 골라 보기에서 나란히 볼 반입니다. 2반부터 4반까지입니다.
+    const [pickedClasses, setPickedClasses] = useState<string[]>(['1반', '2반']);
     const [searchText, setSearchText] = useState('');
     const [showScores, setShowScores] = useState(true);
     const [boardSize, setBoardSize] = useState<BoardSize>(readBoardSize);
@@ -114,6 +128,15 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
         () => Array.from({ length: settings.classCount }, (_, i) => `${i + 1}반`),
         [settings.classCount]
     );
+    // 학급 수가 줄어 없는 반이 들어 있으면 빼고, 두 칸보다 적으면 남은 반으로 채웁니다.
+    const shownPicked = useMemo(() => {
+        const kept = [...new Set(pickedClasses)].filter((name) => classNames.includes(name)).slice(0, MAX_PICKED);
+        for (const name of classNames) {
+            if (kept.length >= Math.min(MIN_PICKED, classNames.length)) break;
+            if (!kept.includes(name)) kept.push(name);
+        }
+        return kept;
+    }, [pickedClasses, classNames]);
 
     // 수동으로 바꾼 뒤에도 맞도록 지금 배정에서 바로 계산합니다.
     const violations = useMemo(
@@ -307,8 +330,9 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
         toast.success(className ? `${name} 학생을 ${className}으로 옮겼습니다.` : `${name} 학생을 미배정으로 뺐습니다.`);
     };
 
+    // 반 이름을 누르면 골라 보기로 그 반을 엽니다. 이미 보고 있는 반이면 칸은 그대로 둡니다.
     const openInTwoClassView = (className: string) => {
-        setTwoClasses(([left, right]) => [className, left === className ? right : left]);
+        if (!shownPicked.includes(className)) setPickedClasses([className, ...shownPicked].slice(0, shownPicked.length));
         setView('two');
     };
 
@@ -328,9 +352,7 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
         clearSelection();
     };
 
-    const handleTwoClassChange = (index: 0 | 1, className: string) => {
-        setTwoClasses(([left, right]) => (index === 0 ? [className, right] : [left, className]));
-    };
+    const handlePickedChange = (next: string[]) => setPickedClasses(next.slice(0, MAX_PICKED));
 
     const handleViewChange = (next: BoardView) => {
         setComparePartnerId(null);
@@ -401,10 +423,10 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                         <>
                             <div role="group" aria-label="보기 방식" className="inline-flex gap-0.5 rounded-button bg-surface-hover p-[3px]">
                                 <button type="button" aria-pressed={shownView === 'compact'} className={seg(shownView === 'compact')} onClick={() => handleViewChange('compact')}>
-                                    {settings.classCount}칸 압축
+                                    전체 반
                                 </button>
                                 <button type="button" aria-pressed={shownView === 'two'} className={seg(shownView === 'two')} onClick={() => handleViewChange('two')}>
-                                    두 반 크게
+                                    골라 보기
                                 </button>
                             </div>
                             <div className="relative w-[170px]">
@@ -417,36 +439,37 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                                     className="h-8 pl-8 text-small"
                                 />
                             </div>
-                            <label className="flex cursor-pointer items-center gap-1.5 text-small text-ink">
-                                <Switch checked={showScores} onCheckedChange={setShowScores} aria-label="성적 표시" />
-                                성적 표시
-                            </label>
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-small whitespace-nowrap text-soft">글자</span>
-                                <div role="group" aria-label="글자 크기" className="inline-flex gap-0.5 rounded-button bg-surface-hover p-[3px]">
-                                    <button type="button" title="스크롤 없이 들어가는 가장 큰 글자로 맞춥니다" aria-pressed={boardSize === 'auto'} className={seg(boardSize === 'auto')} onClick={() => handleBoardSizeChange('auto')}>자동</button>
-                                    <button type="button" title="16px로 넉넉하게 보고 세로로 스크롤합니다" aria-pressed={boardSize === 'large'} className={seg(boardSize === 'large')} onClick={() => handleBoardSizeChange('large')}>크게</button>
-                                </div>
-                            </div>
+                            <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="data-[state=open]:bg-wash">
+                                        보기<CaretDown aria-hidden="true" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start">
+                                    <DropdownMenuCheckboxItem checked={showScores} onCheckedChange={(v) => setShowScores(v === true)} onSelect={(e) => e.preventDefault()}>
+                                        성적 표시
+                                    </DropdownMenuCheckboxItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel>글자 크기 (전체 반)</DropdownMenuLabel>
+                                    <DropdownMenuRadioGroup value={boardSize} onValueChange={(v) => handleBoardSizeChange(v as BoardSize)}>
+                                        <DropdownMenuRadioItem value="auto" onSelect={(e) => e.preventDefault()}>
+                                            <span className="flex flex-col">
+                                                자동
+                                                <span className="text-caption text-soft">스크롤 없이 들어가는 가장 큰 글자</span>
+                                            </span>
+                                        </DropdownMenuRadioItem>
+                                        <DropdownMenuRadioItem value="large" onSelect={(e) => e.preventDefault()}>
+                                            <span className="flex flex-col">
+                                                크게
+                                                <span className="text-caption text-soft">16px로 넉넉하게, 세로로 스크롤</span>
+                                            </span>
+                                        </DropdownMenuRadioItem>
+                                    </DropdownMenuRadioGroup>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                             <Button variant="outline" size="sm" onClick={handleUndo} disabled={undoStack.length === 0}>
                                 <ArrowCounterClockwise />되돌리기
                             </Button>
-                            <div className="flex items-center gap-1.5">
-                                <span className="text-small whitespace-nowrap text-soft">번호 부여 방식</span>
-                                <Select
-                                    value={settings.numberingMethod}
-                                    onValueChange={(v) => setNumberingMethod(v as NumberingMethod)}
-                                >
-                                    <SelectTrigger size="sm" aria-label="번호 부여 방식" className="w-[136px] text-small">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="mixed">성별 혼합</SelectItem>
-                                        <SelectItem value="maleFirst">남학생 → 여학생</SelectItem>
-                                        <SelectItem value="femaleFirst">여학생 → 남학생</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
                             <span role="status" data-board-status className={`ml-auto flex items-center gap-1 text-small font-semibold whitespace-nowrap ${violations.length > 0 ? 'text-danger' : 'text-ink'}`}>
                                 {violations.length > 0 ? <WarningCircle size={15} /> : <CheckCircle size={15} className="text-accent-ink" />}
                                 조건 어김 {violations.length}건 · 전체 {students.length}명
@@ -466,8 +489,8 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                         hasAssignments={hasAssignments}
                         view={view}
                         size={boardSize}
-                        twoClasses={twoClasses}
-                        onTwoClassChange={handleTwoClassChange}
+                        pickedClasses={shownPicked}
+                        onPickedChange={handlePickedChange}
                         query={query}
                         showScores={showScores}
                         selectedId={selectedStudentId}
@@ -483,13 +506,21 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                 </TabsContent>
 
                 <TabsContent value="stats" className="space-y-4 p-4">
-                    {/* 배정 모드 */}
+                    {/* 배정 방식과 실행 */}
                     <section className="rounded-card bg-card p-4 shadow-card">
                         <div className="flex flex-wrap items-end justify-between gap-4">
                             <div>
-                                <p className="mb-1 px-1 text-caption font-semibold text-soft">배정 모드 선택</p>
+                                <p className="mb-1 flex items-center gap-1 px-1 text-caption font-semibold text-soft">
+                                    배정 방식
+                                    <HelpTip label="배정 방식" width={380}>
+                                        <p><strong>신규 배정</strong>: 남녀 각각 성적순으로 한 명씩 돌아가며 나눈 뒤 모든 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀, 생활지도, 성적)을 맞춰 처음부터 새로 편성합니다.</p>
+                                        <p><strong>현재 배정 수정</strong>: 지금 배정을 유지하고 어긴 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀)만 고칩니다. 옮기는 학생을 가장 적게 합니다.</p>
+                                        <p><strong>균형 조정</strong>: 지금 배정에서 시작해 어긴 조건을 고치고 성적과 생활지도 균형까지 맞춥니다. 수정보다 많은 학생을 옮길 수 있습니다.</p>
+                                        <p className="text-soft">수정과 균형 조정은 배정이 있어야 고를 수 있습니다.</p>
+                                    </HelpTip>
+                                </p>
                                 <Tabs value={assignmentMode} onValueChange={(v) => setAssignmentMode(v as AssignmentMode)} className="w-[420px] max-w-full">
-                                    <TabsList className="grid h-10 w-full grid-cols-3">
+                                    <TabsList className="grid h-[38px] w-full grid-cols-3">
                                         <TabsTrigger value="new"><Rocket />신규 배정</TabsTrigger>
                                         <TabsTrigger value="optimize" disabled={!hasAssignments}><Wrench />현재 배정 수정</TabsTrigger>
                                         <TabsTrigger value="balance" disabled={!hasAssignments}><Scales />균형 조정</TabsTrigger>
@@ -497,45 +528,40 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                                 </Tabs>
                             </div>
 
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                <Button onClick={handleAssign} disabled={isAssigning || students.length === 0}>
-                                    {hasAssignments ? <ArrowClockwise /> : <Rocket />}
-                                    {isAssigning ? '배정 중...' : hasAssignments ? '배정 실행' : '반편성 시작'}
-                                </Button>
-                                <Button variant="outline" onClick={handleUndo} disabled={undoStack.length === 0}>
-                                    <ArrowCounterClockwise />되돌리기
-                                </Button>
-                                <span className="mx-1 h-8 w-px bg-line" aria-hidden />
-                                <Button variant="outline" onClick={() => setIsReportOpen(true)} disabled={students.length === 0}>
-                                    <ChartBar />배정 리포트
-                                </Button>
-                                <Button variant="outline" onClick={() => setIsExportDialogOpen(true)} disabled={!hasAssignments}>
-                                    <DownloadSimple />배정 결과 엑셀
-                                </Button>
-                                <MoreMenu label="반 편성 메뉴" size="icon">
-                                    <MoreMenuItem danger disabled={!hasAssignments} onSelect={() => setIsResetConfirmOpen(true)}>
-                                        <Trash aria-hidden="true" />배정 초기화
-                                    </MoreMenuItem>
-                                </MoreMenu>
+                            <div className="flex flex-col items-end gap-1.5">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <Button onClick={handleAssign} disabled={isAssigning || students.length === 0}>
+                                        {hasAssignments ? <ArrowClockwise /> : <Rocket />}
+                                        {isAssigning ? '배정 중...' : hasAssignments ? '배정 실행' : '반편성 시작'}
+                                    </Button>
+                                    <Button variant="outline" onClick={handleUndo} disabled={undoStack.length === 0}>
+                                        <ArrowCounterClockwise />되돌리기
+                                    </Button>
+                                    <span className="mx-1 h-8 w-px bg-line" aria-hidden />
+                                    <Button variant="outline" onClick={() => setIsReportOpen(true)} disabled={students.length === 0}>
+                                        <ChartBar />배정 리포트
+                                    </Button>
+                                    <Button variant="outline" onClick={() => setIsExportDialogOpen(true)} disabled={!hasAssignments}>
+                                        <DownloadSimple />배정 결과 엑셀
+                                    </Button>
+                                    <MoreMenu label="반 편성 메뉴" size="icon">
+                                        <MoreMenuItem danger disabled={!hasAssignments} onSelect={() => setIsResetConfirmOpen(true)}>
+                                            <Trash aria-hidden="true" />배정 초기화
+                                        </MoreMenuItem>
+                                    </MoreMenu>
+                                </div>
+                                <ConditionsStatus hasAssignments={hasAssignments} violations={violations} />
                             </div>
-                        </div>
-
-                        <div className="mt-3 flex items-start gap-2 rounded-button bg-wash px-3 py-2 text-small text-accent-ink">
-                            <Lightbulb size={16} className="mt-0.5 shrink-0" />
-                            {assignmentMode === 'new' ? (
-                                <p><strong>신규 배정:</strong> 남녀 각각 성적순으로 한 명씩 돌아가며 나눈 뒤 모든 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀, 생활지도, 성적)을 맞춰 처음부터 새로 편성합니다.</p>
-                            ) : assignmentMode === 'optimize' ? (
-                                <p><strong>현재 배정 수정:</strong> 지금 배정을 유지하고 어긴 조건(고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀)만 고칩니다. 옮기는 학생을 가장 적게 합니다.</p>
-                            ) : (
-                                <p><strong>균형 조정:</strong> 지금 배정에서 시작해 어긴 조건을 고치고 성적과 생활지도 균형까지 맞춥니다. 수정보다 많은 학생을 옮길 수 있습니다.</p>
-                            )}
                         </div>
                     </section>
 
-                    <BalanceDetailBar students={students} groups={groups} classCount={settings.classCount} hasAssignments={hasAssignments} />
-                    <BalanceTable students={students} groups={groups} classCount={settings.classCount} onOpenClass={handleOpenClassFromStats} />
-                    <CriteriaAndStatus hasAssignments={hasAssignments} violations={violations} />
-
+                    <BalanceTable
+                        students={students}
+                        groups={groups}
+                        classCount={settings.classCount}
+                        hasAssignments={hasAssignments}
+                        onOpenClass={handleOpenClassFromStats}
+                    />
                 </TabsContent>
             </Tabs>
 
@@ -571,8 +597,24 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                         <DialogTitle className="flex items-center gap-2 text-title-sm font-bold">
                             <DownloadSimple size={22} className="text-brand" />배정 결과 엑셀 내보내기
                         </DialogTitle>
-                        <DialogDescription>엑셀 파일에 넣을 정보 수준을 고릅니다.</DialogDescription>
+                        <DialogDescription>번호 매기는 방식과 넣을 정보를 고릅니다.</DialogDescription>
                     </DialogHeader>
+                    <div className="flex items-center justify-between gap-3 rounded-button bg-canvas px-3 py-2">
+                        <label htmlFor="numbering-method" className="text-small font-semibold text-ink">번호 부여 방식</label>
+                        <Select
+                            value={settings.numberingMethod}
+                            onValueChange={(v) => setNumberingMethod(v as NumberingMethod)}
+                        >
+                            <SelectTrigger id="numbering-method" size="sm" aria-label="번호 부여 방식" className="w-[160px] bg-card text-small">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="mixed">성별 혼합</SelectItem>
+                                <SelectItem value="maleFirst">남학생 → 여학생</SelectItem>
+                                <SelectItem value="femaleFirst">여학생 → 남학생</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     {leftOutOfExport.length > 0 && (
                         <div data-export-left-out className="rounded-button bg-danger-wash p-3 text-small text-ink">
                             <p className="font-semibold">반이 없는 학생 {leftOutOfExport.length}명은 결과 파일에 들어가지 않습니다.</p>

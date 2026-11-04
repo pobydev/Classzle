@@ -174,6 +174,29 @@ try {
     await page.waitForTimeout(500);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
+    // 골라 보기: 2~4반을 나란히 보고, 비교하는 동안에는 두 반으로 정했다가 끝나면 보던 칸으로 돌아갑니다.
+    await expect(page.locator('[data-balance-table]')).not.toContainText('▲');
+    await page.getByRole('tab', { name: /상세 배치 조정/ }).click();
+    await page.getByRole('button', { name: '골라 보기' }).click();
+    const pickView = page.locator('[data-view="two"]');
+    await expect(pickView).toHaveAttribute('data-columns', '2');
+    await expect(pickView.getByRole('button', { name: /칸 빼기$/ })).toHaveCount(0);
+    await page.getByRole('button', { name: '반 추가' }).click();
+    await page.getByRole('button', { name: '반 추가' }).click();
+    await expect(pickView).toHaveAttribute('data-columns', '4');
+    await expect(page.getByRole('button', { name: '반 추가' })).toHaveCount(0);
+    await pickView.getByRole('button', { name: '4반 칸 빼기' }).click();
+    await expect(pickView).toHaveAttribute('data-columns', '3');
+    await pickView.locator('[data-chip]').first().click();
+    await page.locator('[data-rec-row]').first().click();
+    await expect(pickView).toHaveAttribute('data-columns', '2');
+    await expect(pickView.getByRole('button', { name: /칸 빼기$/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '반 추가' })).toHaveCount(0);
+    await page.locator('[data-board-panel]').getByRole('button', { name: '취소' }).click();
+    await expect(pickView).toHaveAttribute('data-columns', '3');
+    await page.getByRole('tab', { name: /학급별 균형 통계/ }).click();
+    checks.push('골라 보기: 2~4반, 빼기와 반 추가, 비교하는 동안 두 반으로 정하고 끝나면 보던 칸으로 돌아감');
+
     await page.getByRole('tab', { name: /균형 조정/ }).click();
     await page.getByRole('button', { name: '반 편성 메뉴' }).click();
     await page.getByRole('menuitem', { name: '배정 초기화' }).click();

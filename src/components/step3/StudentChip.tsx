@@ -81,18 +81,34 @@ interface StudentChipProps {
     onSelect: (id: string) => void;
 }
 
-function stateClass({ selected, rank, relation, found, emphasized, partner }: StudentChipProps): string {
-    if (selected) return 'border-accent bg-tint ring-1 ring-accent';
-    if (partner) return 'border-dashed border-accent bg-tint ring-1 ring-accent';
+// 생활지도 바탕: -3은 진한, -2는 옅은 따뜻한 바탕입니다. -1과 리더는 바탕 없이 배지만 씁니다.
+export type ChipLevel = 'strong' | 'soft' | null;
+export function chipLevelOf(student: Pick<Student, 'behavior_type' | 'behavior_score'>): ChipLevel {
+    if (student.behavior_type === 'LEADER' || student.behavior_type === 'NONE') return null;
+    if (student.behavior_score <= -3) return 'strong';
+    if (student.behavior_score === -2) return 'soft';
+    return null;
+}
+export const LEVEL_BG: Record<Exclude<ChipLevel, null>, string> = {
+    strong: 'bg-guidance-strong',
+    soft: 'bg-guidance-soft',
+};
+
+// 생활지도 바탕이 있는 칩은 바탕을 그대로 두고 테두리와 고리로만 상태를 보여 줍니다.
+// 그래서 고른 학생, 추천, 비교 상대도 -3, -2 바탕과 함께 알아볼 수 있습니다.
+function stateClass({ selected, rank, relation, found, emphasized, partner }: StudentChipProps, level: ChipLevel): string {
+    const bg = (state: string) => (level ? LEVEL_BG[level] : state);
+    if (selected) return `border-accent ring-2 ring-accent ${bg('bg-tint')}`;
+    if (partner) return `border-dashed border-accent ring-2 ring-accent ${bg('bg-tint')}`;
     const recommended = rank !== null;
     const emphasis = emphasized ? ' ring-2 ring-accent' : '';
     // 상대 표시는 점선 여부, 테두리 색, 아이콘이 따로 움직입니다. 추천이면서 분리 배정 상대일 수 있습니다.
     const line = recommended ? 'border-dashed' : 'border-solid';
-    if (relation === 'avoid') return `${line} border-danger bg-danger-wash${emphasis}`;
-    if (relation === 'keep') return `${line} border-ink bg-surface-hover${emphasis}`;
-    if (recommended) return `border-dashed border-accent ${emphasized ? 'bg-tint' : 'bg-wash'}${emphasis}`;
-    if (found) return 'border-accent-ink bg-tint';
-    return 'border-transparent hover:bg-surface-hover';
+    if (relation === 'avoid') return `${line} border-danger ${bg('bg-danger-wash')}${emphasis}`;
+    if (relation === 'keep') return `${line} border-ink ${bg('bg-surface-hover')}${emphasis}`;
+    if (recommended) return `border-dashed border-accent ${bg(emphasized ? 'bg-tint' : 'bg-wash')}${emphasis}`;
+    if (found) return `border-accent-ink ${bg('bg-tint')}`;
+    return level ? `border-transparent ${LEVEL_BG[level]} hover:border-hairline` : 'border-transparent hover:bg-surface-hover';
 }
 
 export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
@@ -101,6 +117,8 @@ export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
         partner, wide, showScore, attendanceNumber, onSelect,
     } = props;
     const gender = student.gender === 'M' ? '남' : '여';
+    const level = chipLevelOf(student);
+    const isLeader = student.behavior_type === 'LEADER' && student.behavior_score > 0;
     const relationLabel = relation === 'avoid' ? '분리 배정 상대' : relation === 'keep' ? '함께 배정 상대' : null;
     const title = [
         student.name,
@@ -126,9 +144,10 @@ export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
             data-relation={relation ?? undefined}
             data-partner={partner || undefined}
             data-found={found || undefined}
+            data-level={level ?? undefined}
             title={title}
             onClick={() => onSelect(student.id)}
-            className={`relative flex w-full min-w-0 scroll-mt-16 cursor-pointer flex-wrap content-center items-center gap-x-[3px] rounded-input border px-[3px] text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${wide ? 'min-h-[30px] text-body' : 'min-h-[var(--chip-h,25px)] text-[length:var(--chip-font,13px)] leading-[1.3]'} ${stateClass(props)} ${dimmed ? 'opacity-30' : ''}`}
+            className={`relative flex w-full min-w-0 scroll-mt-16 cursor-pointer flex-wrap content-center items-center gap-x-[3px] rounded-input border px-[3px] text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${wide ? 'min-h-[30px] text-body' : 'min-h-[var(--chip-h,25px)] text-[length:var(--chip-font,13px)] leading-[1.3]'} ${stateClass(props, level)} ${dimmed ? 'opacity-30' : ''}`}
         >
             {relationIcon && (
                 <span className={wide ? 'shrink-0' : 'absolute -top-1 -left-1 z-[1] rounded-full bg-card'}>{relationIcon}</span>
@@ -139,8 +158,11 @@ export const StudentChip = memo(function StudentChip(props: StudentChipProps) {
             {wide && (
                 <span className="w-6 shrink-0 text-right text-caption text-soft tabular-nums">{attendanceNumber ?? ''}</span>
             )}
-            {/* 이름은 줄이지 않습니다. 칸보다 긴 이름만 말줄임이 됩니다. */}
-            <span className={`max-w-full shrink-0 truncate font-medium text-ink ${wide ? 'ml-1' : ''}`}>{student.name}</span>
+            {/* 이름은 줄이지 않습니다. 칸보다 긴 이름만 말줄임이 됩니다. 리더는 이름 앞에 ★를 둡니다. */}
+            <span className={`max-w-full shrink-0 truncate font-medium text-ink ${wide ? 'ml-1' : ''}`}>
+                {isLeader && <span className="mr-px text-accent" aria-hidden="true">★</span>}
+                {student.name}
+            </span>
             <span className={`shrink-0 text-soft ${wide ? 'text-caption' : 'text-[length:var(--chip-sub,12px)]'}`}>{gender}</span>
             {showScore && !wide && (
                 <span data-chip-score className="shrink-0 text-[length:var(--chip-sub,12px)] text-soft tabular-nums">

@@ -36,6 +36,8 @@
   --color-danger: var(--danger);
   --color-danger-wash: var(--danger-wash);
   --color-overlay: var(--overlay);
+  --color-guidance-strong: var(--guidance-strong);
+  --color-guidance-soft: var(--guidance-soft);
 
   /* 화면 글자 8단계 */
   --text-micro: 11px;
@@ -113,6 +115,11 @@
   --danger: #c42b31;
   --danger-wash: #fdeeee;
   --overlay: rgba(30, 42, 74, 0.36);
+
+  /* 보드 학생 칸의 생활지도 바탕 (Classzle 전용, 2026-11-04 사용자 승인).
+     -3은 진한, -2는 옅은 따뜻한 바탕이고 행동과 정서는 같은 색입니다. 늘 배지 글자와 함께 씁니다. */
+  --guidance-strong: #fcd9b6;
+  --guidance-soft: #fff1e3;
 
   --radius: 10px;
 

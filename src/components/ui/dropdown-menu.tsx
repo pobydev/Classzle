@@ -3,6 +3,8 @@
 import * as React from "react"
 import * as MenuPrimitive from "@radix-ui/react-dropdown-menu"
 
+import { Check } from "@phosphor-icons/react"
+
 import { cn } from "@/lib/utils"
 
 const DropdownMenu = MenuPrimitive.Root
@@ -65,7 +67,36 @@ function DropdownMenuSeparator({ className, ...props }: React.ComponentProps<typ
   return <MenuPrimitive.Separator className={cn("my-1 h-px bg-line", className)} {...props} />
 }
 
+const ITEM = "relative flex cursor-pointer items-center gap-2 rounded-input py-2 pr-2.5 pl-8 text-small text-ink outline-none select-none data-[highlighted]:bg-wash data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+
+function DropdownMenuCheckboxItem({ className, children, ...props }: React.ComponentProps<typeof MenuPrimitive.CheckboxItem>) {
+  return (
+    <MenuPrimitive.CheckboxItem className={cn(ITEM, className)} {...props}>
+      <span className="absolute left-2.5 flex size-4 items-center justify-center">
+        <MenuPrimitive.ItemIndicator><Check size={14} weight="bold" className="text-accent" /></MenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
+const DropdownMenuRadioGroup = MenuPrimitive.RadioGroup
+
+function DropdownMenuRadioItem({ className, children, ...props }: React.ComponentProps<typeof MenuPrimitive.RadioItem>) {
+  return (
+    <MenuPrimitive.RadioItem className={cn(ITEM, className)} {...props}>
+      <span className="absolute left-2.5 flex size-4 items-center justify-center">
+        <MenuPrimitive.ItemIndicator><span className="size-2 rounded-full bg-accent" /></MenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </MenuPrimitive.RadioItem>
+  )
+}
+
 export {
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,

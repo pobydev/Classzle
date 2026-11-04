@@ -9,7 +9,7 @@ import { previousClassOf, sameClass } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
 import type { CustomGroup, Student, Violation } from '@/types';
 import { behaviorMark, groupsOf, relationMemo, UNASSIGNED, type RelationIndex } from './boardModel';
-import { Mark, RankBadge, StudentMarks } from './StudentChip';
+import { Mark, RankBadge, StudentMarks, LEVEL_BG } from './StudentChip';
 
 // 공통 디자인의 스크롤바: 평소에는 보이지 않고 마우스를 올린 곳에서만 5px로 나타납니다.
 
@@ -29,11 +29,13 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export function BoardLegend() {
     return (
         <div className="mt-4 space-y-1.5 border-t border-line pt-3 text-caption text-soft">
-            <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="flex items-center gap-1"><Mark tone="level3">행-3</Mark>행동</span>
-                <span className="flex items-center gap-1"><Mark tone="level2">정-2</Mark>정서</span>
-                <span className="flex items-center gap-1"><Mark tone="leader">리+1</Mark>리더</span>
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1" data-legend-levels>
+                <span className="flex items-center gap-1"><span className={`flex items-center rounded-input px-1 py-px ${LEVEL_BG.strong}`}><Mark tone="level3">행-3</Mark></span>-3</span>
+                <span className="flex items-center gap-1"><span className={`flex items-center rounded-input px-1 py-px ${LEVEL_BG.soft}`}><Mark tone="level2">정-2</Mark></span>-2</span>
+                <span className="flex items-center gap-1"><Mark tone="level1">행-1</Mark>-1</span>
+                <span className="flex items-center gap-1"><span className="text-accent" aria-hidden="true">★</span><Mark tone="leader">리+1</Mark>리더</span>
             </p>
+            <p>행은 행동, 정은 정서입니다. -3과 -2는 이름 칸에 바탕을 칠합니다.</p>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="flex items-center gap-1"><Mark>고</Mark>고정 배정</span>
                 <span className="flex items-center gap-1"><Mark>분</Mark>분리 배정</span>
