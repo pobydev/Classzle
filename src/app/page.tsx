@@ -94,7 +94,7 @@ export default function Home() {
               <Step1Setup />
             </TabsContent>
 
-            <TabsContent value="step2" className="p-5">
+            <TabsContent value="step2" className="h-full p-5">
               <Step2Constraints leaveGuard={leaveStep2} />
             </TabsContent>
 

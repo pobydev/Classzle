@@ -155,10 +155,25 @@ try {
     expect((await stored()).students).toHaveLength(329);
     checks.push('3 학생을 지우기 전에 묻고, 취소하면 그대로임');
 
-    // 8. 2단계에서 사이드바로 옮기기
+    // 2단계: 기준 학생을 고르면 왼쪽이 상대 고르기가 되고, 저장하면 탭의 개수가 늘어남
     await page.getByRole('tab', { name: '2단계 조건 설정' }).click();
-    await page.getByRole('button', { name: '전출 예정' }).click();
-    await page.locator('.cursor-pointer.rounded-input').first().click();
+    const avoidTab = page.getByRole('tab', { name: /^분리 배정/ });
+    await avoidTab.click();
+    await expect(avoidTab).toContainText('0');
+    const picks = page.locator('[data-pick-student]');
+    await picks.first().click();
+    await expect(page.locator('section[aria-label="학생 고르기"] h3')).toContainText('상대 고르기');
+    await picks.first().click();
+    await expect(picks.first()).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('[data-step2-save]').click();
+    await expect(avoidTab).toContainText('1');
+    await expect(page.locator('[data-relation-list]')).toBeVisible();
+    await expect(page.locator('section[aria-label="학생 고르기"] h3')).toContainText('기준 학생 고르기');
+    checks.push('2단계: 기준 학생 → 상대 고르기 → 저장, 탭에 설정한 개수');
+
+    // 8. 2단계에서 사이드바로 옮기기
+    await page.getByRole('tab', { name: /^전출 예정/ }).click();
+    await page.locator('[data-pick-student]').first().click();
     await page.getByRole('tab', { name: '1단계 기초 정보' }).click();
     await expect(dialog).toContainText('저장하지 않은 변경 사항이 있습니다');
     await dialog.getByRole('button', { name: '이 화면에 머무르기' }).click();

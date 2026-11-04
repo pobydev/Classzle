@@ -58,7 +58,7 @@ export function ExcelGuideDialog({ open, onOpenChange }: { open: boolean; onOpen
                                             </TableRow>
                                             <TableRow>
                                                 <TableCell className="font-medium">성별</TableCell>
-                                                <TableCell>'남', '여', 'M', 'F' 중 하나</TableCell>
+                                                <TableCell>남, 여, M, F 중 하나</TableCell>
                                             </TableRow>
                                             <TableRow>
                                                 <TableCell className="font-medium">성적</TableCell>
@@ -136,7 +136,7 @@ export function ExcelGuideDialog({ open, onOpenChange }: { open: boolean; onOpen
                             생활지도 값 (두 양식 공통)
                         </h3>
                         <p className="text-body text-soft ml-8">
-                            '생활지도' 칸에는 아래 글자를 그대로 넣어야 값이 들어갑니다. 학생마다 값은 하나입니다.
+                            생활지도 칸에는 아래 글자를 그대로 넣어야 값이 들어갑니다. 학생마다 값은 하나입니다.
                         </p>
                         <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="border rounded-input p-3">

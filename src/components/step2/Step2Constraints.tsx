@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect, type MutableRefObject } from 'react';
+import { useState, useEffect, useMemo, type MutableRefObject } from 'react';
 import { useClasszleStore } from '@/lib/store';
 import { CustomGroup, Student } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import PreTransferSettings from '@/components/PreTransferSettings';
 import {
     Dialog,
     DialogContent,
@@ -22,7 +20,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowsLeftRight, Handshake, Lightbulb, PencilSimple, Plus, Trash } from '@phosphor-icons/react';
+import { ArrowsLeftRight, CheckCircle, Handshake, PencilSimple, Plus, Trash, X } from '@phosphor-icons/react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { HelpTip } from '@/components/common/HelpTip';
+import { buildRelations } from '@/components/step3/boardModel';
+import { StudentPicker } from './StudentPicker';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/shell/ConfirmProvider';
 
@@ -30,6 +32,64 @@ import { useConfirm } from '@/components/shell/ConfirmProvider';
 interface Step2ConstraintsProps {
     // 앱 틀이 이 단계를 떠나기 전에 부릅니다. 머무르기로 하면 false입니다.
     leaveGuard: MutableRefObject<(() => Promise<boolean>) | null>;
+}
+
+type Mode = 'group' | 'avoid' | 'keep' | 'fixed' | 'pretransfer';
+
+// 조건 이름은 사용자가 정한 것입니다 (그룹 분산, 분리 배정, 함께 배정, 고정 배정, 전출 예정).
+const TABS: { value: Mode; label: string }[] = [
+    { value: 'group', label: '그룹 분산' },
+    { value: 'avoid', label: '분리 배정' },
+    { value: 'keep', label: '함께 배정' },
+    { value: 'fixed', label: '고정 배정' },
+    { value: 'pretransfer', label: '전출 예정' },
+];
+
+const TAB_HINTS: Record<Mode, { line: string; help: React.ReactNode }> = {
+    group: {
+        line: '그룹 학생을 모든 반에 고르게 나눕니다.',
+        help: (
+            <>
+                <p>그룹을 만들고 학생을 넣으면, 그 학생들이 한 반에 몰리지 않게 나눕니다.</p>
+                <p>예: 특수학급, 운동부처럼 반마다 비슷하게 있어야 하는 학생</p>
+            </>
+        ),
+    },
+    avoid: {
+        line: '같은 반이 되면 안 되는 학생을 정합니다.',
+        help: (
+            <>
+                <p>기준 학생을 고른 뒤 상대를 고르고 저장합니다. 고른 학생들은 다른 반에 배정합니다.</p>
+                <p>예: 학교폭력 사안으로 떼어 놓아야 하는 경우, 사이가 좋지 않은 경우</p>
+            </>
+        ),
+    },
+    keep: {
+        line: '같은 반에 두는 학생을 정합니다.',
+        help: (
+            <>
+                <p>담임 판단으로 같은 반에 두는 학생입니다. 분리 배정 다음으로 지키는 조건이고, 어기면 위반으로 표시합니다.</p>
+                <p>예: 생활지도나 교우관계 때문에 함께 두어야 한다고 판단한 경우</p>
+            </>
+        ),
+    },
+    fixed: {
+        line: '학생을 정한 반에 꼭 배정합니다.',
+        help: <p>왼쪽에서 학생을 고르고, 오른쪽에서 반을 고른 뒤 저장합니다. 고정 안 함을 고르면 풀립니다.</p>,
+    },
+    pretransfer: {
+        line: '방학 중 전출할 학생을 고릅니다.',
+        help: (
+            <>
+                <p><strong>균형 배정</strong>: 인원, 남녀, 성적은 전출 뒤 기준으로 맞추고, 전출 예정 학생은 반마다 고르게 나눕니다.</p>
+                <p><strong>마지막 번호</strong>: 반 번호가 끊기지 않도록, 이름과 관계없이 그 반의 가장 마지막 번호를 받습니다.</p>
+            </>
+        ),
+    },
+};
+
+function EmptyPanel({ children }: { children: React.ReactNode }) {
+    return <p className="flex h-full min-h-40 items-center justify-center px-6 text-center text-small text-soft">{children}</p>;
 }
 
 const GROUP_COLORS = [
@@ -74,18 +134,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
     const [relationMode, setRelationMode] = useState<'avoid' | 'keep' | 'fixed' | 'pretransfer' | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [relationMemo, setRelationMemo] = useState('');
-    const [selectedClassFilter, setSelectedClassFilter] = useState<string>('all');
     const [tempMemberIds, setTempMemberIds] = useState<string[]>([]);
-    // 분산배정 그룹 학생 검색
-    const [groupStudentSearch, setGroupStudentSearch] = useState<string>('');
-    // 고정 배정 학생 검색
-    const [fixedStudentSearch, setFixedStudentSearch] = useState<string>('');
-    // 기준 학생용 필터/검색 (분리 배정, 함께 배정)
-    const [baseStudentClassFilter, setBaseStudentClassFilter] = useState<string>('all');
-    const [baseStudentSearch, setBaseStudentSearch] = useState<string>('');
-    // 대상 학생용 필터/검색 (분리 배정, 함께 배정)
-    const [targetStudentClassFilter, setTargetStudentClassFilter] = useState<string>('all');
-    const [targetStudentSearch, setTargetStudentSearch] = useState<string>('');
     const [tempRelationTargetIds, setTempRelationTargetIds] = useState<string[]>([]);
     const [tempRelationMemos, setTempRelationMemos] = useState<Record<string, string>>({});
     const [selectedRelationsForDelete, setSelectedRelationsForDelete] = useState<Set<string>>(new Set());
@@ -111,9 +160,6 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
             const memos = relationMode === 'avoid' ? selectedStudent.avoid_memos : selectedStudent.keep_memos;
             setTempRelationTargetIds([...ids]);
             setTempRelationMemos(memos ? { ...memos } : {});
-            // 대상 학생 필터/검색만 초기화 (기준 학생 필터는 유지)
-            setTargetStudentClassFilter('all');
-            setTargetStudentSearch('');
         } else {
             setTempRelationTargetIds([]);
             setTempRelationMemos({});
@@ -125,11 +171,6 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
             setTempPreTransferIds(ids);
         }
     }, [selectedStudent, relationMode, students]);
-
-    // Extract unique class numbers for filtering
-    const availableClasses = Array.from(new Set(students.map(s => s.prev_info.split('-')[1] || '')))
-        .sort((a, b) => parseInt(a) - parseInt(b))
-        .filter(c => c);
 
     // Get all existing relations for summary display, grouped by base student's class
     // Same-class: show once only, Cross-class: show in both sections
@@ -181,10 +222,6 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
         });
 
         return relationsByClass;
-    };
-
-    const getTotalRelationsCount = (mode: 'avoid' | 'keep') => {
-        return Object.values(getRelationsGroupedByClass(mode)).flat().length;
     };
 
     const handleSaveGroupMembers = () => {
@@ -444,931 +481,440 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
 
     const classNames = Array.from({ length: settings.classCount }, (_, i) => `${i + 1}반`);
 
-    return (
-        <div className="space-y-6 pb-20 relative">
-            {/* 상단 통합 설정 영역 (삭제됨 - 항상 고급 모드 적용) */}
+    const relations = useMemo(() => buildRelations(students), [students]);
+    // 탭에 보일 설정 개수입니다. 관계는 두 학생을 한 건으로 셉니다.
+    const pairCount = (mode: 'avoid' | 'keep') => {
+        const seen = new Set<string>();
+        students.forEach((s) => (mode === 'avoid' ? s.avoid_ids : s.keep_ids).forEach((id) => {
+            if (students.some((t) => t.id === id)) seen.add([s.id, id].sort().join('|'));
+        }));
+        return seen.size;
+    };
+    const counts: Record<Mode, number> = {
+        group: groups.length,
+        avoid: pairCount('avoid'),
+        keep: pairCount('keep'),
+        fixed: students.filter((s) => s.fixed_class).length,
+        pretransfer: students.filter((s) => s.is_pre_transfer).length,
+    };
+    const tabValue: Mode = relationMode ?? 'group';
+    const handleTabChange = (value: string) => {
+        setRelationMode(value === 'group' ? null : (value as Exclude<Mode, 'group'>));
+        setSelectedStudent(null);
+    };
 
-            {/* 상단 탭 버튼들 */}
-            <div className="flex space-x-2 border-b pb-4 overflow-x-auto">
-                <Button
-                    variant={relationMode === null ? 'default' : 'outline'}
-                    onClick={() => {
-                        setRelationMode(null);
-                        setSelectedStudent(null);
+    // 기준 학생을 놓을 때도 저장하지 않은 변경을 묻습니다.
+    const handleClearBase = async () => {
+        if (hasUnsavedRelationChanges() || hasUnsavedFixedChanges()) {
+            const confirmed = await confirm({
+                title: '저장하지 않은 변경 사항이 있습니다.',
+                description: '변경 사항을 버리고 다른 학생을 고를까요?',
+                confirmLabel: '버리고 선택',
+                cancelLabel: '이 학생 계속 편집',
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
+        setSelectedStudent(null);
+    };
+
+    const selectedGroup = groups.find((g) => g.id === selectedGroupId) ?? null;
+    const relationName = relationMode === 'avoid' ? '분리 배정' : '함께 배정';
+    const nameWithInfo = (s: Student) => `${s.name}(${s.prev_info})`;
+    const byClassNumber = (a: Student, b: Student) =>
+        parseInt(a.prev_info.split('-')[1] || '0') - parseInt(b.prev_info.split('-')[1] || '0') ||
+        parseInt(a.prev_info.split('-')[2] || '0') - parseInt(b.prev_info.split('-')[2] || '0');
+
+    // ---- 탭마다 바뀌는 부분: 왼쪽 제목과 고르기, 오른쪽 제목과 내용, 저장 ----
+    let leftTitle: React.ReactNode = '학생 고르기';
+    let leftBody: React.ReactNode = null;
+    let rightTitle: React.ReactNode = null;
+    let rightTools: React.ReactNode = null;
+    let rightBody: React.ReactNode = null;
+    let save: { onClick: () => void; disabled: boolean } = { onClick: () => {}, disabled: true };
+
+    if (relationMode === null) {
+        leftTitle = selectedGroup ? <>&lsquo;{selectedGroup.name}&rsquo;에 넣을 학생</> : '학생 고르기';
+        leftBody = selectedGroup ? (
+            <StudentPicker
+                students={students}
+                relations={relations}
+                multi
+                pickedIds={new Set(tempMemberIds)}
+                onPick={(s) => setTempMemberIds(tempMemberIds.includes(s.id) ? tempMemberIds.filter((id) => id !== s.id) : [...tempMemberIds, s.id])}
+            />
+        ) : (
+            <EmptyPanel>오른쪽에서 그룹을 고르면 학생을 넣고 뺄 수 있습니다.</EmptyPanel>
+        );
+        rightTitle = <>그룹 {groups.length}개</>;
+        rightTools = (
+            <Button variant="outline" size="sm" onClick={() => {
+                setEditingGroup(null);
+                setNewGroup({ name: '', color: GROUP_COLORS[0].value });
+                setIsGroupDialogOpen(true);
+            }}>
+                <Plus aria-hidden="true" />새 그룹
+            </Button>
+        );
+        save = { onClick: handleSaveGroupMembers, disabled: !selectedGroupId };
+        rightBody = groups.length === 0 ? (
+            <EmptyPanel>만든 그룹이 없습니다. 새 그룹을 눌러 만듭니다.</EmptyPanel>
+        ) : (
+            <ul className="divide-y divide-line" data-group-list>
+                {groups.map((group) => {
+                    const isSelected = selectedGroupId === group.id;
+                    const memberIds = isSelected ? tempMemberIds : group.member_ids;
+                    const members = students.filter((s) => memberIds.includes(s.id)).sort(byClassNumber);
+                    return (
+                        <li key={group.id} className={isSelected ? 'bg-wash' : ''}>
+                            <div className="flex items-center gap-2 px-4 py-2">
+                                <button
+                                    type="button"
+                                    aria-pressed={isSelected}
+                                    onClick={() => setSelectedGroupId(isSelected ? null : group.id)}
+                                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-input py-1 text-left focus-visible:outline-2"
+                                >
+                                    <span className={`size-3 shrink-0 rounded-full ${group.color.split(' ')[0]}`} aria-hidden="true" />
+                                    <span className="font-semibold text-ink">{group.name}</span>
+                                    <span className="text-small text-soft">학생 {members.length}명</span>
+                                    {isSelected && <span className="text-caption font-semibold text-accent-ink">왼쪽에서 학생을 넣고 뺍니다</span>}
+                                </button>
+                                <Button variant="ghost" size="icon-sm" aria-label={`${group.name} 수정`} onClick={() => {
+                                    setNewGroup({ name: group.name, color: group.color });
+                                    setEditingGroup(group);
+                                    setIsGroupDialogOpen(true);
+                                }}>
+                                    <PencilSimple aria-hidden="true" />
+                                </Button>
+                                <Button variant="ghost" size="icon-sm" aria-label={`${group.name} 삭제`} className="hover:bg-danger-wash hover:text-danger" onClick={(e) => handleDeleteGroup(group.id, e)}>
+                                    <Trash aria-hidden="true" />
+                                </Button>
+                            </div>
+                            {members.length > 0 && (
+                                <p className="flex flex-wrap gap-x-2 gap-y-1 px-4 pb-2.5 pl-9 text-small text-soft">
+                                    {members.map((s) => (
+                                        <span key={s.id} className="inline-flex items-center gap-1 whitespace-nowrap">
+                                            {nameWithInfo(s)}
+                                            {isSelected && (
+                                                <button type="button" aria-label={`${s.name} 빼기`} className="cursor-pointer rounded-input text-soft hover:text-danger" onClick={() => setTempMemberIds(tempMemberIds.filter((id) => id !== s.id))}>
+                                                    <X size={12} aria-hidden="true" />
+                                                </button>
+                                            )}
+                                        </span>
+                                    ))}
+                                </p>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+        );
+    } else if (relationMode === 'avoid' || relationMode === 'keep') {
+        const RelationIcon = relationMode === 'keep' ? Handshake : ArrowsLeftRight;
+        const iconClass = relationMode === 'keep' ? 'text-accent' : 'text-danger';
+        if (selectedStudent) {
+            leftTitle = (
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0">상대 고르기</span>
+                    <span className="flex min-w-0 items-center gap-1 rounded-full bg-tint py-0.5 pr-1 pl-2 text-caption font-semibold text-accent-ink">
+                        <span className="truncate">기준 {nameWithInfo(selectedStudent)}</span>
+                        <button type="button" aria-label="기준 학생 바꾸기" onClick={handleClearBase} className="cursor-pointer rounded-full p-0.5 hover:bg-card">
+                            <X size={12} aria-hidden="true" />
+                        </button>
+                    </span>
+                </span>
+            );
+            leftBody = (
+                <StudentPicker
+                    students={students}
+                    relations={relations}
+                    multi
+                    excludeIds={new Set([selectedStudent.id])}
+                    pickedIds={new Set(tempRelationTargetIds)}
+                    onPick={(s) => {
+                        if (tempRelationTargetIds.includes(s.id)) {
+                            setTempRelationTargetIds(tempRelationTargetIds.filter((id) => id !== s.id));
+                            const newMemos = { ...tempRelationMemos };
+                            delete newMemos[s.id];
+                            setTempRelationMemos(newMemos);
+                        } else {
+                            setTempRelationTargetIds([...tempRelationTargetIds, s.id]);
+                        }
                     }}
-                >
-                    그룹 분산
+                />
+            );
+            rightTitle = <>{nameWithInfo(selectedStudent)}의 {relationName} 상대 {tempRelationTargetIds.length}명</>;
+            save = { onClick: handleSaveRelationTargets, disabled: !hasUnsavedRelationChanges() };
+            rightBody = tempRelationTargetIds.length === 0 ? (
+                <EmptyPanel>왼쪽에서 상대를 고릅니다. 여러 명을 고를 수 있습니다.</EmptyPanel>
+            ) : (
+                <ul className="divide-y divide-line" data-relation-targets>
+                    {students.filter((s) => tempRelationTargetIds.includes(s.id)).map((s) => (
+                        <li key={s.id} className="flex items-center gap-2 px-4 py-2">
+                            <RelationIcon size={15} className={`shrink-0 ${iconClass}`} aria-hidden="true" />
+                            <span className="w-40 shrink-0 truncate font-medium text-ink">{nameWithInfo(s)}</span>
+                            <Input
+                                placeholder="사유 (선택)"
+                                aria-label={`${s.name} 사유`}
+                                value={tempRelationMemos[s.id] || ''}
+                                onChange={(e) => setTempRelationMemos({ ...tempRelationMemos, [s.id]: e.target.value })}
+                                className="h-8 flex-1 text-small"
+                            />
+                            <Button variant="ghost" size="sm" className="text-danger hover:bg-danger-wash hover:text-danger" onClick={() => {
+                                setTempRelationTargetIds(tempRelationTargetIds.filter((id) => id !== s.id));
+                                const newMemos = { ...tempRelationMemos };
+                                delete newMemos[s.id];
+                                setTempRelationMemos(newMemos);
+                            }}>
+                                빼기
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            );
+        } else {
+            leftTitle = '기준 학생 고르기';
+            leftBody = (
+                <StudentPicker students={students} relations={relations} pickedIds={new Set()} onPick={handleSelectBaseStudent} />
+            );
+            const grouped = getRelationsGroupedByClass(relationMode);
+            const allRelations = Object.values(grouped).flat();
+            const allSelected = allRelations.length > 0 && allRelations.every((r) => selectedRelationsForDelete.has(`${r.studentA.id}|${r.studentB.id}`));
+            rightTitle = <>{relationName} {counts[relationMode]}건</>;
+            rightTools = selectedRelationsForDelete.size > 0 ? (
+                <Button variant="destructive" size="sm" onClick={handleBulkDeleteRelations}>
+                    고른 {selectedRelationsForDelete.size}건 삭제
                 </Button>
-                <Button
-                    variant={relationMode === 'avoid' ? 'default' : 'outline'}
-                    onClick={() => {
-                        setRelationMode('avoid');
-                        setSelectedStudent(null);
-                    }}
-                >
-                    분리 배정
-                </Button>
-                <Button
-                    variant={relationMode === 'keep' ? 'default' : 'outline'}
-                    onClick={() => {
-                        setRelationMode('keep');
-                        setSelectedStudent(null);
-                    }}
-                >
-                    함께 배정
-                </Button>
-                <Button
-                    variant={relationMode === 'fixed' ? 'default' : 'outline'}
-                    onClick={() => {
-                        setRelationMode('fixed');
-                        setSelectedStudent(null);
-                    }}
-                >
-                    고정 배정
-                </Button>
-                <Button
-                    variant={relationMode === 'pretransfer' ? 'default' : 'outline'}
-                    onClick={() => {
-                        setRelationMode('pretransfer');
-                        setSelectedStudent(null);
-                    }}
-                >
-                    전출 예정
-                </Button>
+            ) : null;
+            rightBody = allRelations.length === 0 ? (
+                <EmptyPanel>{relationMode === 'avoid' ? '설정된 분리 배정이 없습니다.' : '설정된 함께 배정이 없습니다.'} 왼쪽에서 기준 학생을 고릅니다.</EmptyPanel>
+            ) : (
+                <div data-relation-list>
+                    <label className="sticky top-0 z-[1] flex cursor-pointer items-center gap-2 border-b border-line bg-card px-4 py-2 text-small text-soft">
+                        <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={(e) => {
+                                if (e.target.checked) {
+                                    const newSet = new Set(selectedRelationsForDelete);
+                                    allRelations.forEach((r) => newSet.add(`${r.studentA.id}|${r.studentB.id}`));
+                                    setSelectedRelationsForDelete(newSet);
+                                } else {
+                                    setSelectedRelationsForDelete(new Set());
+                                }
+                            }}
+                            className="size-4 accent-accent"
+                        />
+                        전체 고르기
+                    </label>
+                    {Object.entries(grouped)
+                        .sort((a, b) => (a[0] === '기타' ? 1 : b[0] === '기타' ? -1 : parseInt(a[0]) - parseInt(b[0])))
+                        .map(([cls, list]) => {
+                            const allClassSelected = list.every((r) => selectedRelationsForDelete.has(`${r.studentA.id}|${r.studentB.id}`));
+                            return (
+                                <section key={cls}>
+                                    <label className="flex cursor-pointer items-center gap-2 border-b border-line bg-canvas px-4 py-1 text-caption text-soft">
+                                        <input
+                                            type="checkbox"
+                                            checked={allClassSelected}
+                                            onChange={() => {
+                                                const newSet = new Set(selectedRelationsForDelete);
+                                                list.forEach((r) => (allClassSelected ? newSet.delete(`${r.studentA.id}|${r.studentB.id}`) : newSet.add(`${r.studentA.id}|${r.studentB.id}`)));
+                                                setSelectedRelationsForDelete(newSet);
+                                            }}
+                                            className="size-3.5 accent-accent"
+                                        />
+                                        <span className="flex-1 font-semibold">{cls === '기타' ? '반 정보 없음' : `${cls}반`}</span>
+                                        <span>{list.length}건</span>
+                                    </label>
+                                    <ul className="divide-y divide-line">
+                                        {list.map(({ studentA, studentB, memo }, idx) => {
+                                            const key = `${studentA.id}|${studentB.id}`;
+                                            const isSelected = selectedRelationsForDelete.has(key);
+                                            return (
+                                                <li key={idx} className={`flex items-center gap-2 px-4 py-1.5 text-small ${isSelected ? 'bg-wash' : 'hover:bg-wash'}`}>
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={`${studentA.name}, ${studentB.name} 고르기`}
+                                                        checked={isSelected}
+                                                        onChange={() => toggleRelationSelection(studentA.id, studentB.id)}
+                                                        className="size-4 accent-accent"
+                                                    />
+                                                    <span className="text-ink">{nameWithInfo(studentA)}</span>
+                                                    <RelationIcon size={14} className={iconClass} aria-hidden="true" />
+                                                    <span className="text-ink">{nameWithInfo(studentB)}</span>
+                                                    {memo && <span className="min-w-0 truncate text-caption text-soft">· {memo}</span>}
+                                                    <span className="ml-auto flex shrink-0 gap-1">
+                                                        <Button variant="ghost" size="sm" className="h-7 px-2 text-accent hover:text-accent-ink" onClick={() => handleSelectBaseStudent(studentA)}>수정</Button>
+                                                        <Button variant="ghost" size="sm" className="h-7 px-2 text-danger hover:bg-danger-wash hover:text-danger" onClick={() => handleDeleteRelation(studentA.id, studentB.id, relationMode)}>삭제</Button>
+                                                    </span>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </section>
+                            );
+                        })}
+                </div>
+            );
+        }
+    } else if (relationMode === 'fixed') {
+        leftTitle = '학생 고르기';
+        leftBody = (
+            <StudentPicker
+                students={students}
+                relations={relations}
+                pickedIds={new Set(selectedStudent ? [selectedStudent.id] : [])}
+                onPick={handleSelectBaseStudent}
+            />
+        );
+        if (selectedStudent) {
+            rightTitle = <>{nameWithInfo(selectedStudent)} 고정 배정</>;
+            rightTools = (
+                <Button variant="ghost" size="sm" onClick={handleClearBase}>목록으로</Button>
+            );
+            save = { onClick: handleSaveFixedClass, disabled: !hasUnsavedFixedChanges() };
+            rightBody = (
+                <div className="space-y-4 p-4">
+                    <div>
+                        <p className="mb-2 text-small font-semibold text-ink">꼭 배정할 반</p>
+                        <div role="radiogroup" aria-label="고정할 반" className="flex flex-wrap gap-1.5">
+                            {classNames.map((cls) => (
+                                <button
+                                    key={cls}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={tempFixedClass === cls}
+                                    onClick={() => setTempFixedClass(cls)}
+                                    className={`h-9 min-w-14 cursor-pointer rounded-button border px-3 text-body tabular-nums transition-colors focus-visible:outline-2 ${
+                                        tempFixedClass === cls ? 'border-accent bg-wash font-bold text-accent-ink ring-1 ring-accent' : 'border-hairline bg-card text-ink hover:border-ring hover:bg-wash'
+                                    }`}
+                                >
+                                    {cls}
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={tempFixedClass === undefined}
+                                onClick={() => setTempFixedClass(undefined)}
+                                className={`h-9 cursor-pointer rounded-button border px-3 text-body transition-colors focus-visible:outline-2 ${
+                                    tempFixedClass === undefined ? 'border-accent bg-wash font-bold text-accent-ink ring-1 ring-accent' : 'border-hairline bg-card text-soft hover:border-ring hover:bg-wash'
+                                }`}
+                            >
+                                고정 안 함
+                            </button>
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label htmlFor="fixed-memo" className="text-small font-semibold text-ink">사유 (선택)</label>
+                        <Input id="fixed-memo" value={relationMemo} onChange={(e) => setRelationMemo(e.target.value)} placeholder="예: 쌍둥이 분리 배정 요청" />
+                    </div>
+                </div>
+            );
+        } else {
+            const fixedStudents = students.filter((s) => s.fixed_class);
+            rightTitle = <>고정 배정 {fixedStudents.length}명</>;
+            rightBody = fixedStudents.length === 0 ? (
+                <EmptyPanel>고정 배정한 학생이 없습니다. 왼쪽에서 학생을 고릅니다.</EmptyPanel>
+            ) : (
+                <div data-fixed-list>
+                    {Object.entries(fixedStudents.reduce((acc, s) => {
+                        const cls = s.fixed_class || '미지정';
+                        (acc[cls] ??= []).push(s);
+                        return acc;
+                    }, {} as Record<string, Student[]>))
+                        .sort((a, b) => parseInt(a[0].replace('반', '')) - parseInt(b[0].replace('반', '')))
+                        .map(([cls, list]) => (
+                            <section key={cls}>
+                                <div className="flex justify-between border-b border-line bg-canvas px-4 py-1 text-caption text-soft">
+                                    <span className="font-semibold">{cls} 고정</span>
+                                    <span>{list.length}명</span>
+                                </div>
+                                <ul className="divide-y divide-line">
+                                    {list.sort(byClassNumber).map((s) => (
+                                        <li key={s.id} className="flex items-center gap-2 px-4 py-1.5 text-small hover:bg-wash">
+                                            <span className="text-ink">{nameWithInfo(s)}</span>
+                                            {s.fixed_class_memo && <span className="min-w-0 truncate text-caption text-soft">· {s.fixed_class_memo}</span>}
+                                            <span className="ml-auto flex shrink-0 gap-1">
+                                                <Button variant="ghost" size="sm" className="h-7 px-2 text-accent hover:text-accent-ink" onClick={() => handleSelectBaseStudent(s)}>수정</Button>
+                                                <Button variant="ghost" size="sm" className="h-7 px-2 text-danger hover:bg-danger-wash hover:text-danger" onClick={() => setFixedClass(s.id, undefined, '')}>해제</Button>
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
+                        ))}
+                </div>
+            );
+        }
+    } else {
+        // 전출 예정
+        const preTransferStudents = students.filter((s) => tempPreTransferIds.includes(s.id)).sort(byClassNumber);
+        const unsaved = hasUnsavedPreTransferChanges();
+        leftTitle = '전출할 학생 고르기';
+        leftBody = (
+            <StudentPicker students={students} relations={relations} multi pickedIds={new Set(tempPreTransferIds)} onPick={(s) => onToggleTempPreTransfer(s.id)} />
+        );
+        rightTitle = (
+            <span className="flex items-center gap-2">
+                전출 예정 {preTransferStudents.length}명
+                {!unsaved && preTransferStudents.length > 0 && (
+                    <span className="flex items-center gap-1 rounded-full bg-wash px-2 py-0.5 text-caption font-medium text-accent-ink">
+                        <CheckCircle size={14} aria-hidden="true" />저장됨
+                    </span>
+                )}
+            </span>
+        );
+        save = { onClick: handleSavePreTransfer, disabled: !unsaved };
+        rightBody = preTransferStudents.length === 0 ? (
+            <EmptyPanel>왼쪽에서 학생을 눌러 전출 예정에 넣습니다.</EmptyPanel>
+        ) : (
+            <ul className="divide-y divide-line" data-pretransfer-list>
+                {preTransferStudents.map((s) => (
+                    <li key={s.id} className="flex items-center gap-2 px-4 py-1.5 text-small hover:bg-wash">
+                        <span className="text-ink">{nameWithInfo(s)}</span>
+                        <Button variant="ghost" size="sm" className="ml-auto h-7 px-2 text-danger hover:bg-danger-wash hover:text-danger" onClick={() => onToggleTempPreTransfer(s.id)}>해제</Button>
+                    </li>
+                ))}
+            </ul>
+        );
+    }
+
+    return (
+        <div className="flex h-full min-h-[460px] flex-col gap-3">
+            <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
+                <Tabs value={tabValue} onValueChange={handleTabChange}>
+                    <TabsList aria-label="조건" className="h-9">
+                        {TABS.map((tab) => (
+                            <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 px-3">
+                                {tab.label}
+                                <span className={`text-caption font-normal tabular-nums ${counts[tab.value] > 0 ? 'text-accent-ink' : 'text-soft'}`}>{counts[tab.value]}</span>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+                </Tabs>
+                <p className="flex items-center gap-1 text-small text-soft" data-step2-hint>
+                    {TAB_HINTS[tabValue].line}
+                    <HelpTip label={TABS.find((t) => t.value === tabValue)!.label} width={360}>{TAB_HINTS[tabValue].help}</HelpTip>
+                </p>
             </div>
 
-            {/* 컨텐츠 영역 */}
-            <div className="min-h-[500px]">
-                {relationMode === null && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-title-sm">그룹 분산 설정</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* 안내 메시지 */}
-                            <div className="bg-wash p-4 rounded-card text-body text-ink">
-                                <h4 className="font-bold mb-2 flex items-center gap-1.5"><Lightbulb size={16} className="text-accent" aria-hidden="true" /> 그룹 분산 설정 안내</h4>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li><strong>그룹 분산</strong>: 그룹 학생을 모든 반에 고르게 나눕니다.</li>
-                                    <li><strong>예시</strong>: '생활지도 유형' 그룹을 만들면, 해당 학생들이 한 반에 몰리지 않도록 배치됩니다.</li>
-                                </ul>
-                            </div>
-                            <div className="flex gap-4">
-                                {/* 그룹 목록 */}
-                                <div className="w-1/3 border rounded-card p-4">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <h3 className="font-bold text-emph">그룹 목록</h3>
-                                        <Button size="sm" onClick={() => {
-                                            setEditingGroup(null);
-                                            setNewGroup({ name: '', color: GROUP_COLORS[0].value });
-                                            setIsGroupDialogOpen(true);
-                                        }}>
-                                            <Plus size={16} aria-hidden="true" />
-                                            새 그룹
-                                        </Button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {groups.map(group => (
-                                            <div
-                                                key={group.id}
-                                                className={`
-                                                    p-3 rounded-card border cursor-pointer transition-colors
-                                                    ${selectedGroupId === group.id ? 'border-accent ring-1 ring-accent bg-wash' : 'hover:bg-wash bg-card'}
-                                                `}
-                                                onClick={() => setSelectedGroupId(group.id === selectedGroupId ? null : group.id)}
-                                            >
-                                                <div className="flex justify-between items-center mb-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`w-3 h-3 rounded-full ${group.color.split(' ')[0]}`} />
-                                                        <span className="font-bold">{group.name}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={() => {
-                                                                setNewGroup({ name: group.name, color: group.color });
-                                                                setEditingGroup(group);
-                                                                setIsGroupDialogOpen(true);
-                                                            }}
-                                                            aria-label={`${group.name} 수정`}
-                                                            className="h-8 w-8 text-soft hover:text-accent-ink hover:bg-wash"
-                                                        >
-                                                            <PencilSimple className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={(e) => handleDeleteGroup(group.id, e)}
-                                                            aria-label={`${group.name} 삭제`}
-                                                            className="h-8 w-8 text-soft hover:text-danger hover:bg-danger-wash"
-                                                        >
-                                                            <Trash className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="text-caption text-soft">
-                                                    학생 {group.member_ids.length}명
-                                                </div>
-                                                <div className="text-caption text-soft mt-1 flex flex-wrap gap-1">
-                                                    {students
-                                                        .filter(s => group.member_ids.includes(s.id))
-                                                        .map((s, index, array) => (
-                                                            <span key={s.id} className="whitespace-nowrap">
-                                                                {s.name}({s.prev_info}){index < array.length - 1 ? ',' : ''}
-                                                            </span>
-                                                        ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {groups.length === 0 && (
-                                            <div className="text-center text-soft py-8">
-                                                만든 그룹이 없습니다.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* 학생 선택 및 멤버 관리 */}
-                                <div className="w-2/3 border rounded-card p-4">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <div>
-                                            <h3 className="font-bold text-emph">
-                                                {selectedGroupId
-                                                    ? `${groups.find(g => g.id === selectedGroupId)?.name} 학생 고르기`
-                                                    : '그룹 학생 고르기'
-                                                }
-                                            </h3>
-                                            <p className="text-body text-soft">
-                                                {selectedGroupId
-                                                    ? '왼쪽 목록에서 학생을 선택하여 추가/제거하고 저장을 눌러 주세요.'
-                                                    : '왼쪽에서 그룹을 고르면 학생을 넣고 뺄 수 있습니다.'
-                                                }
-                                            </p>
-                                        </div>
-                                        {selectedGroupId && (
-                                            <Button onClick={handleSaveGroupMembers}>
-                                                저장 및 완료
-                                            </Button>
-                                        )}
-                                    </div>
-                                    {selectedGroupId ? (
-                                        <div className="grid grid-cols-2 gap-4 h-[400px]">
-                                            {/* 전체 학생 목록 */}
-                                            <div className="border rounded-input p-2 flex flex-col h-full overflow-hidden">
-                                                <div className="mb-2 flex justify-between items-center">
-                                                    <span className="font-bold text-body">전체 학생</span>
-                                                    <Select
-                                                        value={selectedClassFilter}
-                                                        onValueChange={setSelectedClassFilter}
-                                                    >
-                                                        <SelectTrigger className="w-[100px] h-8 text-caption">
-                                                            <SelectValue placeholder="이전반 선택" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="all">전체</SelectItem>
-                                                            {availableClasses.map(cls => (
-                                                                <SelectItem key={cls} value={cls}>{cls}반</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <Input
-                                                    placeholder="이름 검색..."
-                                                    value={groupStudentSearch}
-                                                    onChange={(e) => setGroupStudentSearch(e.target.value)}
-                                                    className="h-8 text-body mb-2"
-                                                />
-                                                <div className="flex-1 overflow-y-auto p-1">
-                                                    {Object.entries(students
-                                                        .filter(s => !tempMemberIds.includes(s.id))
-                                                        .filter(s => selectedClassFilter === 'all' || s.prev_info.split('-')[1] === selectedClassFilter)
-                                                        .filter(s => !groupStudentSearch || s.name.toLowerCase().includes(groupStudentSearch.toLowerCase()))
-                                                        .reduce((acc, s) => {
-                                                            const cls = s.prev_info.split('-')[1] || '기타';
-                                                            if (!acc[cls]) acc[cls] = [];
-                                                            acc[cls].push(s);
-                                                            return acc;
-                                                        }, {} as Record<string, typeof students>))
-                                                        .sort((a, b) => {
-                                                            if (a[0] === '기타') return 1;
-                                                            if (b[0] === '기타') return -1;
-                                                            return parseInt(a[0]) - parseInt(b[0]);
-                                                        })
-                                                        .map(([cls, classStudents]) => (
-                                                            <div key={cls} className="mb-4 last:mb-0">
-                                                                <div className="text-caption font-bold text-soft mb-2 px-1 border-b pb-1 sticky top-0 bg-card z-10 flex justify-between">
-                                                                    <span>{cls}반 (이전)</span>
-                                                                    <span className="font-normal">{classStudents.length}명</span>
-                                                                </div>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    {classStudents
-                                                                        .sort((a, b) => {
-                                                                            // 이름순 정렬 (번호가 있다면 번호순 권장하나, prev_info 파싱 복잡도 고려해 이름순)
-                                                                            // prev_info: "4-1-15"
-                                                                            const numA = parseInt(a.prev_info.split('-')[2] || '0');
-                                                                            const numB = parseInt(b.prev_info.split('-')[2] || '0');
-                                                                            if (numA !== numB) return numA - numB;
-                                                                            return a.name.localeCompare(b.name);
-                                                                        })
-                                                                        .map(s => (
-                                                                            <div
-                                                                                key={s.id}
-                                                                                className="p-2 hover:bg-wash rounded-input border cursor-pointer text-body flex items-center justify-center gap-1 transition-colors"
-                                                                                onClick={() => setTempMemberIds([...tempMemberIds, s.id])}
-                                                                            >
-                                                                                <span className="font-medium whitespace-nowrap">{s.name}</span>
-                                                                                <span className="text-caption text-soft whitespace-nowrap">({s.prev_info.split('-')[2]})</span>
-                                                                            </div>
-                                                                        ))}
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    }
-                                                    {students.filter(s => !tempMemberIds.includes(s.id))
-                                                        .filter(s => selectedClassFilter === 'all' || s.prev_info.split('-')[1] === selectedClassFilter)
-                                                        .length === 0 && (
-                                                            <div className="text-center text-soft py-8">
-                                                                선택 가능한 학생이 없습니다.
-                                                            </div>
-                                                        )}
-                                                </div>
-                                            </div>
-                                            {/* 그룹 멤버 목록 */}
-                                            <div className="border rounded-input p-2 flex flex-col h-full overflow-hidden">
-                                                <div className="mb-2 font-bold text-body">그룹 학생 ({tempMemberIds.length}명)</div>
-                                                <div className="flex-1 overflow-y-auto space-y-1 bg-canvas rounded-card p-2 border">
-                                                    {students
-                                                        .filter(s => tempMemberIds.includes(s.id))
-                                                        .sort((a, b) => {
-                                                            // 반별, 번호순 정렬
-                                                            const classA = parseInt(a.prev_info.split('-')[1] || '0');
-                                                            const classB = parseInt(b.prev_info.split('-')[1] || '0');
-                                                            if (classA !== classB) return classA - classB;
-                                                            const numA = parseInt(a.prev_info.split('-')[2] || '0');
-                                                            const numB = parseInt(b.prev_info.split('-')[2] || '0');
-                                                            return numA - numB;
-                                                        })
-                                                        .map(s => (
-                                                            <div
-                                                                key={s.id}
-                                                                className="p-2 hover:bg-wash rounded-input cursor-pointer text-body flex justify-between bg-card border items-center transition-colors"
-                                                                onClick={() => setTempMemberIds(tempMemberIds.filter(id => id !== s.id))}
-                                                            >
-                                                                <span>{s.name} ({s.prev_info})</span>
-                                                                <span className="text-danger font-medium text-caption">제거</span>
-                                                            </div>
-                                                        ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center justify-center h-[400px] text-soft">
-                                            왼쪽에서 그룹을 선택해 주세요.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Relation Modes (Avoid, Keep) - Refactored UI */}
-                {(relationMode === 'avoid' || relationMode === 'keep') && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-title-sm">{relationMode === 'avoid' ? '분리 배정 설정' : '함께 배정 설정'}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* 안내 메시지 */}
-                            <div className="bg-wash p-4 rounded-card text-body text-ink">
-                                <h4 className="font-bold mb-2 flex items-center gap-1.5">
-                                    <Lightbulb size={16} className="text-accent" aria-hidden="true" />
-                                    {relationMode === 'avoid' ? '분리 배정 설정 안내' : '함께 배정 설정 안내'}
-                                </h4>
-                                <ul className="list-disc list-inside space-y-1">
-                                    {relationMode === 'avoid' ? (
-                                        <>
-                                            <li><strong>분리 배정</strong>: 같은 반이 되면 안 되는 학생입니다. 선택한 학생들은 다른 반에 배정합니다.</li>
-                                            <li><strong>예시</strong>: 학폭 사안으로 분리해야 하는 경우, 사이가 좋지 않은 경우</li>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <li><strong>함께 배정</strong>: 담임 판단으로 같은 반에 두는 학생입니다. 분리 배정 다음으로 지키는 조건이고, 어기면 위반으로 표시합니다.</li>
-                                            <li><strong>예시</strong>: 담임 판단하에 생활지도상, 혹은 교우관계상 붙여줄 필요가 있다고 판단되는 경우</li>
-                                        </>
-                                    )}
-                                </ul>
-                            </div>
-                            <div className="flex gap-4">
-                                {/* 기준 학생 선택 */}
-                                <div className="w-1/3 border rounded-card p-4">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-bold text-emph">기준 학생 선택</h3>
-                                        <Select
-                                            value={baseStudentClassFilter}
-                                            onValueChange={setBaseStudentClassFilter}
-                                        >
-                                            <SelectTrigger className="w-[100px] h-7 text-caption">
-                                                <SelectValue placeholder="이전반 선택" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">전체</SelectItem>
-                                                {availableClasses.map(cls => (
-                                                    <SelectItem key={cls} value={cls}>{cls}반</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <Input
-                                        placeholder="이름 검색..."
-                                        value={baseStudentSearch}
-                                        onChange={(e) => setBaseStudentSearch(e.target.value)}
-                                        className="h-8 text-body mb-2"
-                                    />
-                                    <div className="h-[420px] overflow-y-auto">
-                                        {Object.entries(students
-                                            .filter(s => baseStudentClassFilter === 'all' || s.prev_info.split('-')[1] === baseStudentClassFilter)
-                                            .filter(s => !baseStudentSearch || s.name.toLowerCase().includes(baseStudentSearch.toLowerCase()))
-                                            .reduce((acc, s) => {
-                                                const cls = s.prev_info.split('-')[1] || '기타';
-                                                if (!acc[cls]) acc[cls] = [];
-                                                acc[cls].push(s);
-                                                return acc;
-                                            }, {} as Record<string, typeof students>))
-                                            .sort((a, b) => {
-                                                if (a[0] === '기타') return 1;
-                                                if (b[0] === '기타') return -1;
-                                                return parseInt(a[0]) - parseInt(b[0]);
-                                            })
-                                            .map(([cls, classStudents]) => (
-                                                <div key={cls} className="mb-3 last:mb-0">
-                                                    <div className="text-caption font-bold text-soft mb-1 px-1 border-b pb-1 sticky top-0 bg-card z-10 flex justify-between">
-                                                        <span>{cls}반 (이전)</span>
-                                                        <span className="font-normal">{classStudents.length}명</span>
-                                                    </div>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        {classStudents
-                                                            .sort((a, b) => {
-                                                                const numA = parseInt(a.prev_info.split('-')[2] || '0');
-                                                                const numB = parseInt(b.prev_info.split('-')[2] || '0');
-                                                                if (numA !== numB) return numA - numB;
-                                                                return a.name.localeCompare(b.name);
-                                                            })
-                                                            .map(s => (
-                                                                <div
-                                                                    key={s.id}
-                                                                    className={`p-2 rounded-input border cursor-pointer text-body flex items-center justify-center gap-1 transition-colors ${selectedStudent?.id === s.id ? 'bg-wash ring-1 ring-accent border-accent' : 'hover:bg-wash border-line'}`}
-                                                                    onClick={() => handleSelectBaseStudent(s)}
-                                                                >
-                                                                    <span className="font-medium whitespace-nowrap">{s.name}</span>
-                                                                    <span className="text-caption text-soft whitespace-nowrap">({s.prev_info.split('-')[2]})</span>
-                                                                </div>
-                                                            ))}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        }
-                                    </div>
-                                </div>
-
-                                {/* 오른쪽 영역: 학생 선택 전/후에 따라 다른 내용 */}
-                                <div className="w-2/3 border rounded-card p-4">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <div>
-                                            <h3 className="font-bold text-emph">
-                                                {selectedStudent
-                                                    ? `${selectedStudent.name}(${selectedStudent.prev_info}) 학생의 ${relationMode === 'avoid' ? '분리 배정' : '함께 배정'} 설정`
-                                                    : `${relationMode === 'avoid' ? '분리 배정' : '함께 배정'} 현황`
-                                                }
-                                            </h3>
-                                            <p className="text-body text-soft">
-                                                {selectedStudent
-                                                    ? '전체 학생에서 대상을 선택하고 저장해 주세요.'
-                                                    : '왼쪽에서 기준 학생을 선택하여 관계를 설정해 주세요.'
-                                                }
-                                            </p>
-                                        </div>
-                                        {selectedStudent && (
-                                            <Button onClick={handleSaveRelationTargets}>
-                                                저장 및 완료
-                                            </Button>
-                                        )}
-                                    </div>
-                                    {selectedStudent ? (
-                                        /* 기준 학생 선택됨: 3열 그리드 + 대상 박스 */
-                                        <div className="grid grid-cols-2 gap-4 h-[420px]">
-                                            {/* 전체 학생 목록 */}
-                                            <div className="border rounded-input p-2 flex flex-col h-full overflow-hidden">
-                                                <div className="mb-2 flex justify-between items-center">
-                                                    <span className="font-bold text-body">대상 학생</span>
-                                                    <Select
-                                                        value={targetStudentClassFilter}
-                                                        onValueChange={setTargetStudentClassFilter}
-                                                    >
-                                                        <SelectTrigger className="w-[100px] h-8 text-caption">
-                                                            <SelectValue placeholder="이전반 선택" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="all">전체</SelectItem>
-                                                            {availableClasses.map(cls => (
-                                                                <SelectItem key={cls} value={cls}>{cls}반</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <Input
-                                                    placeholder="이름 검색..."
-                                                    value={targetStudentSearch}
-                                                    onChange={(e) => setTargetStudentSearch(e.target.value)}
-                                                    className="h-8 text-body mb-2"
-                                                />
-                                                <div className="flex-1 overflow-y-auto p-1">
-                                                    {Object.entries(students
-                                                        .filter(s => s.id !== selectedStudent.id && !tempRelationTargetIds.includes(s.id))
-                                                        .filter(s => targetStudentClassFilter === 'all' || s.prev_info.split('-')[1] === targetStudentClassFilter)
-                                                        .filter(s => !targetStudentSearch || s.name.toLowerCase().includes(targetStudentSearch.toLowerCase()))
-                                                        .reduce((acc, s) => {
-                                                            const cls = s.prev_info.split('-')[1] || '기타';
-                                                            if (!acc[cls]) acc[cls] = [];
-                                                            acc[cls].push(s);
-                                                            return acc;
-                                                        }, {} as Record<string, typeof students>))
-                                                        .sort((a, b) => {
-                                                            if (a[0] === '기타') return 1;
-                                                            if (b[0] === '기타') return -1;
-                                                            return parseInt(a[0]) - parseInt(b[0]);
-                                                        })
-                                                        .map(([cls, classStudents]) => (
-                                                            <div key={cls} className="mb-4 last:mb-0">
-                                                                <div className="text-caption font-bold text-soft mb-2 px-1 border-b pb-1 sticky top-0 bg-card z-10 flex justify-between">
-                                                                    <span>{cls}반</span>
-                                                                    <span className="font-normal">{classStudents.length}명</span>
-                                                                </div>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    {classStudents
-                                                                        .sort((a, b) => {
-                                                                            const numA = parseInt(a.prev_info.split('-')[2] || '0');
-                                                                            const numB = parseInt(b.prev_info.split('-')[2] || '0');
-                                                                            if (numA !== numB) return numA - numB;
-                                                                            return a.name.localeCompare(b.name);
-                                                                        })
-                                                                        .map(s => (
-                                                                            <div
-                                                                                key={s.id}
-                                                                                className="p-2 hover:bg-wash rounded-input border cursor-pointer text-body flex items-center justify-center gap-1 transition-colors"
-                                                                                onClick={() => setTempRelationTargetIds([...tempRelationTargetIds, s.id])}
-                                                                            >
-                                                                                <span className="font-medium whitespace-nowrap">{s.name}</span>
-                                                                                <span className="text-caption text-soft whitespace-nowrap">({s.prev_info.split('-')[2]})</span>
-                                                                            </div>
-                                                                        ))}
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    }
-                                                </div>
-                                            </div>
-                                            {/* 관계 대상 목록 */}
-                                            <div className="border rounded-input p-2 flex flex-col h-full overflow-hidden">
-                                                <div className="mb-2 font-bold text-body">
-                                                    {relationMode === 'avoid' ? '분리 배정 학생' : '함께 배정 학생'} ({tempRelationTargetIds.length}명)
-                                                </div>
-                                                <div className="flex-1 overflow-y-auto space-y-2 bg-canvas rounded-card p-2 border">
-                                                    {students
-                                                        .filter(s => tempRelationTargetIds.includes(s.id))
-                                                        .map(s => (
-                                                            <div
-                                                                key={s.id}
-                                                                className="p-2 rounded-input text-body bg-card border hover:bg-wash transition-colors"
-                                                            >
-                                                                <div className="flex justify-between items-center mb-1">
-                                                                    <span className="font-medium">{s.name} ({s.prev_info})</span>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-6 px-2 text-caption text-danger hover:text-danger hover:bg-danger-wash"
-                                                                        onClick={() => {
-                                                                            setTempRelationTargetIds(tempRelationTargetIds.filter(id => id !== s.id));
-                                                                            const newMemos = { ...tempRelationMemos };
-                                                                            delete newMemos[s.id];
-                                                                            setTempRelationMemos(newMemos);
-                                                                        }}
-                                                                    >
-                                                                        제거
-                                                                    </Button>
-                                                                </div>
-                                                                <Input
-                                                                    placeholder="메모 (사유)..."
-                                                                    value={tempRelationMemos[s.id] || ''}
-                                                                    onChange={(e) => setTempRelationMemos({ ...tempRelationMemos, [s.id]: e.target.value })}
-                                                                    className="h-7 text-caption bg-card"
-                                                                />
-                                                            </div>
-                                                        ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        /* 기준 학생 미선택: 현재 설정된 관계 요약 표시 (학급별 그룹) */
-                                        <div className="h-[420px] overflow-y-auto">
-                                            {getTotalRelationsCount(relationMode as 'keep' | 'avoid') > 0 ? (
-                                                <div className="space-y-4">
-                                                    {/* 일괄 선택/삭제 툴바 */}
-                                                    <div className="sticky top-0 bg-card z-10 py-2 border-b flex justify-between items-center">
-                                                        <label className="flex items-center gap-2 cursor-pointer">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={(() => {
-                                                                    const allRelations = Object.values(getRelationsGroupedByClass(relationMode as 'keep' | 'avoid')).flat();
-                                                                    return allRelations.length > 0 && allRelations.every(r =>
-                                                                        selectedRelationsForDelete.has(`${r.studentA.id}|${r.studentB.id}`)
-                                                                    );
-                                                                })()}
-                                                                onChange={(e) => {
-                                                                    const allRelations = Object.values(getRelationsGroupedByClass(relationMode as 'keep' | 'avoid')).flat();
-                                                                    if (e.target.checked) {
-                                                                        const newSet = new Set(selectedRelationsForDelete);
-                                                                        allRelations.forEach(r => newSet.add(`${r.studentA.id}|${r.studentB.id}`));
-                                                                        setSelectedRelationsForDelete(newSet);
-                                                                    } else {
-                                                                        setSelectedRelationsForDelete(new Set());
-                                                                    }
-                                                                }}
-                                                                className="h-4 w-4 accent-accent"
-                                                            />
-                                                            <span className="text-body font-medium">전체 선택</span>
-                                                        </label>
-                                                        {selectedRelationsForDelete.size > 0 && (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-body text-soft">{selectedRelationsForDelete.size}개 선택</span>
-                                                                <Button
-                                                                    variant="destructive"
-                                                                    size="sm"
-                                                                    onClick={handleBulkDeleteRelations}
-                                                                >
-                                                                    선택 삭제
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="bg-canvas rounded-card p-2 border space-y-4 h-[350px] overflow-y-auto">
-                                                        {Object.entries(getRelationsGroupedByClass(relationMode as 'keep' | 'avoid'))
-                                                            .sort((a, b) => {
-                                                                if (a[0] === '기타') return 1;
-                                                                if (b[0] === '기타') return -1;
-                                                                return parseInt(a[0]) - parseInt(b[0]);
-                                                            })
-                                                            .map(([cls, relations]) => {
-                                                                const allClassSelected = relations.every(r =>
-                                                                    selectedRelationsForDelete.has(`${r.studentA.id}|${r.studentB.id}`)
-                                                                );
-                                                                const toggleClassSelection = () => {
-                                                                    const newSet = new Set(selectedRelationsForDelete);
-                                                                    if (allClassSelected) {
-                                                                        relations.forEach(r => newSet.delete(`${r.studentA.id}|${r.studentB.id}`));
-                                                                    } else {
-                                                                        relations.forEach(r => newSet.add(`${r.studentA.id}|${r.studentB.id}`));
-                                                                    }
-                                                                    setSelectedRelationsForDelete(newSet);
-                                                                };
-                                                                return (
-                                                                    <div key={cls} className="bg-card rounded-input border p-2">
-                                                                        <div className="text-caption font-bold text-soft mb-2 px-1 border-b pb-1 flex items-center gap-2">
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={allClassSelected}
-                                                                                onChange={toggleClassSelection}
-                                                                                className="h-3 w-3 accent-accent"
-                                                                            />
-                                                                            <span className="flex-1">{cls}반</span>
-                                                                            <span className="font-normal">{relations.length}건</span>
-                                                                        </div>
-                                                                        <div className="grid grid-cols-2 gap-2">
-                                                                            {relations.map(({ studentA, studentB, memo }, idx) => {
-                                                                                const selectionKey = `${studentA.id}|${studentB.id}`;
-                                                                                const isSelected = selectedRelationsForDelete.has(selectionKey);
-                                                                                return (
-                                                                                    <div
-                                                                                        key={idx}
-                                                                                        className={`py-1 px-2 rounded-input border text-body flex items-center gap-2 ${isSelected ? 'bg-wash border-accent' : 'bg-card hover:bg-wash'}`}
-                                                                                    >
-                                                                                        <input
-                                                                                            type="checkbox"
-                                                                                            checked={isSelected}
-                                                                                            onChange={() => toggleRelationSelection(studentA.id, studentB.id)}
-                                                                                            className="h-4 w-4 accent-accent"
-                                                                                        />
-                                                                                        <div className="flex-1 min-w-0">
-                                                                                            <span className="text-caption">
-                                                                                                {relationMode === 'keep' ? (
-                                                                                                    <div className="flex items-center gap-1">
-                                                                                                        <span>{studentA.name}({studentA.prev_info})</span>
-                                                                                                        <Handshake size={14} className="text-accent" />
-                                                                                                        <span>{studentB.name}({studentB.prev_info})</span>
-                                                                                                    </div>
-                                                                                                ) : (
-                                                                                                    <div className="flex items-center gap-1">
-                                                                                                        <span>{studentA.name}({studentA.prev_info})</span>
-                                                                                                        <ArrowsLeftRight size={14} className="text-danger" />
-                                                                                                        <span>{studentB.name}({studentB.prev_info})</span>
-                                                                                                    </div>
-                                                                                                )}
-                                                                                            </span>
-                                                                                            {memo && (
-                                                                                                <span className="text-micro text-soft ml-1">| {memo}</span>
-                                                                                            )}
-                                                                                        </div>
-                                                                                        <div className="flex gap-1 shrink-0">
-                                                                                            <Button
-                                                                                                variant="ghost"
-                                                                                                size="sm"
-                                                                                                className="h-6 px-2 text-caption text-accent hover:text-accent-ink hover:bg-wash"
-                                                                                                onClick={() => handleSelectBaseStudent(studentA)}
-                                                                                            >
-                                                                                                수정
-                                                                                            </Button>
-                                                                                            <Button
-                                                                                                variant="ghost"
-                                                                                                size="sm"
-                                                                                                className="h-6 px-2 text-caption text-danger hover:text-danger hover:bg-danger-wash"
-                                                                                                onClick={() => handleDeleteRelation(studentA.id, studentB.id, relationMode as 'keep' | 'avoid')}
-                                                                                            >
-                                                                                                삭제
-                                                                                            </Button>
-                                                                                        </div>
-                                                                                    </div>
-                                                                                );
-                                                                            })}
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })
-                                                        }
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center h-full text-soft bg-canvas rounded-card">
-                                                    <p className="mb-1">
-                                                        {relationMode === 'avoid' ? '설정된 분리 배정이 없습니다.' : '설정된 함께 배정이 없습니다.'}
-                                                    </p>
-                                                    <p>왼쪽에서 기준 학생을 선택하여 추가해 주세요.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Fixed Assignment Mode */}
-                {relationMode === 'fixed' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-title-sm">고정 배정 설정</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* 안내 메시지 */}
-                            <div className="bg-wash p-4 rounded-card text-body text-ink">
-                                <h4 className="font-bold mb-2 flex items-center gap-1.5"><Lightbulb size={16} className="text-accent" aria-hidden="true" /> 고정 배정 설정 안내</h4>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li><strong>고정 배정</strong>: 선택된 학생을 특정 반에 반드시 배정합니다.</li>
-                                </ul>
-                            </div>
-                            <div className="flex gap-4">
-                                {/* 기준 학생 선택 */}
-                                <div className="w-1/3 border rounded-card p-4">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-bold text-emph">기준 학생 선택</h3>
-                                        <Select
-                                            value={selectedClassFilter}
-                                            onValueChange={setSelectedClassFilter}
-                                        >
-                                            <SelectTrigger className="w-[80px] h-7 text-caption">
-                                                <SelectValue placeholder="학급" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">전체</SelectItem>
-                                                {availableClasses.map(cls => (
-                                                    <SelectItem key={cls} value={cls}>{cls}반</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <Input
-                                        placeholder="이름 검색..."
-                                        value={fixedStudentSearch}
-                                        onChange={(e) => setFixedStudentSearch(e.target.value)}
-                                        className="h-8 text-body mb-2"
-                                    />
-                                    <div className="h-[420px] overflow-y-auto">
-                                        {Object.entries(students
-                                            .filter(s => selectedClassFilter === 'all' || s.prev_info.split('-')[1] === selectedClassFilter)
-                                            .filter(s => !fixedStudentSearch || s.name.toLowerCase().includes(fixedStudentSearch.toLowerCase()))
-                                            .reduce((acc, s) => {
-                                                const cls = s.prev_info.split('-')[1] || '기타';
-                                                if (!acc[cls]) acc[cls] = [];
-                                                acc[cls].push(s);
-                                                return acc;
-                                            }, {} as Record<string, typeof students>))
-                                            .sort((a, b) => {
-                                                if (a[0] === '기타') return 1;
-                                                if (b[0] === '기타') return -1;
-                                                return parseInt(a[0]) - parseInt(b[0]);
-                                            })
-                                            .map(([cls, classStudents]) => (
-                                                <div key={cls} className="mb-3 last:mb-0">
-                                                    <div className="text-caption font-bold text-soft mb-1 px-1 border-b pb-1 sticky top-0 bg-card z-10 flex justify-between">
-                                                        <span>{cls}반</span>
-                                                        <span className="font-normal">{classStudents.length}명</span>
-                                                    </div>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        {classStudents.map(s => (
-                                                            <div
-                                                                key={s.id}
-                                                                className={`p-2 rounded-input border cursor-pointer text-body flex items-center justify-center gap-1 transition-colors ${selectedStudent?.id === s.id ? 'bg-wash ring-1 ring-accent border-accent' : 'hover:bg-wash border-line'}`}
-                                                                onClick={() => handleSelectBaseStudent(s)}
-                                                            >
-                                                                <div className="flex flex-col items-center gap-0.5 w-full">
-                                                                    <div className="flex items-center justify-center gap-1 w-full">
-                                                                        <span className="font-medium whitespace-nowrap">{s.name}</span>
-                                                                        <span className="text-caption text-soft whitespace-nowrap">({s.prev_info.split('-')[2]})</span>
-                                                                    </div>
-                                                                    {s.fixed_class && <Badge variant="secondary" className="text-micro px-1 py-0 h-4">{s.fixed_class}</Badge>}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        }
-                                    </div>
-                                </div>
-
-                                {/* 오른쪽 영역 */}
-                                <div className="w-2/3 border rounded-card p-4">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <h3 className="font-bold text-emph">
-                                                {selectedStudent
-                                                    ? `${selectedStudent.name}(${selectedStudent.prev_info}) 학생의 고정 배정`
-                                                    : '고정 배정 설정'
-                                                }
-                                            </h3>
-                                            <p className="text-body text-soft">
-                                                {selectedStudent
-                                                    ? '특정 반에 고정 배정합니다.'
-                                                    : '왼쪽에서 학생을 선택해 주세요.'
-                                                }
-                                            </p>
-                                        </div>
-                                        {selectedStudent && (
-                                            <Button onClick={handleSaveFixedClass}>
-                                                저장 및 완료
-                                            </Button>
-                                        )}
-                                    </div>
-                                    {selectedStudent ? (
-                                        <div className="bg-canvas rounded-card p-4 border space-y-4">
-                                            <div className="grid grid-cols-4 gap-4">
-                                                {classNames.map(cls => (
-                                                    <Button
-                                                        key={cls}
-                                                        variant={tempFixedClass === cls ? 'default' : 'outline'}
-                                                        className="h-20 text-title-sm"
-                                                        onClick={() => setTempFixedClass(cls)}
-                                                    >
-                                                        {cls}
-                                                    </Button>
-                                                ))}
-                                                <Button
-                                                    variant={tempFixedClass === undefined ? 'secondary' : 'outline'}
-                                                    className="h-20 text-title-sm"
-                                                    onClick={() => setTempFixedClass(undefined)}
-                                                >
-                                                    고정 해제
-                                                </Button>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label>사유 (선택)</label>
-                                                <Input
-                                                    value={relationMemo}
-                                                    onChange={(e) => setRelationMemo(e.target.value)}
-                                                    placeholder="예: 쌍둥이 분리 배정 요청"
-                                                />
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="h-[420px] overflow-y-auto bg-canvas rounded-card p-2 border">
-                                            {students.filter(s => s.fixed_class).length > 0 ? (
-                                                <div className="space-y-4">
-                                                    {/* 고정 배정된 반별 그룹화 */}
-                                                    {Object.entries(students
-                                                        .filter(s => s.fixed_class)
-                                                        .reduce((acc, s) => {
-                                                            const cls = s.fixed_class || '미지정';
-                                                            if (!acc[cls]) acc[cls] = [];
-                                                            acc[cls].push(s);
-                                                            return acc;
-                                                        }, {} as Record<string, typeof students>))
-                                                        .sort((a, b) => {
-                                                            const numA = parseInt(a[0].replace('반', ''));
-                                                            const numB = parseInt(b[0].replace('반', ''));
-                                                            return numA - numB;
-                                                        })
-                                                        .map(([cls, classStudents]) => (
-                                                            <div key={cls}>
-                                                                <div className="text-caption font-bold text-soft mb-2 px-1 border-b pb-1 flex justify-between">
-                                                                    <span>{cls} 고정</span>
-                                                                    <span className="font-normal">{classStudents.length}명</span>
-                                                                </div>
-                                                                <div className="grid grid-cols-2 gap-2">
-                                                                    {classStudents
-                                                                        .sort((a, b) => {
-                                                                            // 원래 반별, 번호순 정렬
-                                                                            const classA = parseInt(a.prev_info.split('-')[1] || '0');
-                                                                            const classB = parseInt(b.prev_info.split('-')[1] || '0');
-                                                                            if (classA !== classB) return classA - classB;
-                                                                            const numA = parseInt(a.prev_info.split('-')[2] || '0');
-                                                                            const numB = parseInt(b.prev_info.split('-')[2] || '0');
-                                                                            return numA - numB;
-                                                                        })
-                                                                        .map(s => (
-                                                                            <div
-                                                                                key={s.id}
-                                                                                className="py-1 px-2 rounded-input border bg-card hover:bg-wash text-body flex justify-between items-center"
-                                                                            >
-                                                                                <div className="flex items-center gap-2 min-w-0">
-                                                                                    <span className="text-caption">{s.name}({s.prev_info})</span>
-                                                                                    {s.fixed_class_memo && (
-                                                                                        <span className="text-micro text-soft truncate">| {s.fixed_class_memo}</span>
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="flex gap-1 shrink-0">
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="sm"
-                                                                                        className="h-6 px-2 text-caption text-accent hover:text-accent-ink hover:bg-wash"
-                                                                                        onClick={() => handleSelectBaseStudent(s)}
-                                                                                    >
-                                                                                        수정
-                                                                                    </Button>
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        size="sm"
-                                                                                        className="h-6 px-2 text-caption text-danger hover:text-danger hover:bg-danger-wash"
-                                                                                        onClick={() => setFixedClass(s.id, undefined, '')}
-                                                                                    >
-                                                                                        해제
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </div>
-                                                                        ))}
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    }
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center h-full text-soft">
-                                                    <p className="mb-1">고정 배정된 학생이 없습니다.</p>
-                                                    <p>왼쪽에서 학생을 선택하여 고정 배정해 주세요.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* NEW: Pre-Transfer Mode */}
-                {
-                    relationMode === 'pretransfer' && (
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-                                <CardTitle className="text-title-sm">전출 예정 학생 관리</CardTitle>
-                                <Button
-                                    onClick={handleSavePreTransfer}
-                                    disabled={!hasUnsavedPreTransferChanges()}
-                                >
-                                    저장 및 완료
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                <PreTransferSettings
-                                    students={students}
-                                    tempPreTransferIds={tempPreTransferIds}
-                                    onToggleTempPreTransfer={onToggleTempPreTransfer}
-                                    hasUnsavedChanges={hasUnsavedPreTransferChanges()}
-                                />
-                            </CardContent>
-                        </Card>
-                    )
-                }
+            <div className="grid min-h-0 flex-1 grid-cols-[minmax(300px,400px)_minmax(0,1fr)] gap-3">
+                <section aria-label="학생 고르기" className="flex min-h-0 flex-col overflow-hidden rounded-card bg-card shadow-card">
+                    <h3 className="flex h-12 shrink-0 items-center border-b border-line px-4 text-body font-bold text-ink">{leftTitle}</h3>
+                    {leftBody}
+                </section>
+                <section aria-label="설정한 것" className="flex min-h-0 flex-col overflow-hidden rounded-card bg-card shadow-card">
+                    <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-3 pl-4">
+                        <h3 className="min-w-0 flex-1 truncate text-body font-bold text-ink">{rightTitle}</h3>
+                        {rightTools}
+                        <Button size="sm" onClick={save.onClick} disabled={save.disabled} data-step2-save>
+                            저장
+                        </Button>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto">{rightBody}</div>
+                </section>
             </div>
 
             {/* 그룹 추가/수정 다이얼로그 */}
@@ -1428,7 +974,6 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                     </div>
                 </DialogContent>
             </Dialog>
-
-        </div >
+        </div>
     );
 }

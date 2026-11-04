@@ -82,7 +82,7 @@ try {
     await page.locator('input[type=file]').first().setInputFiles(path.join(root, 'sample-students-12class.xlsx'));
     await expect(page.locator('[data-roster-summary]')).toContainText('330명', { timeout: 30000 });
     await page.getByRole('tab', { name: '2단계 조건 설정' }).click();
-    await page.getByRole('button', { name: '분리 배정' }).waitFor();
+    await page.getByRole('tab', { name: /^분리 배정/ }).waitFor();
     await shot('2-step2');
     await page.getByRole('tab', { name: '3단계 반 편성' }).click();
     await page.getByRole('button', { name: /반편성 시작|배정 실행/ }).waitFor();
