@@ -44,12 +44,12 @@ export function FlagMark() {
 }
 
 function Flagged({ cell, text, bold, className = '', tint = false }: { cell: BalanceCell; text?: string; bold?: boolean; className?: string; tint?: boolean }) {
-    // 0은 흐리게 둡니다. 차이 줄의 0도 같습니다.
+    // 0은 옅은 글자(--soft)로 둡니다. 읽어야 하는 값이라 장식용 --faint는 쓰지 않습니다. 차이 줄의 0도 같습니다.
     const zero = !cell.flagged && cell.value === 0;
     return (
         <td
             data-flagged={cell.flagged || undefined}
-            className={`${TD} ${className} ${cell.flagged ? 'bg-danger-wash font-semibold text-ink' : tint ? `${BAND_TINT} group-hover:bg-wash` : ''} ${zero ? 'text-faint' : bold ? 'font-bold text-ink' : ''}`}
+            className={`${TD} ${className} ${cell.flagged ? 'bg-danger-wash font-semibold text-ink' : tint ? `${BAND_TINT} group-hover:bg-wash` : ''} ${zero ? 'text-soft' : bold ? 'font-bold text-ink' : ''}`}
         >
             {cell.flagged && <FlagMark />}
             {text ?? cell.value}
@@ -105,7 +105,7 @@ export function BalanceTable({ students, groups, classCount, hasAssignments, onO
     return (
         <div className="rounded-card bg-card shadow-card" data-balance-table>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-3 py-2">
-                <BalanceDetailButton students={students} groups={groups} classCount={classCount} />
+                <BalanceDetailButton students={students} groups={groups} classCount={classCount} disabled={!hasAssignments} />
                 {hasAssignments && <BandLine students={students} groups={groups} classCount={classCount} />}
                 {hasAssignments && (
                     <p data-flag-legend className="ml-auto flex items-center gap-1.5 text-small text-soft">
@@ -127,7 +127,7 @@ export function BalanceTable({ students, groups, classCount, hasAssignments, onO
 
             {!hasAssignments ? (
                 <p data-balance-empty className="border-t border-line px-3 py-16 text-center text-body text-soft">
-                    반편성 시작을 누르면 여기에 결과가 나옵니다.
+                    배정 실행을 누르면 여기에 결과가 나옵니다.
                 </p>
             ) : (
                 <table className="w-full border-collapse text-small">
@@ -178,7 +178,7 @@ export function BalanceTable({ students, groups, classCount, hasAssignments, onO
                                     text={c.key === 'average' ? table.difference.average.value.toFixed(1) : undefined}
                                 />
                             ))}
-                            <td className={`${TD} ${GROUP_START} text-faint`}>-</td>
+                            <td className={`${TD} ${GROUP_START} text-soft`}>-</td>
                         </tr>
                         {table.rows.map((row) => (
                             <tr key={row.className} className="group hover:bg-wash">
@@ -194,7 +194,7 @@ export function BalanceTable({ students, groups, classCount, hasAssignments, onO
                                     </button>
                                 </th>
                                 {ordered.map((c) => <Flagged key={c.key} cell={row.cells[c.key]} className={starts.has(c.key) ? GROUP_START : ''} tint={tinted.has(c.key)} />)}
-                                <td className={`${TD} ${GROUP_START} ${row.transferMale + row.transferFemale > 0 ? 'text-soft' : 'text-faint'}`}>
+                                <td className={`${TD} ${GROUP_START} ${row.transferMale + row.transferFemale > 0 ? 'text-ink' : 'text-soft'}`}>
                                     {row.transferMale + row.transferFemale > 0 ? `${row.transferMale}/${row.transferFemale}` : '-'}
                                 </td>
                             </tr>
@@ -209,7 +209,7 @@ export function BalanceTable({ students, groups, classCount, hasAssignments, onO
 function BandCells({ counts }: { counts: BandCounts }) {
     return (
         <>
-            {counts.map((value, i) => <td key={i} className={`${TD} ${i === 0 ? GROUP_START : ''} ${value === 0 ? 'text-faint' : ''}`}>{value}</td>)}
+            {counts.map((value, i) => <td key={i} className={`${TD} ${i === 0 ? GROUP_START : ''} ${value === 0 ? 'text-soft' : ''}`}>{value}</td>)}
         </>
     );
 }
@@ -267,7 +267,7 @@ function PreviousMixTab({ students, classCount }: { students: Student[]; classCo
                             <tr key={row.className} className="hover:bg-wash">
                                 <th scope="row" className={`${TD} text-left font-bold text-ink`}>{row.className}</th>
                                 {matrix.previousClasses.map((p) => (
-                                    <td key={p} className={`${TD} ${row.counts[p] ? '' : 'text-faint'}`}>{row.counts[p] ?? 0}</td>
+                                    <td key={p} className={`${TD} ${row.counts[p] ? '' : 'text-soft'}`}>{row.counts[p] ?? 0}</td>
                                 ))}
                                 <td className={`${TD} ${GROUP_START} font-semibold`}>{row.total}</td>
                             </tr>
@@ -311,10 +311,10 @@ function PreviousLevelsTab({ students }: { students: Student[] }) {
                             <tr key={row.previousClass} className="hover:bg-wash">
                                 <th scope="row" className={`${TD} text-left font-bold text-ink`}>{row.previousClass}반</th>
                                 <td className={TD}>{row.total}</td>
-                                <td className={`${TD} ${GROUP_START} ${row.minus3 ? '' : 'text-faint'}`}>{row.minus3}</td>
-                                <td className={`${TD} ${row.minus2 ? '' : 'text-faint'}`}>{row.minus2}</td>
-                                <td className={`${TD} ${row.minus1 ? '' : 'text-faint'}`}>{row.minus1}</td>
-                                <td className={`${TD} ${GROUP_START} ${row.leader ? '' : 'text-faint'}`}>{row.leader}</td>
+                                <td className={`${TD} ${GROUP_START} ${row.minus3 ? '' : 'text-soft'}`}>{row.minus3}</td>
+                                <td className={`${TD} ${row.minus2 ? '' : 'text-soft'}`}>{row.minus2}</td>
+                                <td className={`${TD} ${row.minus1 ? '' : 'text-soft'}`}>{row.minus1}</td>
+                                <td className={`${TD} ${GROUP_START} ${row.leader ? '' : 'text-soft'}`}>{row.leader}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -325,11 +325,11 @@ function PreviousLevelsTab({ students }: { students: Student[] }) {
 }
 
 /** '반 자세히 보기' 단추와 창. 표에 다 싣지 않은 값을 세 탭으로 나눠 봅니다. */
-function BalanceDetailButton({ students, groups, classCount }: { students: Student[]; groups: CustomGroup[]; classCount: number }) {
+function BalanceDetailButton({ students, groups, classCount, disabled = false }: { students: Student[]; groups: CustomGroup[]; classCount: number; disabled?: boolean }) {
     const [open, setOpen] = useState(false);
     return (
         <>
-            <Button variant="outline" size="sm" onClick={() => setOpen(true)} disabled={students.length === 0}>
+            <Button variant="outline" size="sm" onClick={() => setOpen(true)} disabled={disabled || students.length === 0}>
                 <TableIcon />반 자세히 보기
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>

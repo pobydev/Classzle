@@ -27,7 +27,8 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ConfirmProvider>{children}</ConfirmProvider>
-        <Toaster />
+        {/* 알림도 앱 글꼴(프리텐다드)로 씁니다. */}
+        <Toaster toastOptions={{ className: 'font-sans' }} />
       </body>
     </html>
   );

@@ -37,6 +37,13 @@ export function BoardLegend() {
                 <span className="flex items-center gap-1"><span className="text-accent" aria-hidden="true">★</span><Mark tone="leader">리+1</Mark>리더</span>
             </p>
             <p>행은 행동, 정은 정서입니다. -3과 -2는 이름 칸에 바탕을 칠합니다.</p>
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1" data-legend-head>
+                반 머리
+                <span className="inline-flex h-[18px] items-center gap-1 rounded-[4px] bg-surface-hover px-1 tabular-nums"><span>-3</span><b className="text-ink">1</b></span>
+                은 -3 학생 1명,
+                <span className="inline-flex h-[18px] items-center gap-0.5 rounded-[4px] bg-danger-wash px-1 tabular-nums"><b className="text-danger">!</b><span>-2</span><b className="text-ink">4</b></span>
+                는 통계표 기준을 넘은 값입니다.
+            </p>
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="flex items-center gap-1"><Mark>고</Mark>고정 배정</span>
                 <span className="flex items-center gap-1"><Mark>분</Mark>분리 배정</span>
@@ -271,8 +278,8 @@ function SelectedDetail({
             <div className="mb-1.5 flex items-center gap-1.5">
                 <RecommendModeSwitch mode={recommendMode} onChange={onRecommendModeChange} />
                 <HelpTip label="추천 방식" width={300}>
-                    <p><strong>생활지도까지</strong>: 성적과 생활지도가 닮은 학생만 보여 줍니다. 바꿔도 -3, -2, 리더가 몰리지 않습니다.</p>
-                    <p><strong>성적만</strong>: 필수 조건만 지키고 성적이 가까운 학생을 보여 줍니다. 생활지도가 다르거나 몰림이 생기면 줄에 글로 알려 드리니, 알고 고릅니다.</p>
+                    <p><strong>생활지도까지</strong>: 성적과 생활지도가 닮은 학생만 보여 줍니다. 성적은 같은 성별 안 순위가 15%p 안이고, 점수 차이가 같은 성별 최고점과 최저점 차이의 10% 안이어야 닮은 것으로 봅니다. 바꿔도 -3, -2, 리더가 몰리지 않습니다.</p>
+                    <p><strong>성적만</strong>: 필수 조건만 지키고 성적이 가까운 순서로 보여 줍니다. 생활지도가 다르거나 몰림이 생기면 줄에 빨간 글로 알려 드리니, 알고 고릅니다.</p>
                 </HelpTip>
             </div>
             {recommendations.length === 0 && (
@@ -284,6 +291,9 @@ function SelectedDetail({
                             : '조건에 맞는 상대가 없습니다.'}
                 </p>
             )}
+            {placed && recommendMode === 'guidance' && recommendations.length > 0 && recommendations.length < 3 && (
+                <p className="mb-1.5 text-small text-soft" data-rec-few>생활지도까지 맞는 상대가 적습니다. 성적만을 누르면 더 볼 수 있습니다.</p>
+            )}
             <ul className="space-y-1" data-recommendations>
                 {recommendations.map((r, index) => {
                     const partner = byId.get(r.studentId);
@@ -291,11 +301,14 @@ function SelectedDetail({
                     // 생활지도가 같으면 평소 색, 한 칸 차이나 다름이면 눈에 띄게 둡니다. 글에도 '같음', '한 칸 차이', '다름'이 들어갑니다.
                     const guidanceDiffers = r.guidanceChange !== null;
                     const current = comparePartnerId === r.studentId;
+                    // 몰림 경고가 붙은 줄은 왼쪽에 빨간 줄을 둬서 훑어볼 때 바로 보이게 합니다.
+                    const warned = r.warnings.length > 0;
                     return (
                         <li key={r.studentId}>
                             <button
                                 type="button"
                                 data-rec-row={r.studentId}
+                                data-rec-warned={warned || undefined}
                                 aria-pressed={current}
                                 aria-label={`추천 ${index + 1}번 ${partner.name} 학생 ${partner.assigned_class}에서 비교하기`}
                                 onClick={() => onCompare(r.studentId)}
@@ -303,7 +316,7 @@ function SelectedDetail({
                                 onMouseLeave={() => onPreviewPartner(null)}
                                 onFocus={() => onPreviewPartner(r.studentId)}
                                 onBlur={() => onPreviewPartner(null)}
-                                className={`flex w-full cursor-pointer items-center gap-1.5 rounded-button border px-2 py-1 text-left transition-colors hover:border-accent hover:bg-wash focus-visible:outline-2 focus-visible:outline-offset-1 ${current ? 'border-accent bg-wash' : 'border-line'}`}
+                                className={`flex w-full cursor-pointer items-center gap-1.5 rounded-button border px-2 py-1 text-left transition-colors hover:border-accent hover:bg-wash focus-visible:outline-2 focus-visible:outline-offset-1 ${current ? 'border-accent bg-wash' : warned ? 'border-danger/40' : 'border-line'} ${warned ? 'border-l-[3px] border-l-danger' : ''}`}
                             >
                                 <RankBadge rank={index + 1} className="shrink-0" />
                                 <span className="min-w-0 flex-1">

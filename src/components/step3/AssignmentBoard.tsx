@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLineDown, Plus, X } from '@phosphor-icons/react';
+import { calculateBalanceTable, headFlagsByClass, type HeadFlags } from '@/lib/balanceTable';
 import { sameClass } from '@/lib/assignment/problem';
 import { calculateAttendanceNumbers } from '@/lib/numbering';
 import { recommendSwaps, type RecommendMode } from '@/lib/recommend';
@@ -43,6 +44,8 @@ const COMPACT_COLUMN_MAX = 220;
 const WIDE_COLUMN_MAX = 720;
 
 function applyChipSize(element: HTMLElement, size: ChipSize) {
+    // 같은 크기를 다시 넣으면 330개 칩의 모양을 다시 계산하므로 건너뜁니다.
+    if (element.dataset.chipFont === String(size.font) && element.dataset.chipHeight === String(size.height)) return;
     element.style.setProperty('--chip-font', `${size.font}px`);
     element.style.setProperty('--chip-sub', `${size.sub}px`);
     element.style.setProperty('--chip-mark', `${size.mark}px`);
@@ -81,33 +84,41 @@ interface AssignmentBoardProps {
     onUnassign: () => void;
 }
 
-function HeadFigures({ stat }: { stat?: ClassStat }) {
+// 반 머리의 인원과 평균입니다. 학생을 고른 동안에는 옮길 수 있는 반에 '여기로'를 씁니다.
+function HeadFigures({ stat, moveHere = false }: { stat?: ClassStat; moveHere?: boolean }) {
     if (!stat) return null;
     return (
         <span className="flex flex-wrap gap-x-1.5 text-caption text-soft">
             <span className="whitespace-nowrap">남{stat.stayMaleCount} 여{stat.stayFemaleCount}</span>
             <span className="whitespace-nowrap">평균 {stat.stayAverageScore}</span>
+            {moveHere && <span data-move-here className="ml-auto whitespace-nowrap font-semibold text-accent-ink">여기로</span>}
         </span>
     );
 }
 
-// 반 머리의 생활지도 한 줄입니다. 전출 뒤 기준이고 0은 흐리게 둡니다.
-function HeadLevels({ stat, compact = false }: { stat?: ClassStat; compact?: boolean }) {
+// 반 머리의 생활지도 한 줄입니다. 전출 뒤 기준입니다.
+// 이름표와 숫자를 작은 칸 하나로 묶어 '-3 0 -2 3'이 '-30 -23'처럼 읽히지 않게 합니다.
+// 0은 옅은 글자(--soft, 4.5:1 이상)로 두고, 통계표에서 기준을 넘은 값은 빨간 바탕과 '!'로 표시합니다.
+function HeadLevels({ stat, flags }: { stat?: ClassStat; flags?: HeadFlags }) {
     if (!stat) return null;
-    const items: [string, string, number][] = [
-        ['-3', '생활지도 -3', stat.minus3Count],
-        ['-2', '생활지도 -2', stat.minus2Count],
-        ['★', '리더', stat.leaderCount],
+    const items: [string, string, number, boolean][] = [
+        ['-3', '생활지도 -3', stat.minus3Count, flags?.minus3 ?? false],
+        ['-2', '생활지도 -2', stat.minus2Count, flags?.minus2 ?? false],
+        ['★', '리더', stat.leaderCount, flags?.leader ?? false],
     ];
     return (
-        <span data-head-levels className={`flex flex-wrap items-center text-caption tabular-nums ${compact ? 'gap-x-1.5' : 'gap-x-1'}`}>
-            {items.map(([mark, label, count], i) => (
-                <span key={mark} className="flex items-center gap-x-1 whitespace-nowrap">
-                    {/* 좁은 전체 반 칸에서는 점을 빼고 간격만 둡니다. */}
-                    {i > 0 && !compact && <span className="text-hairline" aria-hidden="true">·</span>}
-                    <span className={count > 0 ? 'text-ink' : 'text-faint'} aria-label={`${label} ${count}명`}>
-                        <span className={mark === '★' ? 'text-accent' : ''}>{mark}</span> {count}
-                    </span>
+        <span data-head-levels className="flex flex-wrap items-center gap-[3px] text-caption tabular-nums">
+            {items.map(([mark, label, count, flagged]) => (
+                <span
+                    key={mark}
+                    data-head-level={mark}
+                    data-flagged={flagged || undefined}
+                    aria-label={`${label} ${count}명${flagged ? ', 기준 넘음' : ''}`}
+                    className={`inline-flex h-[18px] items-center gap-[3px] whitespace-nowrap rounded-[4px] px-[3px] ${flagged ? 'bg-danger-wash' : 'bg-surface-hover'}`}
+                >
+                    {flagged && <span className="-mr-0.5 font-bold text-danger" aria-hidden="true">!</span>}
+                    <span className={mark === '★' ? 'text-accent' : 'text-soft'} aria-hidden="true">{mark}</span>
+                    <span className={count > 0 || flagged ? 'font-bold text-ink' : 'text-soft'} aria-hidden="true">{count}</span>
                 </span>
             ))}
         </span>
@@ -138,6 +149,10 @@ export function AssignmentBoard({
     const scrollerRef = useRef<HTMLDivElement>(null);
     const compactScroll = useRef({ top: 0, left: 0 });
     const fitRef = useRef<(() => void) | null>(null);
+    // 지금 쓰는 칩 크기의 FIT_SIZES 번호입니다.
+    const fitIndex = useRef(0);
+    // 마지막으로 맞춘 크기와 그때의 창 크기, 내용입니다. 전체 반으로 돌아올 때 다시 다 재지 않으려고 둡니다.
+    const fitMemo = useRef<{ box: string; index: number; groups: CustomGroup[]; showScores: boolean; classCount: number } | null>(null);
     // 패널의 추천 줄에 마우스나 초점이 있는 상대입니다.
     const [hoveredPartnerId, setPreviewPartnerId] = useState<string | null>(null);
 
@@ -153,6 +168,11 @@ export function AssignmentBoard({
     }, [byClass, classNames, numberingMethod]);
     const relations = useMemo(() => buildRelations(students), [students]);
     const statByClass = useMemo(() => new Map(classStats.map((stat) => [stat.className, stat])), [classStats]);
+    // 통계표와 같은 기준으로 반 머리에 '!'를 붙입니다.
+    const headFlags = useMemo(
+        () => (hasAssignments ? headFlagsByClass(calculateBalanceTable(students, classCount, groups)) : new Map<string, HeadFlags>()),
+        [hasAssignments, students, classCount, groups],
+    );
 
     // 고른 학생이 바뀌거나 배정이 바뀔 때만 계산합니다.
     const recommendations = useMemo(
@@ -203,17 +223,36 @@ export function AssignmentBoard({
             applyChipSize(board, LARGE_SIZE);
             return;
         }
-        const fit = () => {
-            const chosen = FIT_SIZES.find((candidate) => {
-                applyChipSize(board, candidate);
-                return scroller.scrollHeight <= scroller.clientHeight;
-            });
-            // 13px로도 넘치면 더 줄이지 않고 스크롤합니다.
-            if (!chosen) applyChipSize(board, FIT_SIZES[FIT_SIZES.length - 1]);
+        // start번째 크기부터 대 봅니다. 크기를 넣고 높이를 잴 때마다 화면 배치를 다시 계산하므로(느린 PC에서 한 번에 0.5초쯤)
+        // 꼭 필요한 만큼만 잽니다. 가장 작은 크기는 재지 않고 넣습니다. 13px로도 넘치면 더 줄이지 않고 스크롤합니다.
+        const last = FIT_SIZES.length - 1;
+        let box = `${scroller.clientWidth}x${scroller.clientHeight}`;
+        const fitFrom = (start: number) => {
+            for (let i = start; i <= last; i++) {
+                applyChipSize(board, FIT_SIZES[i]);
+                if (i === last || scroller.scrollHeight <= scroller.clientHeight) {
+                    fitIndex.current = i;
+                    fitMemo.current = { box, index: i, groups, showScores, classCount };
+                    return;
+                }
+            }
         };
-        fit();
-        fitRef.current = fit;
-        const observer = new ResizeObserver(fit);
+        const fit = () => fitFrom(0);
+        // 비교를 마치고 전체 반으로 돌아올 때처럼 창 크기와 내용이 그대로면 고른 크기부터 대 봅니다.
+        const memo = fitMemo.current;
+        if (memo && memo.box === box && memo.groups === groups && memo.showScores === showScores && memo.classCount === classCount) fitFrom(memo.index);
+        else fit();
+        // 교환과 옮기기 뒤에는 지금 크기보다 작은 것만 대 봅니다. 이미 가장 작으면 재지도 않습니다.
+        fitRef.current = () => {
+            if (fitIndex.current < last && scroller.scrollHeight > scroller.clientHeight) fitFrom(fitIndex.current + 1);
+        };
+        // 창 크기가 바뀔 때만 처음부터 다시 맞춥니다. 처음 붙일 때 오는 알림은 방금 맞춘 크기와 같으므로 건너뜁니다.
+        const observer = new ResizeObserver(() => {
+            const next = `${scroller.clientWidth}x${scroller.clientHeight}`;
+            if (next === box) return;
+            box = next;
+            fit();
+        });
         observer.observe(scroller);
         return () => {
             fitRef.current = null;
@@ -223,8 +262,7 @@ export function AssignmentBoard({
 
     // 교환과 옮기기로는 크기를 다시 고르지 않습니다. 칩을 고칠 때마다 글자가 바뀌지 않게 하고, 넘칠 때만 다시 맞춥니다.
     useLayoutEffect(() => {
-        const scroller = scrollerRef.current;
-        if (scroller && scroller.scrollHeight > scroller.clientHeight) fitRef.current?.();
+        fitRef.current?.();
     }, [students]);
 
     // 비교나 두 반 보기에서 돌아오면 있던 스크롤 자리로 돌아갑니다.
@@ -338,12 +376,9 @@ export function AssignmentBoard({
                                             <span className="flex items-center gap-1">
                                                 <b className="text-[length:var(--chip-head,14px)] text-ink">{name}</b>
                                                 <HeadCount stat={stat} />
-                                                {selected && !sameClass(selected.assigned_class, name) && (
-                                                    <ArrowLineDown size={13} className="ml-auto shrink-0 text-accent" aria-hidden />
-                                                )}
                                             </span>
-                                            <HeadFigures stat={stat} />
-                                            <HeadLevels stat={stat} compact />
+                                            <HeadFigures stat={stat} moveHere={!!selected && !sameClass(selected.assigned_class, name)} />
+                                            <HeadLevels stat={stat} flags={headFlags.get(name)} />
                                         </button>
                                         <div className="grid gap-px p-[3px]">
                                             {byClass[name].map((s) => renderChip(s, false))}
@@ -415,7 +450,7 @@ export function AssignmentBoard({
                                                 )}
                                             </div>
                                             <div className="mt-0.5 pl-1">
-                                                <HeadLevels stat={stat} />
+                                                <HeadLevels stat={stat} flags={headFlags.get(name)} />
                                             </div>
                                         </div>
                                         <div className="grid gap-px p-[3px]">

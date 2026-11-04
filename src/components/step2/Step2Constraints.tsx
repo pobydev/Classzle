@@ -279,27 +279,38 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
         return tempPreTransferIds.some(id => !originalIds.includes(id));
     };
 
+    // 고른 그룹의 학생을 넣거나 뺐는데 아직 저장하지 않았는지 봅니다.
+    const hasUnsavedGroupChanges = () => {
+        if (!selectedGroupId) return false;
+        const group = groups.find((g) => g.id === selectedGroupId);
+        if (!group) return false;
+        return tempMemberIds.length !== group.member_ids.length || tempMemberIds.some((id) => !group.member_ids.includes(id));
+    };
+
     // Check for any unsaved changes across all modes
     const hasAnyUnsavedChanges = () => {
-        if (selectedGroupId) return true; // Editing a group
+        if (hasUnsavedGroupChanges()) return true; // Editing a group
         if (hasUnsavedRelationChanges()) return true; // Editing relations
         if (hasUnsavedFixedChanges()) return true; // Editing fixed assignment
         if (hasUnsavedPreTransferChanges()) return true; // Editing pre-transfer students
         return false;
     };
 
+    // 단계를 떠날 때와 탭을 옮길 때 같은 확인 창으로 묻습니다.
+    const confirmDiscard = async () => {
+        if (!hasAnyUnsavedChanges()) return true;
+        return confirm({
+            title: '저장하지 않은 변경 사항이 있습니다.',
+            description: '변경 사항을 버리고 이동할까요?',
+            confirmLabel: '버리고 이동',
+            cancelLabel: '이 화면에 머무르기',
+            danger: true,
+        });
+    };
+
     // 사이드바, 이전, 다음 어느 길로 떠나도 앱 틀이 이 질문을 거칩니다.
     useEffect(() => {
-        leaveGuard.current = async () => {
-            if (!hasAnyUnsavedChanges()) return true;
-            return confirm({
-                title: '저장하지 않은 변경 사항이 있습니다.',
-                description: '변경 사항을 버리고 이동할까요?',
-                confirmLabel: '버리고 이동',
-                cancelLabel: '이 화면에 머무르기',
-                danger: true,
-            });
-        };
+        leaveGuard.current = confirmDiscard;
         return () => {
             leaveGuard.current = null;
         };
@@ -433,6 +444,9 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
             });
             setNewGroup({ name: '', color: GROUP_COLORS[0].value });
             setIsGroupDialogOpen(false);
+            // 만든 그룹을 바로 골라 왼쪽에서 학생을 넣을 수 있게 합니다.
+            const created = useClasszleStore.getState().groups.at(-1);
+            if (created && !hasUnsavedGroupChanges()) setSelectedGroupId(created.id);
         }
     };
 
@@ -498,9 +512,28 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
         pretransfer: students.filter((s) => s.is_pre_transfer).length,
     };
     const tabValue: Mode = relationMode ?? 'group';
-    const handleTabChange = (value: string) => {
+    // 탭을 옮길 때도 저장하지 않은 변경이 있으면 묻습니다. 버리면 고르던 그룹과 학생을 놓습니다.
+    const handleTabChange = async (value: string) => {
+        if (value === tabValue) return;
+        if (!(await confirmDiscard())) return;
+        setSelectedGroupId(null);
         setRelationMode(value === 'group' ? null : (value as Exclude<Mode, 'group'>));
         setSelectedStudent(null);
+    };
+
+    // 다른 그룹을 고를 때도 고르던 그룹의 변경을 묻습니다.
+    const handleSelectGroup = async (groupId: string | null) => {
+        if (groupId !== selectedGroupId && hasUnsavedGroupChanges()) {
+            const confirmed = await confirm({
+                title: '저장하지 않은 변경 사항이 있습니다.',
+                description: '변경 사항을 버리고 다른 그룹을 고를까요?',
+                confirmLabel: '버리고 선택',
+                cancelLabel: '이 그룹 계속 편집',
+                danger: true,
+            });
+            if (!confirmed) return;
+        }
+        setSelectedGroupId(groupId);
     };
 
     // 기준 학생을 놓을 때도 저장하지 않은 변경을 묻습니다.
@@ -556,7 +589,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                 <Plus aria-hidden="true" />새 그룹
             </Button>
         );
-        save = { onClick: handleSaveGroupMembers, disabled: !selectedGroupId };
+        save = { onClick: handleSaveGroupMembers, disabled: !hasUnsavedGroupChanges() };
         rightBody = groups.length === 0 ? (
             <EmptyPanel>만든 그룹이 없습니다. 새 그룹을 눌러 만듭니다.</EmptyPanel>
         ) : (
@@ -571,7 +604,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                                 <button
                                     type="button"
                                     aria-pressed={isSelected}
-                                    onClick={() => setSelectedGroupId(isSelected ? null : group.id)}
+                                    onClick={() => handleSelectGroup(isSelected ? null : group.id)}
                                     className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-input py-1 text-left focus-visible:outline-2"
                                 >
                                     <span className={`size-3 shrink-0 rounded-full ${group.color.split(' ')[0]}`} aria-hidden="true" />
@@ -808,7 +841,7 @@ export default function Step2Constraints({ leaveGuard }: Step2ConstraintsProps) 
                     </div>
                     <div className="space-y-1.5">
                         <label htmlFor="fixed-memo" className="text-small font-semibold text-ink">사유 (선택)</label>
-                        <Input id="fixed-memo" value={relationMemo} onChange={(e) => setRelationMemo(e.target.value)} placeholder="예: 쌍둥이 분리 배정 요청" />
+                        <Input id="fixed-memo" value={relationMemo} onChange={(e) => setRelationMemo(e.target.value)} placeholder="예: 특수학급 연계" />
                     </div>
                 </div>
             );

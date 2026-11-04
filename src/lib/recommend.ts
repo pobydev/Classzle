@@ -2,9 +2,12 @@ import type { CustomGroup, Student } from '@/types';
 import { FULL_WEIGHTS } from './assignment';
 import { compileProblem, resolveClassIndex } from './assignment/problem';
 
-// 성적은 점수가 아니라 같은 성별 안 성적 순위(백분위)로 비교합니다. 학교마다 점수 단위가 달라서입니다.
-// 순위가 이보다 더 차이 나면(%p) 추천하지 않습니다.
+// '생활지도까지'에서 닮은 성적의 기준입니다. 두 가지를 모두 지켜야 닮은 학생입니다.
+// 1. 같은 성별 안 성적 순위(백분위) 차이가 이 값(%p) 이하입니다. 학교마다 점수 단위가 달라 순위로 봅니다.
 export const MAX_RANK_GAP = 15;
+// 2. 점수 차이가 같은 성별 성적 범위(최고 - 최저)의 이 비율(%) 이하입니다.
+//    점수가 드문드문한 끝자리에서는 순위가 가까워도 점수가 크게 벌어지므로 점수로도 막습니다.
+export const MAX_SCORE_GAP_PERCENT = 10;
 // 생활지도가 한 칸 다르면 순위 차이 이만큼(%p)으로 칩니다. 두 칸 이상 다르면 추천하지 않습니다.
 export const GUIDANCE_STEP_COST = 5;
 
@@ -163,7 +166,8 @@ export const RECOMMEND_WEIGHTS = FULL_WEIGHTS;
  * - 다른 반, 같은 성별, 같은 전출 예정 여부. 1:1로 바꾸므로 인원과 남녀가 틀어지지 않습니다.
  * - 고정 배정, 분리 배정, 함께 배정, 그룹 분산, 인원, 남녀를 새로 어기지 않습니다.
  * - -3, -2(행동, 정서 유형별 포함)와 리더(+2, 리더 전체)가 고르게 나뉜 범위를 새로 벗어나는 반을 만들지 않습니다.
- * - 같은 성별 안 성적 순위 차이가 MAX_RANK_GAP 이하이고, 생활지도가 한 칸 이하로 다릅니다.
+ * - 같은 성별 안 성적 순위 차이가 MAX_RANK_GAP 이하이고, 점수 차이가 같은 성별 성적 범위의 MAX_SCORE_GAP_PERCENT 이하이며,
+ *   생활지도가 한 칸 이하로 다릅니다.
  *   전출 예정 학생끼리는 이 두 가지를 보지 않습니다. 전출 뒤 기준으로 맞추므로 성적과 생활지도가 균형에 들어가지 않기 때문입니다.
  * 순서: 생활지도 칸 수 x GUIDANCE_STEP_COST + 순위 차이가 작은 순, 같으면 성적 차이, 그다음 균형 변화.
  *
@@ -190,6 +194,14 @@ export function recommendSwaps(
         .map((_, i) => i)
         .filter((i) => gender[i] === gender[self] && (stay[self] ? stay[i] === 1 : true));
     percentileRanks(pool, score, rank);
+    // 같은 성별 성적 범위로 '생활지도까지'의 점수 차이 상한을 정합니다. 순위와 같은 학생 묶음으로 잽니다.
+    let poolMin = Infinity;
+    let poolMax = -Infinity;
+    for (const i of pool) {
+        if (score[i] < poolMin) poolMin = score[i];
+        if (score[i] > poolMax) poolMax = score[i];
+    }
+    const maxScoreGap = pool.length > 0 ? ((poolMax - poolMin) * MAX_SCORE_GAP_PERCENT) / 100 : 0;
     const classOf = students.map((s) => resolveClassIndex(s.assigned_class, classNames));
     const home = classOf[self];
     if (home < 0) return [];
@@ -267,7 +279,8 @@ export function recommendSwaps(
         // '생활지도까지'는 닮은 학생만 추천합니다. 전출 예정 학생끼리는 보지 않습니다. '성적만'은 이 제한이 없습니다.
         const rankDifference = Math.abs(rank[self] - rank[j]);
         const steps = guidanceSteps(students[self], candidate);
-        if (mode === 'guidance' && stay[self] && (rankDifference > MAX_RANK_GAP + 1e-9 || steps > 1)) return;
+        const scoreGap = Math.abs(score[self] - score[j]);
+        if (mode === 'guidance' && stay[self] && (rankDifference > MAX_RANK_GAP + 1e-9 || scoreGap > maxScoreGap + 1e-9 || steps > 1)) return;
 
         // 고정 반을 새로 어기는 교환은 뺍니다.
         if (fixedTo[self] >= 0 && fixedTo[self] !== other) return;

@@ -85,7 +85,7 @@ try {
     await page.getByRole('tab', { name: /^분리 배정/ }).waitFor();
     await shot('2-step2');
     await page.getByRole('tab', { name: '3단계 반 편성' }).click();
-    await page.getByRole('button', { name: /반편성 시작|배정 실행/ }).waitFor();
+    await page.getByRole('button', { name: '배정 실행' }).waitFor();
     await shot('3-step3');
     checks.push('1~3단계 메뉴로 이동, 가상 명단 330명');
 
@@ -149,6 +149,7 @@ try {
     await expect(guide.getByRole('heading', { name: 'Classzle 사용 가이드' })).toBeVisible();
     await expect(guide).toContainText('저장 파일은 암호화되지 않습니다.');
     await expect(guide).toContainText('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.');
+    await expect(guide).toContainText('Ctrl + 0');
     await expect(guide).toContainText(`버전 ${version}`);
     await expect(guide.locator('[data-made-by] img')).toBeVisible();
     for (const number of ['01', '02', '03', '04', '05', '06']) await expect(guide).toContainText(number);
@@ -167,6 +168,22 @@ try {
     await rail.getByRole('button', { name: '메뉴 펼치기' }).click();
     await expect(sidebar).toBeVisible();
     checks.push('56px 아이콘 줄로 접고 다시 펼침, 접어도 단계 이동됨');
+
+    // 확대 단축키: 메뉴가 없어도 Ctrl + +, Ctrl + -, Ctrl + 0이 동작하고, 값을 자료 폴더에 기억합니다.
+    // Playwright의 키 입력은 메인 프로세스의 before-input-event까지 가지 않으므로 실제 키보드와 같은 길(sendInputEvent)로 누릅니다.
+    const zoomLevel = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomLevel());
+    const pressCtrl = (keyCode) => app.evaluate(({ BrowserWindow }, k) => BrowserWindow.getAllWindows()[0].webContents.sendInputEvent({ type: 'keyDown', keyCode: k, modifiers: ['control'] }), keyCode);
+    await pressCtrl('=');
+    await expect.poll(zoomLevel).toBe(0.5);
+    await pressCtrl('=');
+    await expect.poll(zoomLevel).toBe(1);
+    await pressCtrl('-');
+    await expect.poll(zoomLevel).toBe(0.5);
+    await expect.poll(async () => fs.readFile(path.join(userData, 'zoom.json'), 'utf8').catch(() => '')).toContain('0.5');
+    await pressCtrl('0');
+    await expect.poll(zoomLevel).toBe(0);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    checks.push('Ctrl + +, Ctrl + -, Ctrl + 0으로 앱 전체 확대, 확대 값을 자료 폴더에 기억');
 
     expect(errors).toEqual([]);
     console.log(JSON.stringify({ checks }, null, 2));

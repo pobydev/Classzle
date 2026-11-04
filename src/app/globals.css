@@ -123,16 +123,6 @@
 
   --radius: 10px;
 
-  /* 생활지도 유형별 색상 */
-  --behavior-none: oklch(0.95 0 0);
-  --behavior-leader-1: oklch(0.85 0.15 145);
-  --behavior-leader-2: oklch(0.75 0.18 145);
-  --behavior-behavior-1: oklch(0.9 0.15 60);
-  --behavior-behavior-2: oklch(0.8 0.2 55);
-  --behavior-behavior-3: oklch(0.7 0.22 50);
-  --behavior-emotional-1: oklch(0.9 0.12 250);
-  --behavior-emotional-2: oklch(0.8 0.16 250);
-  --behavior-emotional-3: oklch(0.7 0.2 250);
 }
 
 @layer base {

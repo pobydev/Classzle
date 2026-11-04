@@ -131,6 +131,15 @@ export function GuideDialog({
                     <p>편성이 모두 끝나면 왼쪽 목록에서 저장된 작업을 지워 주세요.</p>
                 </Step>
 
+                <section className={SECTION} data-guide-shortcuts>
+                    <h3 className={HEADING}>단축키</h3>
+                    <ul className="ml-4 list-disc">
+                        <li>화면 크게, 작게: <strong className={STRONG}>Ctrl + +</strong>, <strong className={STRONG}>Ctrl + −</strong>, 원래 크기는 <strong className={STRONG}>Ctrl + 0</strong>입니다. Ctrl을 누른 채 마우스 휠을 굴려도 됩니다. 회의에서 TV로 함께 볼 때 씁니다. 고른 크기는 다음에 켜도 그대로입니다.</li>
+                        <li>생활지도 입력: 표의 생활지도 칸을 누른 뒤 숫자 키를 누릅니다. 1·2는 리더, 3·4·5는 행동, 6·7·8은 정서, 0은 해당 없음입니다.</li>
+                        <li>상세 배치 조정: <strong className={STRONG}>Esc</strong>를 누르면 비교를 닫고, 한 번 더 누르면 고른 학생을 놓습니다.</li>
+                    </ul>
+                </section>
+
                 <section className={SECTION}>
                     <h3 className={HEADING}>학생 정보</h3>
                     <p>{privacyNote(updates.isSupported)}</p>

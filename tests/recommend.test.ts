@@ -80,10 +80,16 @@ describe('교환 추천', () => {
     });
 
     // 남학생 21명을 10점 간격으로 둡니다(r0 100점 ~ r20 300점). 순위가 한 명 차이면 5%p입니다.
-    // 따로 적지 않은 학생은 3반에 둡니다.
+    // 성적 범위가 200점이라 점수 차이 상한은 20점(10%)입니다. 따로 적지 않은 학생은 3반에 둡니다.
     const ladder = (placed: Record<number, Partial<Student>>) =>
         Array.from({ length: 21 }, (_, r) =>
             makeStudent({ id: `r${r}`, gender: 'M', academic_score: 100 + r * 10, assigned_class: '3반', ...placed[r] }),
+        );
+    // 순위만 따로 보려고 점수를 촘촘히 둡니다. r0~r19는 1점 간격(600~619점)이고 r20만 1000점입니다.
+    // 성적 범위가 400점이라 점수 차이 상한(40점)에 걸리는 학생은 r20뿐입니다.
+    const denseLadder = (placed: Record<number, Partial<Student>>) =>
+        Array.from({ length: 21 }, (_, r) =>
+            makeStudent({ id: `r${r}`, gender: 'M', academic_score: r === 20 ? 1000 : 600 + r, assigned_class: '3반', ...placed[r] }),
         );
 
     it('같은 성별 학생만 추천합니다', () => {
@@ -132,15 +138,25 @@ describe('교환 추천', () => {
     });
 
     it('생활지도가 같아도 성적 순위가 15%p 넘게 차이 나면 뺍니다', () => {
-        const students = ladder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 14: { assigned_class: '2반' } });
+        const students = denseLadder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 14: { assigned_class: '2반' } });
         const result = recommendSwaps('r10', students, 3);
-        // r7과 r13은 15%p, r6과 r14는 20%p 차이입니다.
+        // r7과 r13은 15%p, r6과 r14는 20%p 차이입니다. 점수 차이는 모두 40점 안입니다.
         expect(ids(result).sort()).toEqual(['r11', 'r12', 'r13', 'r7', 'r8']);
         result.forEach((r) => expect(r.rankDifference).toBeLessThanOrEqual(15 + 1e-9));
     });
 
+    it('순위가 15%p 안이어도 점수 차이가 같은 성별 성적 범위의 10%를 넘으면 뺍니다', () => {
+        const students = ladder({ 10: { assigned_class: '1반' }, 9: { assigned_class: '1반' }, 11: { assigned_class: '2반' }, 13: { assigned_class: '2반' } });
+        const result = recommendSwaps('r10', students, 3);
+        // 범위 200점의 10%는 20점입니다. r12, r8은 20점이라 남고, r13, r7은 15%p지만 30점이라 빠집니다.
+        expect(ids(result).sort()).toEqual(['r11', 'r12', 'r8']);
+        result.forEach((r) => expect(r.scoreDifference).toBeLessThanOrEqual(20 + 1e-9));
+        // '성적만'은 이 상한이 없습니다.
+        expect(ids(recommendSwaps('r10', students, 3, [], 10, 'score'))).toContain('r13');
+    });
+
     it('생활지도가 한 칸 다르고 성적이 아주 가까운 학생이 생활지도가 같고 성적이 먼 학생보다 앞섭니다', () => {
-        const students = ladder({
+        const students = denseLadder({
             10: { assigned_class: '1반' },
             11: { assigned_class: '2반', behavior_type: 'EMOTIONAL', behavior_score: -1 },
             13: { assigned_class: '2반' },
@@ -152,7 +168,7 @@ describe('교환 추천', () => {
         expect(order.indexOf('r11')).toBeLessThan(order.indexOf('r13'));
         const near = result.find((r) => r.studentId === 'r11')!;
         expect(near.order).toBeCloseTo(10);
-        expect(describeRecommendation(near)).toBe('성적 차이 10점 · 생활지도 한 칸 차이(없음 → 정-1)');
+        expect(describeRecommendation(near)).toBe('성적 차이 1점 · 생활지도 한 칸 차이(없음 → 정-1)');
     });
 
     it('생활지도가 두 칸 이상 다르면 뺍니다', () => {
@@ -333,10 +349,11 @@ describe('성적만 추천', () => {
 });
 
 describe('교환 뒤 성적 평균 차이', () => {
-    // 3반에 성적이 아주 높은 학생 40명을 두어 1반, 2반 학생의 성적 순위가 서로 가깝게 합니다. 평균은 1반과 2반만 봅니다.
+    // 3반에 성적이 아주 높은 학생 40명을 둡니다. 평균은 1반과 2반만 봅니다.
+    // 성적이 먼 상대의 값도 보려고 점수 차이로 거르지 않는 '성적만'으로 셉니다. 평균 차이 계산은 두 방식이 같습니다.
     const pool = Array.from({ length: 40 }, (_, i) => makeStudent({ id: `p${i}`, assigned_class: '3반', academic_score: 2000 + i }));
     const changeFor = (students: Student[], partner: string) =>
-        recommendSwaps('a', [...students, ...pool], 3).find((r) => r.studentId === partner)?.scoreGapChange;
+        recommendSwaps('a', [...students, ...pool], 3, [], 10, 'score').find((r) => r.studentId === partner)?.scoreGapChange;
 
     it('두 반의 평균 차이가 얼마나 변하는지 알려 줍니다', () => {
         const students = [

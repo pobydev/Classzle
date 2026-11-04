@@ -6,7 +6,6 @@ import {
     ArrowCounterClockwise,
     CaretDown,
     ChartBar,
-    CheckCircle,
     DownloadSimple,
     MagnifyingGlass,
     Rocket,
@@ -176,6 +175,23 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
         setTab(value as DashboardTab);
         clearSelection();
     };
+
+    // 보드에서 Esc를 누르면 비교 중이면 비교를 닫고, 아니면 고른 학생을 놓습니다.
+    // 열린 창이나 메뉴가 있거나 글자를 쓰는 중이면 그쪽에 맡깁니다.
+    const handleEscape = useStableCallback((event: KeyboardEvent) => {
+        if (event.key !== 'Escape' || event.defaultPrevented || !boardActive) return;
+        if (!selectedStudentId && !comparePartnerId) return;
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (document.querySelector('[role="dialog"], [role="menu"], [data-radix-popper-content-wrapper]')) return;
+        event.preventDefault();
+        if (comparePartnerId) setComparePartnerId(null);
+        else setSelectedStudentId(null);
+    });
+    useEffect(() => {
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [handleEscape]);
 
     const handleUndo = () => {
         undoLastChange();
@@ -408,7 +424,7 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
             }
             setPendingSwap(null);
             clearSelection();
-            toast.success('조건을 어기는 변경을 적용했습니다. 어긴 조건은 오른쪽 목록과 위쪽 조건 어김 표시에 나옵니다.');
+            toast.success("조건을 어기는 변경을 적용했습니다. 위쪽 '지키지 못한 조건'을 누르면 목록이 나옵니다.");
         }
     };
 
@@ -492,9 +508,10 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                             <Button variant="outline" size="sm" onClick={handleUndo} disabled={undoStack.length === 0}>
                                 <ArrowCounterClockwise />되돌리기
                             </Button>
-                            <span role="status" data-board-status className={`ml-auto flex items-center gap-1 text-small font-semibold whitespace-nowrap ${violations.length > 0 ? 'text-danger' : 'text-ink'}`}>
-                                {violations.length > 0 ? <WarningCircle size={15} /> : <CheckCircle size={15} className="text-accent-ink" />}
-                                조건 어김 {violations.length}건 · 전체 {students.length}명
+                            {/* 통계 탭과 같은 이름과 같은 목록을 씁니다. */}
+                            <span role="status" data-board-status className="ml-auto flex items-center gap-2 whitespace-nowrap">
+                                <ConditionsStatus hasAssignments={hasAssignments} violations={violations} />
+                                <span className="text-small text-soft">전체 {students.length}명</span>
                             </span>
                         </>
                     )}
@@ -556,13 +573,13 @@ export default function Step3Dashboard({ onBoardActiveChange }: Step3DashboardPr
                                 <div className="flex flex-wrap items-center justify-end gap-2">
                                     <Button onClick={handleAssign} disabled={isAssigning || students.length === 0}>
                                         {hasAssignments ? <ArrowClockwise /> : <Rocket />}
-                                        {isAssigning ? '배정 중...' : hasAssignments ? '배정 실행' : '반편성 시작'}
+                                        {isAssigning ? '배정 중...' : '배정 실행'}
                                     </Button>
                                     <Button variant="outline" onClick={handleUndo} disabled={undoStack.length === 0}>
                                         <ArrowCounterClockwise />되돌리기
                                     </Button>
                                     <span className="mx-1 h-8 w-px bg-line" aria-hidden />
-                                    <Button variant="outline" onClick={() => setIsReportOpen(true)} disabled={students.length === 0}>
+                                    <Button variant="outline" onClick={() => setIsReportOpen(true)} disabled={!hasAssignments}>
                                         <ChartBar />배정 리포트
                                     </Button>
                                     <Button variant="outline" onClick={() => setIsExportDialogOpen(true)} disabled={!hasAssignments}>

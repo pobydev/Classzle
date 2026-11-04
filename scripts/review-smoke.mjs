@@ -178,13 +178,19 @@ try {
     await expect(dialog).toContainText('저장하지 않은 변경 사항이 있습니다');
     await dialog.getByRole('button', { name: '이 화면에 머무르기' }).click();
     await expect(page.getByRole('tab', { name: '2단계 조건 설정' })).toHaveAttribute('data-state', 'active');
+    // 2단계 안에서 탭을 옮길 때도 같은 창으로 묻고, 머무르면 고르던 것이 그대로입니다.
+    await page.getByRole('tab', { name: /^함께 배정/ }).click();
+    await expect(dialog).toContainText('저장하지 않은 변경 사항이 있습니다');
+    await dialog.getByRole('button', { name: '이 화면에 머무르기' }).click();
+    await expect(page.getByRole('tab', { name: /^전출 예정/ })).toHaveAttribute('data-state', 'active');
+    await expect(page.locator('[data-pick-student]').first()).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('tab', { name: '3단계 반 편성' }).click();
     await dialog.getByRole('button', { name: '버리고 이동' }).click();
     await expect(page.getByRole('tab', { name: '3단계 반 편성' })).toHaveAttribute('data-state', 'active');
-    checks.push('8 사이드바로 옮길 때 저장하지 않은 변경을 묻고 머무를 수 있음');
+    checks.push('8 사이드바로 옮길 때와 2단계 탭을 옮길 때 저장하지 않은 변경을 묻고 머무를 수 있음');
 
     // 14. 배정이 사라지면 신규 탭
-    await page.getByRole('button', { name: /반편성 시작|배정 실행/ }).click();
+    await page.getByRole('button', { name: '배정 실행' }).click();
     await page.waitForSelector('text=/명의 학생 배정이 변경|옮긴 학생이 없습니다/', { timeout: 120000 });
     await page.waitForTimeout(500);
     await page.keyboard.press('Escape');
@@ -218,8 +224,12 @@ try {
     await expect(page.getByRole('button', { name: '반 추가' })).toHaveCount(0);
     await page.locator('[data-board-panel]').getByRole('button', { name: '취소' }).click();
     await expect(pickView).toHaveAttribute('data-columns', '3');
+    // Esc는 고른 학생을 놓습니다.
+    await expect(pickView.locator('[data-chip][aria-pressed="true"]')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(pickView.locator('[data-chip][aria-pressed="true"]')).toHaveCount(0);
     await page.getByRole('tab', { name: /학급별 균형 통계/ }).click();
-    checks.push('골라 보기: 2~4반, 빼기와 반 추가, 비교하는 동안 두 반으로 정하고 끝나면 보던 칸으로 돌아감');
+    checks.push('골라 보기: 2~4반, 빼기와 반 추가, 비교하는 동안 두 반으로 정하고 끝나면 보던 칸으로 돌아감, Esc로 고른 학생 놓기');
 
     await page.getByRole('tab', { name: /균형 조정/ }).click();
     await page.getByRole('button', { name: '반 편성 메뉴' }).click();
@@ -263,6 +273,10 @@ try {
     const blocked = path.join(profile, 'blocked');
     await fs.writeFile(blocked, '');
     await app.evaluate(({ app: a }, dir) => a.setPath('temp', dir), blocked);
+    // 배정 리포트는 배정이 있어야 열립니다. 위에서 초기화했으므로 다시 배정합니다.
+    await expect(page.getByRole('button', { name: /배정 리포트/ })).toBeDisabled();
+    await page.getByRole('button', { name: '배정 실행' }).click();
+    await page.waitForSelector('text=/명의 학생 배정이 변경|옮긴 학생이 없습니다/', { timeout: 120000 });
     await page.getByRole('button', { name: /배정 리포트/ }).click();
     await page.getByRole('button', { name: '보고서 인쇄' }).click();
     await expect(page.getByText('인쇄 미리보기를 열지 못했습니다.').first()).toBeVisible();

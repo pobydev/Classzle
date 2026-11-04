@@ -15,7 +15,14 @@ const GROUPS: { type: Kind; label: string; options: { score: number; key: string
     { type: 'EMOTIONAL', label: '정서', options: [{ score: -1, key: '6' }, { score: -2, key: '7' }, { score: -3, key: '8' }] },
 ];
 
-const CSS_KEY: Record<Kind, string> = { LEADER: 'leader', BEHAVIOR: 'behavior', EMOTIONAL: 'emotional' };
+// 고른 값의 색은 3단계 보드와 같은 뜻으로 씁니다(StudentChip.tsx).
+// -3은 진한 바탕, -2는 옅은 바탕에 빨간 글자, -1은 배지처럼 회색 바탕, 리더는 ★와 옅은 하늘색입니다. 행동과 정서는 같은 색입니다.
+function selectedClass(type: Kind, score: number): string {
+    if (type === 'LEADER') return 'border-accent/40 bg-tint text-accent-ink';
+    if (score <= -3) return 'border-danger/40 bg-guidance-strong text-danger';
+    if (score === -2) return 'border-danger/30 bg-guidance-soft text-danger';
+    return 'border-hairline bg-surface-hover text-ink';
+}
 const BUTTON_WIDTH = 32;
 const BUTTON_GAP = 2;
 const groupWidth = (count: number) => count * BUTTON_WIDTH + (count - 1) * BUTTON_GAP;
@@ -145,19 +152,15 @@ function BehaviorPickerBase({
                                 tabIndex={-1}
                                 // 값을 다시 누르면 해제합니다.
                                 onClick={() => (isOn ? onChange(studentId, 'NONE', 0) : onChange(studentId, group.type, option.score))}
-                                style={{
-                                    width: BUTTON_WIDTH,
-                                    backgroundColor: isOn
-                                        ? `var(--behavior-${CSS_KEY[group.type]}-${Math.abs(option.score)})`
-                                        : undefined,
-                                }}
-                                // 고르지 않은 값은 테두리 없이 흐린 글자로 두고, 고른 값만 색을 칠합니다.
-                                className={`h-7 cursor-pointer rounded-input border text-small tabular-nums transition-colors ${
+                                style={{ width: BUTTON_WIDTH }}
+                                // 고르지 않은 값은 테두리 없이 흐린 글자로 두고, 고른 값만 보드와 같은 색을 칠합니다.
+                                className={`h-7 cursor-pointer rounded-input border text-small tabular-nums whitespace-nowrap transition-colors ${
                                     isOn
-                                        ? 'border-accent font-bold text-ink'
+                                        ? `${selectedClass(group.type, option.score)} font-bold`
                                         : 'border-transparent text-soft hover:bg-surface-hover hover:text-ink'
                                 }`}
                             >
+                                {isOn && group.type === 'LEADER' && <span aria-hidden="true">★</span>}
                                 {signed(option.score)}
                             </button>
                         );

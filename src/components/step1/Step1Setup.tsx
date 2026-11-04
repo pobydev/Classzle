@@ -257,7 +257,8 @@ export default function Step1Setup() {
                 classLine.push(`파일에 맞춰 학급 수를 ${detectedClassCount}개로 정했습니다. 새 학년도 학급 수와 다르면 맨 위 요약 줄의 바꾸기를 눌러 고쳐 주세요.`);
                 setClassCount(detectedClassCount);
             }
-            setNotices([formLine, ...classLine, ...warnings]);
+            // 고칠 일이 있는 안내(학급 수, 빈 값 등)를 앞에 둡니다. 접힌 줄에는 첫 안내가 보입니다.
+            setNotices([...classLine, ...warnings, formLine]);
             setErrorMessage('');
         } catch (error) {
             setErrorMessage((error as Error).message);

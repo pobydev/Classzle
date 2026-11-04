@@ -7,6 +7,7 @@ import { isSafeExternalUrl } from './externalUrl';
 import { createFolderApproval } from './folderApproval';
 import { cleanOldPrintFiles, isPrintSource, PRINT_FOLDER } from './printFiles';
 import { setupUpdates } from './updater';
+import { setupZoom } from './zoom';
 import { cleanLeftoverTemp, isFileLockedError, projectFilePath, writeFileSafely } from './projectFiles';
 import { projectNameFromFile, projectNameProblem } from './projectName';
 
@@ -295,6 +296,9 @@ function createWindow() {
 
     // 외부 링크는 기본 브라우저로 열기
     mainWindow.webContents.setWindowOpenHandler(openLinkOutside);
+
+    // 메뉴 없이도 Ctrl + +, Ctrl + −, Ctrl + 0으로 확대합니다. 확대 값은 다시 켜도 기억합니다.
+    setupZoom(mainWindow, app.getPath('userData'));
 
     if (isDev) {
         // 개발 모드: Next.js 개발 서버에 연결

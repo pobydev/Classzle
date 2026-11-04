@@ -248,3 +248,20 @@ export function calculatePreviousClassMatrix(students: Student[], classCount: nu
     const previousClasses = [...previousSet].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
     return { previousClasses, rows, totals };
 }
+
+// 보드 반 머리의 '-3', '-2', '★'에 '!'를 붙일지 정합니다. 통계표의 표시를 그대로 묶습니다.
+// -3은 행동 -3이나 정서 -3, -2는 행동 -2나 정서 -2, ★는 리더 +2나 +1 칸에 '!'가 있으면 붙습니다.
+export interface HeadFlags {
+    minus3: boolean;
+    minus2: boolean;
+    leader: boolean;
+}
+
+export function headFlagsByClass(table: BalanceTable): Map<string, HeadFlags> {
+    const flagged = (row: BalanceRow, ...keys: string[]) => keys.some((key) => row.cells[key]?.flagged ?? false);
+    return new Map(table.rows.map((row) => [row.className, {
+        minus3: flagged(row, 'behavior3', 'emotional3'),
+        minus2: flagged(row, 'behavior2', 'emotional2'),
+        leader: flagged(row, 'leader2', 'leader1'),
+    }]));
+}
