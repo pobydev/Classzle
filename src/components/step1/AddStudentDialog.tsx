@@ -57,7 +57,7 @@ export function AddStudentDialog({ open, onOpenChange }: { open: boolean; onOpen
                         <Input id="new-student-name" className="col-span-3" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <label className="text-right" htmlFor="new-student-prev">이전 학년도</label>
+                        <label className="text-right" htmlFor="new-student-prev">전학년도</label>
                         <Input
                             id="new-student-prev"
                             className="col-span-3"

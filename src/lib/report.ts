@@ -24,7 +24,7 @@ export interface ConditionSummary {
 export interface ReportStudent {
     name: string;
     className: string;
-    // 전 학년 반. 예: '전 학년 2-12'. 같은 이름 학생을 구분할 때 씁니다.
+    // 전학년도 반. 예: '전학년도 2-12'. 같은 이름 학생을 구분할 때 씁니다.
     previous: string;
 }
 
@@ -82,7 +82,7 @@ export interface ReportModel {
 export function previousLabel(student: Pick<Student, 'prev_info'>): string {
     const [grade, classNum] = String(student.prev_info ?? '').split('-').map((part) => (part === 'undefined' ? '' : part.trim()));
     if (!grade || !classNum) return '';
-    return `전 학년 ${grade}-${classNum}`;
+    return `전학년도 ${grade}-${classNum}`;
 }
 
 const reportStudent = (s: Student): ReportStudent => ({

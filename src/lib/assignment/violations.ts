@@ -34,6 +34,7 @@ export function collectViolations(
                 key: `FIXED|${s.id}`,
                 message: `${s.name} 학생의 고정 배정(${s.fixed_class})이 학급 수를 벗어났습니다.`,
                 studentIds: [s.id],
+                unfixable: true,
             });
         } else if (resolveClassIndex(s.assigned_class, classNames) !== target) {
             violations.push({
@@ -62,28 +63,32 @@ export function collectViolations(
 
     eachPair((s) => s.avoid_ids, 'AVOID', (a, b, key) => {
         if (sameClass(a.assigned_class, b.assigned_class)) {
+            // 두 학생이 같은 반에 고정되어 있으면 배정으로는 고칠 수 없습니다. 까닭을 함께 적습니다.
+            const unfixable = Boolean(a.fixed_class && sameClass(a.fixed_class, b.fixed_class));
             violations.push({
                 type: 'AVOID',
                 key,
-                // 두 학생이 같은 반에 고정되어 있으면 배정으로는 고칠 수 없습니다. 까닭을 함께 적습니다.
                 message: `${a.name} 학생과 ${b.name} 학생은 분리 배정인데 같은 반(${a.assigned_class})입니다.`
-                    + (a.fixed_class && sameClass(a.fixed_class, b.fixed_class) ? ` 두 학생 모두 ${a.fixed_class}에 고정되어 있어 지킬 수 없습니다. 고정 배정을 풀어 주세요.` : ''),
+                    + (unfixable ? ` 두 학생 모두 ${a.fixed_class}에 고정되어 있어 지킬 수 없습니다. 고정 배정을 풀어 주세요.` : ''),
                 studentIds: [a.id, b.id],
                 className: a.assigned_class,
+                ...(unfixable ? { unfixable } : {}),
             });
         }
     });
 
     eachPair((s) => s.keep_ids, 'KEEP', (a, b, key) => {
         if (a.assigned_class && b.assigned_class && !sameClass(a.assigned_class, b.assigned_class)) {
+            const unfixable = Boolean(a.fixed_class && b.fixed_class && !sameClass(a.fixed_class, b.fixed_class));
             violations.push({
                 type: 'KEEP',
                 key,
                 message: `${a.name} 학생과 ${b.name} 학생은 함께 배정인데 ${a.assigned_class}과 ${b.assigned_class}으로 나뉘었습니다.`
-                    + (a.fixed_class && b.fixed_class && !sameClass(a.fixed_class, b.fixed_class)
+                    + (unfixable
                         ? ` 두 학생이 서로 다른 반(${a.fixed_class}, ${b.fixed_class})에 고정되어 있어 지킬 수 없습니다. 고정 배정을 풀어 주세요.`
                         : ''),
                 studentIds: [a.id, b.id],
+                ...(unfixable ? { unfixable } : {}),
             });
         }
     });

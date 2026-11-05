@@ -114,7 +114,7 @@ function useStableCallback<Args extends unknown[], Result>(callback: (...args: A
 export default function Step3Dashboard({ onBoardActiveChange, workName = null }: Step3DashboardProps) {
     const {
         students, groups, settings,
-        applyAssignment, undoLastChange, undoStack,
+        applyAssignment, noteAssignedAt, undoLastChange, undoStack,
         assignStudentToClass, swapStudents,
         movementHistory, clearMovements,
         setNumberingMethod, resetAssignments
@@ -310,6 +310,8 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
             // 수정과 균형 조정에서 옮긴 학생이 없으면 되돌릴 것도 없으므로 되돌리기 칸을 쌓지 않습니다.
             if (assignmentMode === 'new' || result.moved > 0) {
                 applyAssignment(result.students, assignmentMode === 'new' ? [] : changes, assignmentMode === 'new');
+            } else {
+                noteAssignedAt();
             }
             setIsAssigning(false);
 
@@ -721,7 +723,7 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
                             onClick={() => confirmExport(false)}
                         >
                             <span className="text-body font-bold text-ink">기본 정보만 출력</span>
-                            <span className="text-caption font-normal text-soft">배정 학년, 반, 번호와 이름, 성별, 이전 반과 번호, 성적, 반 평균, 전출 표시</span>
+                            <span className="text-caption font-normal text-soft">배정 학년, 반, 번호와 이름, 성별, 전학년도 반과 번호, 성적, 반 평균, 전출 표시</span>
                         </Button>
                         <Button
                             variant="outline"

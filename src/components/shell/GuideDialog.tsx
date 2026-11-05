@@ -59,7 +59,7 @@ export function GuideDialog({
                 <Step number="01" title="기초 정보 넣기">
                     <p>왼쪽 <strong className={STRONG}>기초 정보</strong>에서 양식을 받아 학생 정보를 붙여 넣고 파일을 넣습니다. 학급 수는 파일에 맞춰 정해지고, 맨 위 요약 줄의 바꾸기로 고칩니다.</p>
                     <ul className="ml-4 list-disc">
-                        <li>양식 A: 새로 반을 편성할 때 씁니다. 이전 학년도 반과 번호가 있으면 됩니다.</li>
+                        <li>양식 A: 새로 반을 편성할 때 씁니다. 전학년도 반과 번호가 있으면 됩니다.</li>
                         <li>양식 B: 이미 나눈 배정안을 고칠 때 씁니다. 신학년 배정 결과를 함께 넣습니다.</li>
                     </ul>
                     <p>

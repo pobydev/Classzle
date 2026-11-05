@@ -40,7 +40,11 @@ export function ConditionsStatus({ hasAssignments, violations }: { hasAssignment
                     <ul className="max-h-64 list-disc space-y-1 overflow-y-auto pl-4 text-small text-ink" data-violation-list>
                         {violations.map((v) => <li key={v.key ?? v.message}>{v.message}</li>)}
                     </ul>
-                    <p className="mt-2 text-caption text-soft">{CHECKED} 현재 배정 수정을 고르면 어긴 조건만 고칩니다.</p>
+                    <p className="mt-2 text-caption text-soft">
+                        {CHECKED}
+                        {/* 고정 배정끼리 부딪친 어김만 남았으면 수정으로 고칠 수 없으므로 권하지 않습니다. */}
+                        {violations.some((v) => !v.unfixable) && ' 현재 배정 수정을 고르면 어긴 조건만 고칩니다.'}
+                    </p>
                 </PopoverContent>
             </Popover>
         </div>

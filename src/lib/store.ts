@@ -45,6 +45,7 @@ interface ClasszleStore {
     assignStudentToClass: (studentId: string, className: string | null) => void;
     resetAssignments: () => void;
     applyAssignment: (students: Student[], changes: AssignmentChange[], startHistory: boolean) => void;
+    noteAssignedAt: () => void;
 
     // 입력표 반영도 되돌리기 한 번으로 돌아옵니다.
     applyGuidance: (students: Student[]) => void;
@@ -88,6 +89,12 @@ interface UndoSnapshot {
 }
 
 const MAX_UNDO = 30;
+
+// 편성 날짜(settings.assignedAt)가 없으면 지금으로 둡니다. 양식 B로 불러와 신규 배정 없이
+// 수정, 균형 조정, 직접 옮기기만 해도 보고서에 '기록 없음' 대신 처음 바꾼 날이 나오게 합니다.
+function withAssignedAt(settings: AppSettings): { settings: AppSettings } | Record<string, never> {
+    return settings.assignedAt ? {} : { settings: { ...settings, assignedAt: Date.now() } };
+}
 
 function withSnapshot(
     state: { students: Student[]; movementHistory: AssignmentChange[]; undoStack: UndoSnapshot[] },
@@ -295,6 +302,7 @@ export const useClasszleStore = create<ClasszleStore>()(
                     students: state.students.map((s) =>
                         s.id === studentId ? { ...s, assigned_class: className } : s
                     ),
+                    ...withAssignedAt(state.settings),
                     movementHistory: [...state.movementHistory, change]
                 };
             }),
@@ -307,10 +315,13 @@ export const useClasszleStore = create<ClasszleStore>()(
             applyAssignment: (students, changes, startHistory) => set((state) => ({
                 undoStack: withSnapshot(state),
                 students,
-                // 신규 배정한 때를 보고서의 편성 날짜로 둡니다.
-                ...(startHistory ? { settings: { ...state.settings, assignedAt: Date.now() } } : {}),
+                // 신규 배정한 때를 보고서의 편성 날짜로 둡니다. 수정, 균형 조정은 날짜가 없을 때만 둡니다.
+                ...(startHistory ? { settings: { ...state.settings, assignedAt: Date.now() } } : withAssignedAt(state.settings)),
                 movementHistory: startHistory ? [] : [...state.movementHistory, ...changes]
             })),
+
+            // 수정, 균형 조정에서 옮긴 학생이 없을 때도 편성 날짜가 없으면 남깁니다.
+            noteAssignedAt: () => set((state) => withAssignedAt(state.settings)),
 
             applyGuidance: (students) => set((state) => {
                 const before = new Map(state.students.map((s) => [s.id, s]));
@@ -395,6 +406,7 @@ export const useClasszleStore = create<ClasszleStore>()(
                         if (s.id === studentId2) return { ...s, assigned_class: class1 };
                         return s;
                     }),
+                    ...withAssignedAt(state.settings),
                     movementHistory: [...state.movementHistory, swapRecord]
                 };
             }),

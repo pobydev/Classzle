@@ -52,9 +52,9 @@ describe('배정 결과 보고서 내용', () => {
         expect(model.history[0].lines).toEqual([`${BAD} 2반 → 1반`, '가상다 1반 → 2반']);
     });
 
-    it('전 학년 반은 전 학년 2-12처럼 씁니다', () => {
-        expect(previousLabel({ prev_info: '2-12-5' })).toBe('전 학년 2-12');
-        expect(previousLabel({ prev_info: '2-1-undefined' })).toBe('전 학년 2-1');
+    it('전학년도 반은 전학년도 2-12처럼 씁니다', () => {
+        expect(previousLabel({ prev_info: '2-12-5' })).toBe('전학년도 2-12');
+        expect(previousLabel({ prev_info: '2-1-undefined' })).toBe('전학년도 2-1');
         expect(previousLabel({ prev_info: '' })).toBe('');
     });
 });
@@ -82,7 +82,7 @@ describe('보고서 HTML', () => {
         expect(names).toContain('가상나');
         expect(names).toContain(`content="${PRIVACY_NOTICE}`);
         expect(names).toContain('✗ 못 지킴');
-        expect(names).toContain('전 학년 2-3');
+        expect(names).toContain('전학년도 2-3');
         // 예전 문서의 맨 아래 문구와 결재란은 없습니다.
         expect(names).not.toContain('학급 편성 도우미');
         expect(names).not.toContain('결재');

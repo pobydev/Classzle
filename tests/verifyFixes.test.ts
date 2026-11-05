@@ -106,7 +106,7 @@ describe('5. 양식 판정', () => {
         const rows = planA(4);
         const { formLine, warnings } = parseRosterRows(rows, ['학년', '반', '번호', '이름', '성별', '성적', '학년', '반', '번호']);
         expect(formLine).toContain('양식 A');
-        expect(warnings.join()).toContain('이전 반 칸이 모두 비어');
+        expect(warnings.join()).toContain('전학년도 반 칸이 모두 비어');
     });
 
     it('평범한 양식 A와 B는 경고 없이 양식만 말합니다', () => {

@@ -482,7 +482,7 @@ export default function Step1Setup() {
                             <tr>
                                 <th className={`${TH} w-[56px]`}>#</th>
                                 <th className={TH}>이름</th>
-                                <th className={TH}>이전 학년도</th>
+                                <th className={TH}>전학년도</th>
                                 <th className={TH}>성별</th>
                                 <th className={TH}>성적</th>
                                 <th className={TH}>

@@ -51,7 +51,7 @@ export interface AppSettings {
     scoreTolerance: number;        // 성적 유사도 허용 범위 (±)
     numberingMethod: NumberingMethod; // 번호 부여 방식
     useAdvancedConstraints: boolean;
-    assignedAt?: number;           // 마지막으로 신규 배정한 때(밀리초). 보고서의 편성 날짜입니다.
+    assignedAt?: number;           // 마지막으로 신규 배정한 때(밀리초). 없으면 처음 수정·조정·옮긴 때. 보고서의 편성 날짜입니다.
 }
 
 // 배정 결과 통계 (확장)
@@ -115,6 +115,7 @@ export interface Violation {
     className?: string;
     key?: string;                  // 같은 어김인지 비교할 때 씁니다
     amount?: number;               // 그룹, 인원처럼 정도가 있는 어김의 크기
+    unfixable?: boolean;           // 고정 배정끼리 부딪쳐 배정을 바꿔도 지킬 수 없는 어김
 }
 
 export interface ElectronAPI {

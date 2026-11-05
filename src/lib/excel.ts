@@ -222,20 +222,20 @@ export function parseRosterRows(allRows: any[], headers: string[] = []): ParsedR
 
     if (isFormB && rowsWithPrev.length < namedRows.length) {
         const blank = namedRows.filter((row) => prevClassOf(row) === undefined).map(nameOfRow);
-        warnings.push(`양식 B로 읽었는데 이전 반이 비어 있는 학생이 있습니다: ${listNames(blank)}. 전입생이면 그대로 두어도 됩니다.`);
+        warnings.push(`양식 B로 읽었는데 전학년도 반이 비어 있는 학생이 있습니다: ${listNames(blank)}. 전입생이면 그대로 두어도 됩니다.`);
     }
     if (!isFormB && rowsWithPrev.length > 0) {
-        warnings.push(`양식 A로 읽었습니다. 이전 반 칸이 채워진 줄은 이 양식과 맞지 않아 그 칸을 쓰지 않았습니다: ${listNames(rowsWithPrev.map(nameOfRow))}`);
+        warnings.push(`양식 A로 읽었습니다. 전학년도 반 칸이 채워진 줄은 이 양식과 맞지 않아 그 칸을 쓰지 않았습니다: ${listNames(rowsWithPrev.map(nameOfRow))}`);
     }
     const hasPrevHeader = headers.some((h) => ['이전반', 'prev_class', '반_1', 'class_1', '반(이전)'].includes(h.trim()))
         || headers.filter((h) => h.trim() === '반').length > 1;
     if (!isFormB && rowsWithPrev.length === 0 && hasPrevHeader) {
-        warnings.push('이전 반 칸이 모두 비어 있어 양식 A로 읽었습니다. 앞쪽 반을 이전 반으로 넣었습니다. 양식 B라면 이전 학년, 반, 번호를 채워 주세요.');
+        warnings.push('전학년도 반 칸이 모두 비어 있어 양식 A로 읽었습니다. 앞쪽 반을 전학년도 반으로 넣었습니다. 양식 B라면 전학년도 학년, 반, 번호를 채워 주세요.');
     }
 
     const named = students.filter((s) => s.name.trim() !== '');
     const placed = named.filter((s) => s.assigned_class).length;
-    const formName = isResultFile ? '배정 결과 파일' : isFormB ? '양식 B(기배정안)' : '양식 A(이전 학년 명단)';
+    const formName = isResultFile ? '배정 결과 파일' : isFormB ? '양식 B(기배정안)' : '양식 A(전학년도 명단)';
     const formLine = `${formName}로 읽었습니다. 학생 ${named.length}명${placed > 0 ? `, 반이 정해진 학생 ${placed}명` : ''}.`;
 
     return { students: named, warnings, formLine };
@@ -652,7 +652,7 @@ export function buildResultWorkbook(
     // ---------------------------------------------------------
     // 2. 배정 결과 (이전반 정렬) 시트
     // ---------------------------------------------------------
-    const sheet2 = workbook.addWorksheet('배정결과(이전반별)');
+    const sheet2 = workbook.addWorksheet('배정결과(전학년도 반별)');
     // sheet2.pageSetup.printTitlesRow = '1:1'; // 이 설정 제거 (수동 헤더와 중복됨)
     sheet2.pageSetup.fitToPage = true;
     sheet2.pageSetup.fitToHeight = 0;
@@ -1195,7 +1195,7 @@ export function buildPreAssignedSampleWorkbook(): ExcelJS.Workbook {
 
     const guides = [
         '1. 앞쪽 [학년, 반, 번호]는 "새로 배정된" 정보입니다.',
-        '2. 뒤쪽 [학년, 반, 번호]는 "이전(작년)" 정보입니다.',
+        '2. 뒤쪽 [학년, 반, 번호]는 "전학년도" 정보입니다.',
         '   예: 2 (학년), 1 (반), 15 (번호)',
         '3. 입력된 반 배정 정보는 초기 배정 상태로 불러와집니다.',
         '   (반 편성에서 [현재 배정 수정] 또는 [신규 배정] 선택 가능)',
