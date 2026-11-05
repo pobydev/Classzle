@@ -42,4 +42,4 @@ npm run electron:build
 PW_DIR=<폴더> npm run test:update
 ```
 
-문의: pobydev@gmail.com
+문의: hello@gnilab.kr

@@ -153,7 +153,7 @@ export function GuideDialog({
 
                 <UpdateSection updates={updates} bodyClass={SECTION} headingClass={HEADING} />
 
-                <p className={BODY}>궁금한 점이나 불편한 점은 pobydev@gmail.com으로 알려 주세요.</p>
+                <p className={BODY}>궁금한 점이나 불편한 점은 hello@gnilab.kr로 알려 주세요.</p>
 
                 <div className="flex justify-end border-t border-line pt-[19px]">
                     <Button onClick={onClose}>확인</Button>
