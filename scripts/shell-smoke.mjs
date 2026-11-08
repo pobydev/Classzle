@@ -152,6 +152,15 @@ try {
     await expect(guide).toContainText('Ctrl + 0');
     await expect(guide).toContainText(`버전 ${version}`);
     await expect(guide.locator('[data-made-by] img')).toBeVisible();
+    // made by gnilab을 누르면 기본 브라우저로 gnilab.kr을 엽니다(2026-11-09). 새 창은 생기지 않습니다.
+    await app.evaluate(({ shell }) => {
+        globalThis.__opened = [];
+        shell.openExternal = (url) => (globalThis.__opened.push(url), Promise.resolve());
+    });
+    const windowsBefore = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+    await guide.locator('a[data-made-by]').click();
+    await expect.poll(() => app.evaluate(() => globalThis.__opened)).toEqual(['https://gnilab.kr/']);
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(windowsBefore);
     for (const number of ['01', '02', '03', '04', '05', '06']) await expect(guide).toContainText(number);
     await shot('5-guide');
     await guide.getByRole('button', { name: '확인' }).click();

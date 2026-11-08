@@ -161,10 +161,18 @@ export function GuideDialog({
 
                 <div className="flex flex-col items-center gap-1.5 text-small text-soft">
                     <span>버전 {appVersion}</span>
-                    <p className="flex items-center gap-[5px] text-caption text-soft" data-made-by="true">
+                    {/* 누르면 기본 브라우저로 gnilab.kr을 엽니다(main/background.ts의 openLinkOutside). */}
+                    <a
+                        href="https://gnilab.kr"
+                        target="_blank"
+                        rel="noreferrer"
+                        title="gnilab.kr 열기"
+                        className="flex items-center gap-[5px] rounded-sm text-caption text-soft no-underline"
+                        data-made-by="true"
+                    >
                         <span>made by</span>
                         <img src="/icons/gnilab.svg" alt="gnilab" className="h-4 w-auto" />
-                    </p>
+                    </a>
                 </div>
             </DialogContent>
         </Dialog>
