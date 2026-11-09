@@ -118,7 +118,7 @@ export function GuideDialog({
                     </p>
                     <p data-guide-board-marks>
                         보드의 <strong className={STRONG}>행-3</strong>에서 행은 행동, 정은 정서, 리는 리더입니다. 학생 칸은 행동은 흙 주황, 정서는 보라, 리더는 초록으로 칠하고, 정도가 클수록 진합니다.{' '}
-                        <strong className={STRONG}>고·분·함·전</strong>은 고정 배정, 분리 배정, 함께 배정, 전출 예정이고, 색이 있는 글자는 그룹 이름의 첫 글자입니다.
+                        <strong className={STRONG}>고·분·함·전</strong>은 고정 배정, 분리 배정, 함께 배정, 전출 예정이고, 색 테두리를 두른 네모 안의 글자는 그룹 이름의 첫 글자입니다.
                         반 이름 아래 숫자는 전출 뒤 기준이고, <strong className={STRONG}>!</strong>는 다른 반보다 몰린 곳입니다. 표시에 마우스를 올리면 뜻이 나오고, 보드 위 <strong className={STRONG}>?</strong>에 모두 모여 있습니다.
                     </p>
                     <p>학생을 고르지 않았을 때 오른쪽에는 <strong className={STRONG}>손볼 곳</strong>(지키지 못한 조건, 몰린 반, 미배정 학생)이 나옵니다. 누르면 그 학생이나 반으로 갑니다.</p>

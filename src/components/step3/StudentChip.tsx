@@ -30,6 +30,36 @@ export function Mark({ tone = 'plain', surface = 'plain', className, title, chil
     );
 }
 
+// 그룹 표시는 흰 바탕에 그룹 색 테두리를 두른 네모입니다(2026-11-09 사용자 결정, 시안 A).
+// 조건 표시(고·분·함·전)는 둥근 회색이고 생활지도는 칸 전체를 칠하므로, 모양만 보고도 갈립니다.
+// Tailwind가 클래스를 찾을 수 있게 그룹 색(Step2Constraints의 GROUP_COLORS)마다 글자로 적어 둡니다.
+const GROUP_OUTLINE: Record<string, string> = {
+    'bg-red-200 text-red-800': 'border-red-700 text-red-800',
+    'bg-orange-200 text-orange-800': 'border-orange-700 text-orange-800',
+    'bg-yellow-200 text-yellow-800': 'border-yellow-700 text-yellow-800',
+    'bg-green-200 text-green-800': 'border-green-700 text-green-800',
+    'bg-blue-200 text-blue-800': 'border-blue-700 text-blue-800',
+    'bg-purple-200 text-purple-800': 'border-purple-700 text-purple-800',
+    'bg-pink-200 text-pink-800': 'border-pink-700 text-pink-800',
+    'bg-cyan-200 text-cyan-800': 'border-cyan-700 text-cyan-800',
+};
+
+export function GroupMark({ group, full = false }: { group: CustomGroup; full?: boolean }) {
+    // 옛 파일에는 #으로 시작하는 색이 있을 수 있습니다. 모르는 값은 진한 글자색으로 둡니다.
+    const hex = group.color.startsWith('#') ? group.color : undefined;
+    const tone = GROUP_OUTLINE[group.color] ?? (hex ? '' : 'border-ink text-ink');
+    return (
+        <span
+            title={`그룹: ${group.name}`}
+            data-group-mark
+            style={hex ? { borderColor: hex, color: hex } : undefined}
+            className={`inline-flex h-[calc(var(--chip-mark,11px)+5px)] shrink-0 items-center rounded-[3px] border-[1.5px] bg-card px-[2px] text-[length:var(--chip-mark,11px)] leading-none font-bold whitespace-nowrap ${tone}`}
+        >
+            {full ? group.name : group.name.slice(0, 1)}
+        </span>
+    );
+}
+
 export function RankBadge({ rank, className = '' }: { rank: number; className?: string }) {
     return (
         <span className={`inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-0.5 text-micro leading-none font-bold text-white ${className}`}>
@@ -39,7 +69,7 @@ export function RankBadge({ rank, className = '' }: { rank: number; className?: 
 }
 
 // surface: 칠한 칸 위에 놓으면 'light'나 'dark'입니다. 따로 놓으면(패널, 안내) 'plain'이고 생활지도 표시에 그 색을 씁니다.
-// 그룹 첫 글자는 어느 바탕에서도 그룹 색 그대로 둡니다.
+// 그룹 표시는 어느 바탕에서도 흰 바탕의 네모 테두리 그대로 둡니다.
 export function StudentMarks({ student, groups, hasAvoid, hasKeep, surface = 'plain' }: {
     student: Student;
     groups: CustomGroup[];
@@ -57,7 +87,7 @@ export function StudentMarks({ student, groups, hasAvoid, hasKeep, surface = 'pl
             {hasKeep && <Mark surface={surface} title="함께 배정">함</Mark>}
             {student.is_pre_transfer && <Mark surface={surface} title="전출 예정">전</Mark>}
             {groupsOf(student, groups).map((g) => (
-                <Mark key={g.id} className={g.color} title={`그룹: ${g.name}`}>{g.name.slice(0, 1)}</Mark>
+                <GroupMark key={g.id} group={g} />
             ))}
         </>
     );

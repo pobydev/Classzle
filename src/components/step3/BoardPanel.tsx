@@ -10,7 +10,7 @@ import { previousClassOf, sameClass } from '@/lib/assignment/problem';
 import type { ClassFigures, SwapPreview } from '@/lib/swapPreview';
 import type { CustomGroup, Student, Violation } from '@/types';
 import { behaviorMark, groupsOf, relationMemo, UNASSIGNED, type RelationIndex } from './boardModel';
-import { Mark, RankBadge, StudentMarks } from './StudentChip';
+import { GroupMark, Mark, RankBadge, StudentMarks } from './StudentChip';
 import { TONE_CLASS, type GuidanceTone } from './boardModel';
 
 // 공통 디자인의 스크롤바: 평소에는 보이지 않고 마우스를 올린 곳에서만 5px로 나타납니다.
@@ -81,8 +81,8 @@ export function BoardMarksHelp({ groups }: { groups: CustomGroup[] }) {
                     <Pair mark={<Mark>함</Mark>}>함께 배정</Pair>
                     <Pair mark={<Mark>전</Mark>}>전출 예정</Pair>
                     {groups.length > 0 && (
-                        <Pair mark={groups.map((g) => <Mark key={g.id} className={g.color}>{g.name.slice(0, 1)}</Mark>)}>
-                            그룹 이름 첫 글자: {groups.map((g) => g.name).join(', ')}
+                        <Pair mark={groups.map((g) => <GroupMark key={g.id} group={g} />)}>
+                            그룹 (네모 안은 이름 첫 글자): {groups.map((g) => g.name).join(', ')}
                         </Pair>
                     )}
                 </ul>
@@ -297,7 +297,7 @@ function SelectedDetail({
                     <Row label="그룹 분산">
                         <span className="flex flex-wrap gap-1">
                             {studentGroups.map((g) => (
-                                <Mark key={g.id} className={g.color}>{g.name}</Mark>
+                                <GroupMark key={g.id} group={g} full />
                             ))}
                         </span>
                     </Row>

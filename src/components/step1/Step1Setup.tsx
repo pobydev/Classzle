@@ -211,7 +211,14 @@ export default function Step1Setup() {
     const handleResetAll = async () => {
         const confirmed = await confirm({
             title: '모든 내용을 지우고 처음으로 돌아갈까요?',
-            description: '저장하지 않은 내용은 모두 사라집니다.',
+            // 저장한 작업은 지우지 않습니다. 그 사실을 굵게 알립니다(2026-11-09 사용자 결정, 시안 A).
+            description: (
+                <>
+                    지금 화면의 명단, 조건, 배정 결과를 모두 지웁니다. 저장하지 않은 내용은 사라집니다.
+                    <br />
+                    <strong>저장한 작업(왼쪽 목록)은 그대로 남습니다.</strong> 저장한 작업을 지우려면 목록에서 하나씩 지웁니다.
+                </>
+            ),
             confirmLabel: '전체 초기화',
             danger: true,
         });

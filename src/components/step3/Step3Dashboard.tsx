@@ -558,6 +558,14 @@ export default function Step3Dashboard({ onBoardActiveChange, workName = null }:
                             <Button variant="outline" size="sm" onClick={handleUndo} disabled={undoStack.length === 0}>
                                 <ArrowCounterClockwise />되돌리기
                             </Button>
+                            {/* 보드에서 고친 뒤 통계 탭으로 돌아가지 않고 바로 내보냅니다(2026-11-09 사용자 결정, #9). 통계 탭과 같은 창을 엽니다. */}
+                            <span className="mx-1 h-6 w-px bg-line" aria-hidden />
+                            <Button variant="outline" size="sm" title="배정 결과 보고서" onClick={() => setIsReportOpen(true)} disabled={!hasAssignments}>
+                                <ChartBar />보고서
+                            </Button>
+                            <Button variant="outline" size="sm" title="배정 결과 엑셀" onClick={() => setIsExportDialogOpen(true)} disabled={!hasAssignments}>
+                                <DownloadSimple />엑셀 저장
+                            </Button>
                             {/* 통계 탭과 같은 이름과 같은 목록을 씁니다. */}
                             <span role="status" data-board-status className="ml-auto flex items-center gap-2 whitespace-nowrap">
                                 <ConditionsStatus hasAssignments={hasAssignments} violations={violations} />
