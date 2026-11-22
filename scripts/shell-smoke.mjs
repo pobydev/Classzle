@@ -143,6 +143,61 @@ try {
     expect(nativeDialogs).toEqual([]);
     checks.push('삭제도 앱 안의 창으로 묻고, Esc는 취소임. 기본 확인 창 없음');
 
+    // 파일로 내보내기와 파일 열기 (1.3.2). 윈도 저장·열기 창은 메인 프로세스에서 바꿔 끼워 고른 것처럼 답합니다.
+    const exported = path.join(profile, '내보낸 작업.json');
+    const stubDialog = (kind, answer) =>
+        app.evaluate(({ dialog }, [k, a]) => {
+            globalThis.__dialogCalls = [];
+            dialog[k] = async (...args) => {
+                // 창을 함께 넘기면 설정은 둘째 값입니다.
+                const { title, defaultPath } = args[args.length - 1];
+                globalThis.__dialogCalls.push({ title, defaultPath });
+                return a;
+            };
+        }, [kind, answer]);
+    const dialogCalls = () => app.evaluate(() => globalThis.__dialogCalls);
+    await stubDialog('showSaveDialog', { canceled: true });
+    await sidebar.getByRole('button', { name: '파일로 내보내기' }).click();
+    await expect.poll(dialogCalls).toHaveLength(1);
+    await expect(page.getByText('파일로 내보냈습니다')).toHaveCount(0);
+    await stubDialog('showSaveDialog', { canceled: false, filePath: exported });
+    await sidebar.getByRole('button', { name: '파일로 내보내기' }).click();
+    await expect(page.getByText("'내보낸 작업.json' 파일로 내보냈습니다.")).toBeVisible();
+    const [saveOptions] = await dialogCalls();
+    expect(saveOptions.title).toBe('작업을 파일로 내보내기');
+    expect(saveOptions.defaultPath).toBe('클래스즐 작업.json');
+    const exportedData = JSON.parse(await fs.readFile(exported, 'utf8'));
+    expect(Object.keys(exportedData).sort()).toEqual(['groups', 'movementHistory', 'settings', 'students']);
+    expect(exportedData.students).toHaveLength(330);
+    checks.push('파일로 내보내기: 취소하면 조용하고, 고른 곳에 목록 저장과 같은 모양(학생 330명)으로 씀');
+
+    const broken = path.join(profile, '깨진 파일.json');
+    await fs.writeFile(broken, '{"students": 3}', 'utf8');
+    await stubDialog('showOpenDialog', { canceled: false, filePaths: [broken] });
+    await sidebar.getByRole('button', { name: '파일 열기' }).click();
+    await expect(page.getByText('올바르지 않은 작업 파일입니다.')).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await stubDialog('showOpenDialog', { canceled: false, filePaths: [exported] });
+    await page.getByRole('tab', { name: '3단계 반 편성' }).click();
+    await sidebar.getByRole('button', { name: '파일 열기' }).click();
+    await expect(page.getByRole('dialog')).toContainText('이 작업을 불러올까요?');
+    await page.getByRole('dialog').getByRole('button', { name: '취소' }).click();
+    await expect(page.getByRole('tab', { name: '3단계 반 편성' })).toHaveAttribute('data-state', 'active');
+    await sidebar.getByRole('button', { name: '파일 열기' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '불러오기' }).click();
+    await expect(page.getByText("'내보낸 작업.json' 파일을 불러왔습니다.")).toBeVisible();
+    await expect(page.getByRole('tab', { name: '1단계 기초 정보' })).toHaveAttribute('data-state', 'active');
+    await expect(page.locator('[data-roster-summary]')).toContainText('330명');
+    expect((await dialogCalls())[0].title).toBe('작업 파일 열기');
+    // 1단계에는 '이름 찾기' 칸이 있어 저장 창 안에서 찾습니다.
+    await sidebar.getByRole('button', { name: '작업 저장' }).click();
+    await page.getByRole('dialog').getByLabel('이름').fill('파일에서 연 작업');
+    await page.getByRole('dialog').getByRole('button', { name: '저장', exact: true }).click();
+    await expect(sidebar.getByRole('button', { name: '파일에서 연 작업', exact: true })).toBeVisible();
+    await expect.poll(() => fs.readFile(path.join(userData, 'projects', '파일에서 연 작업.json'), 'utf8').then((t) => JSON.parse(t).students.length, () => 0)).toBe(330);
+    await shot('4b-opened-file');
+    checks.push('파일 열기: 잘못된 파일은 묻기 전에 알리고, 올바른 파일은 묻고 연 뒤 작업 저장으로 목록에 넣음');
+
     // 사용 가이드
     await sidebar.getByRole('button', { name: '클래스즐 사용 가이드' }).click();
     const guide = page.getByRole('dialog');
@@ -150,6 +205,7 @@ try {
     await expect(guide).toContainText('저장 파일은 암호화되지 않습니다.');
     await expect(guide).toContainText('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.');
     await expect(guide).toContainText('Ctrl + 0');
+    await expect(guide.locator('[data-guide-work-file]')).toContainText('파일로 내보내기');
     await expect(guide).toContainText(`버전 ${version}`);
     await expect(guide.locator('[data-made-by] img')).toBeVisible();
     // made by gnilab을 누르면 기본 브라우저로 gnilab.kr을 엽니다(2026-11-09). 새 창은 생기지 않습니다.
@@ -171,12 +227,13 @@ try {
     await sidebar.getByRole('button', { name: '메뉴 접기' }).click();
     const rail = page.locator('aside[data-sidebar="collapsed"]');
     expect((await rail.boundingBox()).width).toBe(56);
+    for (const name of ['작업 저장', '파일 열기', '파일로 내보내기']) await expect(rail.getByRole('button', { name })).toBeVisible();
     await page.getByRole('tab', { name: '3단계 반 편성' }).click();
     await expect(page.getByRole('tab', { name: '3단계 반 편성' })).toHaveAttribute('data-state', 'active');
     await shot('6-rail');
     await rail.getByRole('button', { name: '메뉴 펼치기' }).click();
     await expect(sidebar).toBeVisible();
-    checks.push('56px 아이콘 줄로 접고 다시 펼침, 접어도 단계 이동됨');
+    checks.push('56px 아이콘 줄로 접고 다시 펼침, 접어도 단계 이동됨, 접은 줄에도 저장·파일 열기·파일로 내보내기');
 
     // 확대 단축키: 메뉴가 없어도 Ctrl + +, Ctrl + -, Ctrl + 0이 동작하고, 값을 자료 폴더에 기억합니다.
     // Playwright의 키 입력은 메인 프로세스의 before-input-event까지 가지 않으므로 실제 키보드와 같은 길(sendInputEvent)로 누릅니다.

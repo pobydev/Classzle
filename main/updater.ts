@@ -4,9 +4,11 @@
 // 단계적 배포에 쓰는 값이며 학생 정보와 관계가 없습니다.
 // 교사가 설치를 누르기 전에는 내려받지 않고, 내려받은 뒤에는 앱을 닫을 때 설치합니다.
 // 확인을 언제 시작할지는 교사의 설정을 아는 화면 쪽(useUpdates)이 정합니다.
+// USB판은 확인하지 않고 electron-updater도 불러오지 않습니다(main/portable.ts).
 import { app, ipcMain } from 'electron';
 import { writeFileSync } from 'fs';
 import * as path from 'path';
+import { updateSupport } from './portable';
 
 type UpdateStatus =
     | { state: 'idle' | 'checking' | 'latest' | 'error' }
@@ -14,7 +16,12 @@ type UpdateStatus =
 
 // scripts/update-smoke.mjs가 시험용 주소를 넣습니다. 이 주소로 받은 파일은 설치하지 않습니다.
 const testFeed = process.env.CLASSZLE_UPDATE_FEED;
-const support = testFeed || (app.isPackaged && process.platform === 'win32') ? 'on' : 'off';
+const support = updateSupport({
+    portableDir: process.env.PORTABLE_EXECUTABLE_DIR,
+    testFeed,
+    isPackaged: app.isPackaged,
+    platform: process.platform,
+});
 
 export function setupUpdates(notify: (status: UpdateStatus) => void) {
     let status: UpdateStatus = { state: 'idle' };

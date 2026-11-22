@@ -3,7 +3,7 @@
 import { ArrowsClockwise } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { checkMessage, isFound, updateMessage } from '@/lib/updates';
+import { checkMessage, isFound, PORTABLE_UPDATE_NOTE, updateMessage } from '@/lib/updates';
 import type { FoundUpdate } from '@/lib/updates';
 import type { Updates } from './useUpdates';
 
@@ -53,6 +53,15 @@ export function UpdateSection({
     headingClass: string;
 }) {
     const { status, found } = updates;
+    // USB판은 확인하지 않으므로 스위치와 버튼 없이 새 버전 받는 법만 알립니다(어울림 USB판과 같음).
+    if (updates.isPortable) {
+        return (
+            <section className={bodyClass} data-update-section="portable">
+                <h3 className={headingClass}>새 버전</h3>
+                <p>{PORTABLE_UPDATE_NOTE}</p>
+            </section>
+        );
+    }
     if (!updates.isSupported) return null;
     const action = found ? actionFor(found, updates) : { label: '업데이트 확인', run: updates.check };
     const message = isFound(status) ? updateMessage(status) : updates.hasAsked ? checkMessage(status.state) : '';

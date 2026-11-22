@@ -1,6 +1,6 @@
 {
   "name": "classzle-app",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "private": true,
   "author": "gnilab",
   "main": "dist-electron/background.js",
@@ -8,7 +8,20 @@
     "productName": "Classzle",
     "appId": "com.classzle.app",
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "public/icons/classzle.ico"
     },
     "directories": {
@@ -23,6 +36,9 @@
       "artifactName": "Classzle-Setup-${version}.${ext}",
       "installerIcon": "public/icons/classzle.ico",
       "uninstallerIcon": "public/icons/classzle.ico"
+    },
+    "portable": {
+      "artifactName": "Classzle-USB-${version}.${ext}"
     },
     "publish": {
       "provider": "github",

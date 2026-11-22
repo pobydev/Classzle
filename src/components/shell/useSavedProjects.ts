@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { overwritesOtherProject, resolveSaveName } from '../../../main/projectName';
+import { exportFileName, overwritesOtherProject, resolveSaveName } from '../../../main/projectName';
 import { parseProjectFile } from '@/lib/projectFile';
+import type { ParsedProject } from '@/lib/projectFile';
 import { useClasszleStore } from '@/lib/store';
 import { useConfirm } from './ConfirmProvider';
 
@@ -85,7 +86,7 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
             });
             if (!answer) return false;
         }
-        const data = JSON.stringify({ students, groups, settings, movementHistory }, null, 2);
+        const data = serialize();
         try {
             const written = await storage.write(name, data);
             if (written === 'locked') {
@@ -104,12 +105,19 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
         return true;
     };
 
-    const apply = (content: string): boolean => {
-        const parsed = parseProjectFile(content);
-        if (!parsed) return false;
+    // 목록 저장과 파일로 내보내기가 같은 모양을 씁니다.
+    const serialize = () => JSON.stringify({ students, groups, settings, movementHistory }, null, 2);
+
+    const applyParsed = (parsed: ParsedProject) => {
         loadProject(parsed.data);
         setNotices(parsed.notices);
         onLoaded();
+    };
+
+    const apply = (content: string): boolean => {
+        const parsed = parseProjectFile(content);
+        if (!parsed) return false;
+        applyParsed(parsed);
         return true;
     };
 
@@ -153,20 +161,45 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
         void refresh();
     };
 
-    /** 브라우저에서 저장 파일을 직접 여는 길입니다. 앱에는 없습니다. */
-    const openFile = () => {
+    /**
+     * 어디에 있든 작업 파일 하나를 엽니다. 다른 컴퓨터에서 내보낸 파일이나 USB의 파일을 열 때 씁니다.
+     * 파일을 먼저 고르고, 올바른 파일일 때만 지금 작업을 버릴지 묻습니다. 연 뒤에는 작업 저장으로 목록에 넣을 수 있습니다.
+     */
+    const openContent = async (name: string, content: string) => {
+        const parsed = parseProjectFile(content);
+        if (!parsed) {
+            toast.error('올바르지 않은 작업 파일입니다.');
+            return;
+        }
+        if (students.length > 0 && !(await confirm(DISCARD_WARNING))) return;
+        applyParsed(parsed);
+        setActiveName(null);
+        toast.success(`'${name}' 파일을 불러왔습니다.`);
+    };
+
+    const openFile = async () => {
+        const api = window.electronAPI;
+        if (api) {
+            try {
+                const result = await api.loadProject();
+                if (result.status === 'canceled') return;
+                if (result.status !== 'opened') throw new Error('read failed');
+                await openContent(result.name, result.data);
+            } catch (e) {
+                console.error(e);
+                toast.error('파일을 읽지 못했습니다.');
+            }
+            return;
+        }
+        // 브라우저에서는 파일 고르기 창으로 엽니다.
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = '.json';
         input.onchange = async () => {
             const file = input.files?.[0];
             if (!file) return;
-            if (students.length > 0 && !(await confirm(DISCARD_WARNING))) return;
             try {
-                if (apply(await file.text())) {
-                    setActiveName(null);
-                    toast.success('작업을 불러왔습니다.');
-                } else toast.error('올바르지 않은 작업 파일입니다.');
+                await openContent(file.name, await file.text());
             } catch (e) {
                 console.error(e);
                 toast.error('파일을 읽지 못했습니다.');
@@ -175,5 +208,38 @@ export function useSavedProjects({ onLoaded }: { onLoaded: () => void }) {
         input.click();
     };
 
-    return { names, activeName, save, load, remove, openFile };
+    /** 지금 작업을 교사가 고른 곳의 파일로 내보냅니다. 목록에 저장하는 것과 같은 내용입니다. */
+    const exportFile = async () => {
+        if (students.length === 0) {
+            toast.error('학생 명단을 넣은 뒤에 내보낼 수 있습니다.');
+            return;
+        }
+        const data = serialize();
+        const api = window.electronAPI;
+        if (!api) {
+            // 브라우저에서는 내려받기로 저장합니다.
+            const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = exportFileName(activeName);
+            link.click();
+            URL.revokeObjectURL(url);
+            return;
+        }
+        try {
+            const result = await api.saveProject(data, activeName ?? undefined);
+            if (result.status === 'canceled') return;
+            if (result.status === 'locked') {
+                toast.error('다른 프로그램이 그 파일을 쓰고 있어 내보내지 못했습니다. 그 프로그램을 닫고 다시 해 주세요.');
+                return;
+            }
+            if (result.status !== 'saved') throw new Error('export failed');
+            toast.success(`'${result.name}' 파일로 내보냈습니다.`);
+        } catch (e) {
+            console.error(e);
+            toast.error('파일로 내보내지 못했습니다.');
+        }
+    };
+
+    return { names, activeName, save, load, remove, openFile, exportFile };
 }

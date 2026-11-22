@@ -9,10 +9,19 @@ import { cleanOldPrintFiles, isPrintSource, PRINT_FOLDER } from './printFiles';
 import { setupUpdates } from './updater';
 import { setupZoom } from './zoom';
 import { cleanLeftoverTemp, isFileLockedError, projectFilePath, writeFileSafely } from './projectFiles';
-import { projectNameFromFile, projectNameProblem } from './projectName';
+import { exportFileName, projectNameFromFile, projectNameProblem } from './projectName';
+import { portableDataDir } from './portable';
 
 
 const isDev = process.env.NODE_ENV === 'development';
+
+// USB판은 자료를 실행 파일 옆 클래스즐-자료 폴더에 둡니다. 다른 사람 컴퓨터에서 켜도 학생 정보가 그 컴퓨터에 남지 않게 합니다.
+// 어울림과 달리 sessionData는 옮기지 않습니다. 지금 작업이 화면의 localStorage(sessionData 안)에 있기 때문입니다.
+const portableData = portableDataDir(process.env.PORTABLE_EXECUTABLE_DIR);
+if (portableData) app.setPath('userData', portableData);
+
+// 인쇄용 임시 파일에는 학생 이름이 있습니다. USB판은 컴퓨터의 임시 폴더 대신 자료 폴더에 둡니다.
+const printRoot = () => (portableData ? app.getPath('userData') : app.getPath('temp'));
 
 // 인쇄 미리보기 활성화
 app.commandLine.appendSwitch('enable-print-preview');
@@ -43,37 +52,45 @@ async function ensureProjectsDir() {
     }
 }
 
-ipcMain.handle('save-project', async (event, data) => {
-    const { canceled, filePath } = await dialog.showSaveDialog({
-        filters: [{ name: 'Classzle Project', extensions: ['json'] }],
-        defaultPath: 'classzle-project.json',
-    });
-
-    if (canceled || !filePath) return false;
+// 작업을 교사가 고른 곳의 파일로 내보냅니다. 다른 컴퓨터로 옮기거나 USB에 담을 때 씁니다.
+ipcMain.handle('save-project', async (_event, data: string, suggestedName?: string) => {
+    const options: Electron.SaveDialogOptions = {
+        title: '작업을 파일로 내보내기',
+        filters: [{ name: '클래스즐 작업 파일', extensions: ['json'] }],
+        defaultPath: exportFileName(typeof suggestedName === 'string' ? suggestedName : null),
+    };
+    const { canceled, filePath } = mainWindow
+        ? await dialog.showSaveDialog(mainWindow, options)
+        : await dialog.showSaveDialog(options);
+    if (canceled || !filePath) return { status: 'canceled' };
 
     try {
         await writeFileSafely(filePath, data);
-        return true;
+        return { status: 'saved', name: path.basename(filePath) };
     } catch (e) {
         console.error('Failed to save file:', e);
-        throw e;
+        return { status: isFileLockedError(e) ? 'locked' : 'failed' };
     }
 });
 
+// 어디에 있든 작업 파일 하나를 엽니다. 내용 검사는 화면 쪽(parseProjectFile)이 합니다.
 ipcMain.handle('load-project', async () => {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-        filters: [{ name: 'Classzle Project', extensions: ['json'] }],
+    const options: Electron.OpenDialogOptions = {
+        title: '작업 파일 열기',
+        filters: [{ name: '클래스즐 작업 파일', extensions: ['json'] }],
         properties: ['openFile'],
-    });
-
-    if (canceled || filePaths.length === 0) return null;
+    };
+    const { canceled, filePaths } = mainWindow
+        ? await dialog.showOpenDialog(mainWindow, options)
+        : await dialog.showOpenDialog(options);
+    if (canceled || filePaths.length === 0) return { status: 'canceled' };
 
     try {
         const data = await fs.readFile(filePaths[0], 'utf-8');
-        return data;
+        return { status: 'opened', name: path.basename(filePaths[0]), data };
     } catch (e) {
         console.error('Failed to load file:', e);
-        throw e;
+        return { status: 'failed' };
     }
 });
 
@@ -192,7 +209,7 @@ function printFooterTemplate(html: string): string {
 
 // 인쇄 미리보기 핸들러
 ipcMain.handle('print-preview', async (_event, htmlContent: string) => {
-    const printDir = path.join(app.getPath('temp'), PRINT_FOLDER);
+    const printDir = path.join(printRoot(), PRINT_FOLDER);
     const stamp = Date.now();
     const htmlPath = path.join(printDir, `report-${stamp}.html`);
     const pdfPath = path.join(printDir, `report-${stamp}.pdf`);
@@ -330,7 +347,7 @@ function createWindow() {
 app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
 
-    void cleanOldPrintFiles(app.getPath('temp'));
+    void cleanOldPrintFiles(printRoot());
     void cleanLeftoverTemp(getProjectsDir());
 
     setupUpdates((status) => mainWindow?.webContents.send('update-status', status));

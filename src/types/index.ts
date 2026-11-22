@@ -1,4 +1,4 @@
-import type { UpdateStatus } from '@/lib/updates';
+import type { UpdateStatus, UpdateSupport } from '@/lib/updates';
 
 // 학생 생활지도 유형
 export type BehaviorType = 'NONE' | 'LEADER' | 'BEHAVIOR' | 'EMOTIONAL';
@@ -125,8 +125,13 @@ export interface ElectronAPI {
         chrome: string;
         electron: string;
     };
-    saveProject: (data: string) => Promise<boolean>;
-    loadProject: () => Promise<string | null>;
+    /** 작업을 고른 곳의 파일로 내보냅니다. suggestedName은 저장 창에 미리 넣는 이름입니다. */
+    saveProject: (
+        data: string,
+        suggestedName?: string,
+    ) => Promise<{ status: 'saved'; name: string } | { status: 'canceled' | 'locked' | 'failed' }>;
+    /** 작업 파일 하나를 골라 엽니다. 내용 검사는 화면 쪽이 합니다. */
+    loadProject: () => Promise<{ status: 'opened'; name: string; data: string } | { status: 'canceled' | 'failed' }>;
     saveNamedProject: (name: string, data: string) => Promise<boolean | 'locked'>;
     loadNamedProject: (name: string) => Promise<string | null>;
     getProjectList: () => Promise<string[]>;
@@ -141,7 +146,7 @@ export interface ElectronAPI {
         | { status: 'exists'; folder: string; existing: string[] }
     >;
     windowAction: (action: 'minimize' | 'maximize' | 'close') => void;
-    getUpdateInfo: () => Promise<{ updates: 'on' | 'off'; status: UpdateStatus }>;
+    getUpdateInfo: () => Promise<{ updates: UpdateSupport; status: UpdateStatus }>;
     checkForUpdates: () => Promise<void>;
     downloadUpdate: () => Promise<void>;
     installUpdate: () => Promise<void>;

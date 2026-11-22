@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         chrome: process.versions.chrome,
         electron: process.versions.electron,
     },
-    saveProject: (data: string) => ipcRenderer.invoke('save-project', data),
+    saveProject: (data: string, suggestedName?: string) => ipcRenderer.invoke('save-project', data, suggestedName),
     loadProject: () => ipcRenderer.invoke('load-project'),
     saveNamedProject: (name: string, data: string) => ipcRenderer.invoke('save-named-project', name, data),
     loadNamedProject: (name: string) => ipcRenderer.invoke('load-named-project', name),

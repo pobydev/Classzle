@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { isFound, readCheckOnStart, writeCheckOnStart } from '@/lib/updates';
-import type { FoundUpdate, UpdateStatus } from '@/lib/updates';
+import type { FoundUpdate, UpdateStatus, UpdateSupport } from '@/lib/updates';
 
 export type Updates = ReturnType<typeof useUpdates>;
 
 const CHECK_DELAY_MS = 5000;
 
-/** 설치본에서만 동작합니다. 웹과 개발 모드에서는 isSupported가 false입니다. */
+/** 설치본에서만 동작합니다. 웹, 개발 모드, USB판에서는 isSupported가 false입니다. */
 export function useUpdates() {
-    const [isSupported, setIsSupported] = useState(false);
+    const [support, setSupport] = useState<UpdateSupport>('off');
+    const isSupported = support === 'on';
     const [status, setStatus] = useState<UpdateStatus>({ state: 'idle' });
     const [checkOnStart, setCheckOnStart] = useState(readCheckOnStart);
     // 나중에, 닫기를 누른 상태입니다. 다음에 켜면 다시 묻도록 저장하지 않습니다.
@@ -21,7 +22,7 @@ export function useUpdates() {
         const unsubscribe = api?.onUpdateStatus?.(setStatus);
         api?.getUpdateInfo?.().then((info) => {
             if (!isMounted) return;
-            setIsSupported(info.updates === 'on');
+            setSupport(info.updates);
             setStatus(info.status);
         });
         return () => {
@@ -42,7 +43,10 @@ export function useUpdates() {
     const found = isFound(status) ? status : null;
 
     return {
+        support,
         isSupported,
+        /** USB판입니다. 새 버전을 확인하지 않고 자료는 실행 파일 옆 클래스즐-자료 폴더에 둡니다. */
+        isPortable: support === 'portable',
         status,
         found,
         /** 사이드바에 알림을 보여 줄 때입니다. */

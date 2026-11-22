@@ -1,7 +1,8 @@
 // 왼쪽 사이드바: 로고, 1~3단계, 저장된 작업, 맨 아래 칸 (brand/DESIGN.md)
 // 12칸 보드를 볼 때는 56px 아이콘 줄로 접습니다. 눌러서 다시 펼칠 수 있습니다.
+// 파일 열기와 파일로 내보내기의 아이콘은 어울림의 백업 불러오기, 백업 저장과 같습니다.
 
-import { ArrowRight, ArrowsClockwise, CaretLeft, CaretRight, FloppyDisk, FolderOpen, Question, Trash } from '@phosphor-icons/react';
+import { ArrowRight, ArrowsClockwise, CaretLeft, CaretRight, DownloadSimple, FloppyDisk, FolderOpen, Question, Trash, UploadSimple } from '@phosphor-icons/react';
 import { Button } from '@/components/ui/button';
 import { TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UpdateNotice } from './Updates';
@@ -78,6 +79,12 @@ export function AppSidebar({
                     </button>
                     <button type="button" onClick={onSave} aria-label="작업 저장" title="작업 저장" className={RAIL_BUTTON}>
                         <FloppyDisk size={18} />
+                    </button>
+                    <button type="button" onClick={() => void projects.openFile()} aria-label="파일 열기" title="파일 열기" className={RAIL_BUTTON}>
+                        <UploadSimple size={18} />
+                    </button>
+                    <button type="button" onClick={() => void projects.exportFile()} aria-label="파일로 내보내기" title="파일로 내보내기" className={RAIL_BUTTON}>
+                        <DownloadSimple size={18} />
                     </button>
                 </div>
                 <div className="mt-auto flex flex-col gap-1 border-t border-line pt-2">
@@ -176,12 +183,17 @@ export function AppSidebar({
                     <FloppyDisk size={16} />
                     작업 저장
                 </Button>
-                {!window.electronAPI && (
-                    <Button variant="ghost" size="sm" onClick={projects.openFile} className="w-full">
-                        <FolderOpen size={16} />
+                {/* 다른 컴퓨터나 USB로 옮길 때 씁니다. 목록 밖의 작업 파일을 열고, 지금 작업을 파일로 만듭니다. */}
+                <div className="flex flex-col">
+                    <Button variant="ghost" size="sm" onClick={() => void projects.openFile()} className="w-full">
+                        <UploadSimple size={16} />
                         파일 열기
                     </Button>
-                )}
+                    <Button variant="ghost" size="sm" onClick={() => void projects.exportFile()} className="w-full">
+                        <DownloadSimple size={16} />
+                        파일로 내보내기
+                    </Button>
+                </div>
             </div>
 
             <div className="flex-shrink-0 flex flex-col gap-0.5 border-t border-line pt-2">

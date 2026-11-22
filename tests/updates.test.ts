@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     checkMessage,
     isFound,
+    PORTABLE_UPDATE_NOTE,
     privacyNote,
     readCheckOnStart,
     updateMessage,
@@ -36,8 +37,16 @@ describe('문구', () => {
     });
 
     it('새 버전 확인이 되는 판에만 인터넷 문장을 쓴다', () => {
-        expect(privacyNote(true)).toBe('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다. 인터넷은 새 버전 확인에만 씁니다.');
-        expect(privacyNote(false)).toBe('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.');
+        expect(privacyNote('on')).toBe('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다. 인터넷은 새 버전 확인에만 씁니다.');
+        expect(privacyNote('off')).toBe('학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.');
+    });
+
+    it('USB판은 새 버전 확인을 말하지 않고 자료가 USB에 있다고 알린다', () => {
+        const note = privacyNote('portable');
+        expect(note).not.toContain('새 버전');
+        expect(note).not.toContain('이 컴퓨터 밖으로');
+        expect(note).toContain('클래스즐-자료');
+        expect(PORTABLE_UPDATE_NOTE).toContain('확인하지 않습니다');
     });
 
     it('버전을 찾은 상태만 알림 대상이다', () => {

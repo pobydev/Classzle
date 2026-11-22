@@ -8,13 +8,25 @@ export type FoundUpdate = {
 
 export type UpdateStatus = { state: 'idle' | 'checking' | 'latest' | 'error' } | FoundUpdate;
 
+/** on: 설치판, portable: USB판(확인하지 않음), off: 웹과 개발 모드. main/portable.ts와 같습니다. */
+export type UpdateSupport = 'on' | 'off' | 'portable';
+
 const SETTING_KEY = 'classzle-update-check';
 
-/** 새 버전 확인이 없는 웹과 개발 모드에는 인터넷 문장을 쓰지 않습니다. */
-export const privacyNote = (canCheckUpdates: boolean) =>
-    canCheckUpdates
-        ? '학생 정보는 이 컴퓨터 밖으로 나가지 않습니다. 인터넷은 새 버전 확인에만 씁니다.'
-        : '학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.';
+/**
+ * 사용 가이드의 학생 정보 문장입니다. 새 버전 확인이 없는 판에는 인터넷 문장을 쓰지 않습니다.
+ * USB판은 어울림 USB판처럼 자료가 USB에 남는다는 것을 알립니다.
+ */
+export const privacyNote = (support: UpdateSupport) =>
+    ({
+        on: '학생 정보는 이 컴퓨터 밖으로 나가지 않습니다. 인터넷은 새 버전 확인에만 씁니다.',
+        off: '학생 정보는 이 컴퓨터 밖으로 나가지 않습니다.',
+        portable: '학생 정보는 인터넷으로 보내지 않습니다. 작업은 USB의 클래스즐-자료 폴더에 저장됩니다.',
+    })[support];
+
+/** USB판 사용 가이드의 '새 버전' 구역 문장입니다. */
+export const PORTABLE_UPDATE_NOTE =
+    'USB판은 새 버전을 확인하지 않습니다. 새 버전은 직접 받아 실행 파일만 바꿔 주세요. 클래스즐-자료 폴더는 그대로 둡니다.';
 
 export const isFound = (status: UpdateStatus): status is FoundUpdate => 'version' in status;
 

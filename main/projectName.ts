@@ -14,6 +14,20 @@ export function projectNameProblem(name: string): string | null {
     return null;
 }
 
+export const DEFAULT_EXPORT_NAME = '클래스즐 작업';
+
+/**
+ * 파일로 내보낼 때 저장 창에 미리 넣는 파일 이름입니다. 연 작업의 이름을 쓰고, 없으면 '클래스즐 작업'입니다.
+ * 파일 이름에 쓸 수 없는 글자는 뺍니다. 이름 끝의 .json은 한 번만 붙입니다.
+ */
+export function exportFileName(name: string | null): string {
+    const base = projectNameFromFile((name ?? '').replace(new RegExp(FORBIDDEN.source, 'g'), '').trim())
+        .replace(/[. ]+$/, '')
+        .slice(0, MAX_LENGTH);
+    const usable = base !== '' && !RESERVED.test(base) && !/^\.+$/.test(base);
+    return `${usable ? base : DEFAULT_EXPORT_NAME}.json`;
+}
+
 /** 파일 이름에서 작업 이름을 얻습니다. 이름 안의 .json은 두고 끝의 확장자만 뗍니다. */
 export function projectNameFromFile(file: string): string {
     return file.endsWith('.json') ? file.slice(0, -'.json'.length) : file;

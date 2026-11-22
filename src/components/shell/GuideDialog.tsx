@@ -130,6 +130,10 @@ export function GuideDialog({
                         <strong className={STRONG}>배정 결과 보고서</strong>에서 조건을 지켰는지와 바꾼 기록을 보고 인쇄하며,{' '}
                         <strong className={STRONG}>배정 결과 엑셀</strong>로 명단을 받습니다. 번호 부여 방식은 내보내기 창에서 고릅니다.
                     </p>
+                    <p data-guide-work-file>
+                        다른 컴퓨터에서 이어 하려면 왼쪽 <strong className={STRONG}>파일로 내보내기</strong>로 작업 파일을 만들고, 그 컴퓨터에서{' '}
+                        <strong className={STRONG}>파일 열기</strong>로 엽니다. 이 파일도 암호화되지 않으니 다 쓰면 지워 주세요.
+                    </p>
                     <p>
                         엑셀은 기본 정보와 상세 정보 중에서 고릅니다. 둘 다 성적과 반 평균이 들어 있고, 상세 정보에는 생활지도,
                         그룹, 관계 조건, 고정 배정이 더 있습니다. 담임 회의와 담당자가 쓰는 파일이므로 학생에게 나눠 주지 말아 주세요.
@@ -148,7 +152,7 @@ export function GuideDialog({
 
                 <section className={SECTION}>
                     <h3 className={HEADING}>학생 정보</h3>
-                    <p>{privacyNote(updates.isSupported)}</p>
+                    <p>{privacyNote(updates.support)}</p>
                 </section>
 
                 <UpdateSection updates={updates} bodyClass={SECTION} headingClass={HEADING} />
@@ -160,7 +164,7 @@ export function GuideDialog({
                 </div>
 
                 <div className="flex flex-col items-center gap-1.5 text-small text-soft">
-                    <span>버전 {appVersion}</span>
+                    <span>버전 {appVersion}{updates.isPortable && ' (USB판)'}</span>
                     {/* 누르면 기본 브라우저로 gnilab.kr을 엽니다(main/background.ts의 openLinkOutside). */}
                     <a
                         href="https://gnilab.kr"
