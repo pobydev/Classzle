@@ -11,6 +11,7 @@ describe('가상 학생 예시 명단', () => {
         [6, 150],
         [8, 220],
         [10, 300],
+        [12, 350],
     ])('%i반 %i명 파일을 양식 A로 읽습니다', async (classes, count) => {
         const buffer = await buildWorkbook(makeRoster({ classes, students: count })).xlsx.writeBuffer();
         const sheet = XLSX.read(buffer, { type: 'array' }).Sheets['학생명단'];
