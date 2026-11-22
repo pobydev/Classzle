@@ -7,6 +7,7 @@ import {
     CaretDown,
     DownloadSimple,
     FileXls,
+    FolderOpen,
     MagnifyingGlass,
     Plus,
     Question,
@@ -230,6 +231,11 @@ export default function Step1Setup() {
     };
 
     const handleFileUpload = useCallback(async (file: File) => {
+        // 작업 파일(.json)을 여기에 놓으면 어디서 여는지 알려 줍니다.
+        if (file.name.toLowerCase().endsWith('.json')) {
+            setErrorMessage('작업 파일입니다. 왼쪽 작업 파일 열기로 열어 주세요.');
+            return;
+        }
         if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
             setErrorMessage('엑셀 파일(.xlsx, .xls)만 넣을 수 있습니다.');
             return;
@@ -359,6 +365,13 @@ export default function Step1Setup() {
                             작성 방법
                             <Question size={15} weight="bold" aria-hidden="true" />
                         </button>
+                    </p>
+                    {/* 엑셀 명단과 작업 파일을 헷갈리지 않게, 하던 작업은 어디서 여는지 한 줄로 알립니다. */}
+                    <p data-work-file-hint className="mt-1.5 flex items-center gap-1.5 text-small text-soft">
+                        <FolderOpen size={15} aria-hidden="true" />
+                        <span>
+                            조건과 배정까지 하던 작업은 왼쪽 <strong className="font-semibold text-ink">작업 파일 열기</strong>로 이어서 합니다.
+                        </span>
                     </p>
                 </section>
                 {dialogs}

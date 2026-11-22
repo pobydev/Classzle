@@ -131,8 +131,8 @@ export function GuideDialog({
                         <strong className={STRONG}>배정 결과 엑셀</strong>로 명단을 받습니다. 번호 부여 방식은 내보내기 창에서 고릅니다.
                     </p>
                     <p data-guide-work-file>
-                        다른 컴퓨터에서 이어 하려면 왼쪽 <strong className={STRONG}>파일로 내보내기</strong>로 작업 파일을 만들고, 그 컴퓨터에서{' '}
-                        <strong className={STRONG}>파일 열기</strong>로 엽니다. 이 파일도 암호화되지 않으니 다 쓰면 지워 주세요.
+                        조건과 배정 결과까지 그대로 다른 컴퓨터에서 이어 하려면 왼쪽 <strong className={STRONG}>작업 파일로 내보내기</strong>로 파일을 만들고,
+                        그 컴퓨터에서 <strong className={STRONG}>작업 파일 열기</strong>로 엽니다. 1단계의 엑셀 명단 넣기와는 다른 파일입니다. 이 파일도 암호화되지 않으니 다 쓰면 지워 주세요.
                     </p>
                     <p>
                         엑셀은 기본 정보와 상세 정보 중에서 고릅니다. 둘 다 성적과 반 평균이 들어 있고, 상세 정보에는 생활지도,

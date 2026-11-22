@@ -55,7 +55,7 @@ async function ensureProjectsDir() {
 // 작업을 교사가 고른 곳의 파일로 내보냅니다. 다른 컴퓨터로 옮기거나 USB에 담을 때 씁니다.
 ipcMain.handle('save-project', async (_event, data: string, suggestedName?: string) => {
     const options: Electron.SaveDialogOptions = {
-        title: '작업을 파일로 내보내기',
+        title: '작업 파일로 내보내기',
         filters: [{ name: '클래스즐 작업 파일', extensions: ['json'] }],
         defaultPath: exportFileName(typeof suggestedName === 'string' ? suggestedName : null),
     };
